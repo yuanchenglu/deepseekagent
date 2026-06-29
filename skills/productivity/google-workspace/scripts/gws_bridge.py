@@ -11,12 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def get_hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+def get_deepagent_home() -> Path:
+    return Path(os.environ.get("DEEPAGENT_HOME") or os.environ.get("HERMES_HOME", Path.home() / ".deepagent"))
 
 
 def get_token_path() -> Path:
-    return get_hermes_home() / "google_token.json"
+    return get_deepagent_home() / "google_token.json"
 
 
 def refresh_token(token_data: dict) -> dict:

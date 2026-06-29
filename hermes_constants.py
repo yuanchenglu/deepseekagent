@@ -1,4 +1,4 @@
-"""Shared constants for Hermes Agent.
+"""Shared constants for DeepAgent.
 
 Import-safe module with no dependencies — can be imported from anywhere
 without risk of circular imports.
@@ -9,12 +9,15 @@ from pathlib import Path
 
 
 def get_hermes_home() -> Path:
-    """Return the Hermes home directory (default: ~/.hermes).
+    """返回 DeepAgent 主目录（默认：~/.deepagent）。
 
-    Reads HERMES_HOME env var, falls back to ~/.hermes.
-    This is the single source of truth — all other copies should import this.
+    优先读 DEEPAGENT_HOME 环境变量，fallback 到 HERMES_HOME（向后兼容），
+    最终 fallback 到 ~/.deepagent。
+    这是所有路径的唯一权威来源——所有其他文件应通过此函数获取路径。
     """
-    return Path(os.getenv("HERMES_HOME", Path.home() / ".hermes"))
+    return Path(os.getenv("DEEPAGENT_HOME",
+               os.getenv("HERMES_HOME",
+               Path.home() / ".deepagent")))
 
 
 def get_default_hermes_root() -> Path:
@@ -33,7 +36,7 @@ def get_default_hermes_root() -> Path:
 
     Import-safe — no dependencies beyond stdlib.
     """
-    native_home = Path.home() / ".hermes"
+    native_home = Path.home() / ".deepagent"
     env_home = os.environ.get("HERMES_HOME", "")
     if not env_home:
         return native_home
@@ -92,17 +95,17 @@ def get_hermes_dir(new_subpath: str, old_name: str) -> Path:
 
 
 def display_hermes_home() -> str:
-    """Return a user-friendly display string for the current HERMES_HOME.
+    """返回当前 DEEPAGENT_HOME 的用户友好显示字符串。
 
-    Uses ``~/`` shorthand for readability::
+    使用 ``~/`` 简写提高可读性::
 
-        default:  ``~/.hermes``
-        profile:  ``~/.hermes/profiles/coder``
-        custom:   ``/opt/hermes-custom``
+        default:  ``~/.deepagent``
+        profile:  ``~/.deepagent/profiles/coder``
+        custom:   ``/opt/deepagent-custom``
 
-    Use this in **user-facing** print/log messages instead of hardcoding
-    ``~/.hermes``.  For code that needs a real ``Path``, use
-    :func:`get_hermes_home` instead.
+    在面向用户的 print/log 消息中使用此函数，而不是硬编码
+    ``~/.deepagent``。对于需要实际 ``Path`` 的代码，请使用
+    :func:`get_hermes_home` 代替。
     """
     home = get_hermes_home()
     try:
@@ -128,7 +131,7 @@ def get_subprocess_home() -> str | None:
     Activation is directory-based: if the ``home/`` subdirectory doesn't
     exist, returns ``None`` and behavior is unchanged.
     """
-    hermes_home = os.getenv("HERMES_HOME")
+    hermes_home = os.getenv("DEEPAGENT_HOME") or os.getenv("HERMES_HOME")
     if not hermes_home:
         return None
     profile_home = os.path.join(hermes_home, "home")
