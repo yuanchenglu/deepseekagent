@@ -732,6 +732,16 @@ class AIAgent:
                 daemon=True,
             ).start()
 
+        # === DeepAgent: StarRoad Cognition ===
+        # 认知模块状态（初始化时不实例化，懒加载）
+        self._cognitive_enabled: bool = False
+        self._cognitive_router = None
+        self._cognitive_gate = None
+        self._memory_index = None
+        self._plan_tracker = None
+        self._expert_matcher = None
+        # === End ===
+
         self.tool_progress_callback = tool_progress_callback
         self.tool_start_callback = tool_start_callback
         self.tool_complete_callback = tool_complete_callback
@@ -3275,6 +3285,25 @@ class AIAgent:
                 cwd=_context_cwd, skip_soul=_soul_loaded)
             if context_files_prompt:
                 prompt_parts.append(context_files_prompt)
+
+        # === DeepAgent: StarRoad Cognition ===
+        # 注入记忆索引导航段（在 context files 之后、时间戳之前）
+        if self._cognitive_enabled and self._memory_index:
+            try:
+                index_summary = self._memory_index.index_summary()
+                if index_summary:
+                    prompt_parts.append(index_summary)
+            except Exception as e:
+                logger.debug("Failed to inject memory index: %s", e)
+        # 注入认知循环引导
+        if self._cognitive_enabled and self._cognitive_router:
+            try:
+                guidance = self._cognitive_router.format_prompt_section()
+                if guidance:
+                    prompt_parts.append(guidance)
+            except Exception as e:
+                logger.debug("Failed to inject cognitive guidance: %s", e)
+        # === End ===
 
         from hermes_time import now as _hermes_now
         now = _hermes_now()
@@ -7941,6 +7970,29 @@ class AIAgent:
         messages.append(user_msg)
         current_turn_user_idx = len(messages) - 1
         self._persist_user_message_idx = current_turn_user_idx
+
+        # === DeepAgent: StarRoad Cognition ===
+        # Pre-turn hook: 路由决策（在 system prompt 构建之前）
+        cognitive_route = None
+        if self._cognitive_enabled and self._cognitive_router:
+            try:
+                cognitive_route = self._cognitive_router.route(
+                    original_user_message,
+                    context={"conversation_history": len(messages)},
+                )
+                if cognitive_route and cognitive_route.path != "direct":
+                    logger.info(
+                        "Cognitive route: path=%s mode=%s route_name=%s experts=%s",
+                        cognitive_route.path,
+                        cognitive_route.mode,
+                        cognitive_route.route_name,
+                        [e.slug for e in cognitive_route.experts],
+                    )
+                    if self._plan_tracker and not self._plan_tracker.get_current_plan_id():
+                        self._plan_tracker.create_or_update(original_user_message)
+            except Exception as e:
+                logger.debug("Cognitive routing failed (non-fatal): %s", e)
+        # === End ===
         
         if not self.quiet_mode:
             self._safe_print(f"💬 Starting conversation: '{user_message[:60]}{'...' if len(user_message) > 60 else ''}'")
@@ -10753,6 +10805,35 @@ class AIAgent:
                 self._memory_manager.queue_prefetch_all(original_user_message)
             except Exception:
                 pass
+
+        # === DeepAgent: StarRoad Cognition ===
+        # Post-turn hook: 三层自评（在 final_response 生成后）
+        if self._cognitive_enabled and self._cognitive_gate and final_response:
+            try:
+                _turn_data = {
+                    "user_message": original_user_message,
+                    "assistant_response": final_response,
+                    "tool_calls": [],
+                    "tool_results": [],
+                    "plan_id": self._plan_tracker.get_current_plan_id() if self._plan_tracker else "",
+                }
+                # 从 messages 中提取工具调用信息
+                for _msg in messages:
+                    if _msg.get("role") == "assistant" and _msg.get("tool_calls"):
+                        _turn_data["tool_calls"].extend(_msg["tool_calls"])
+                    if _msg.get("role") == "tool":
+                        _turn_data["tool_results"].append(_msg)
+
+                _eval_result = self._cognitive_gate.evaluate(_turn_data)
+                if _eval_result.gaps_found and self._plan_tracker:
+                    for _gap in _eval_result.gaps_found:
+                        self._plan_tracker.add_gap(_gap)
+                        logger.info("CognitiveGate gap recorded: %s", _gap)
+                if _eval_result.should_interrupt_user:
+                    logger.info("CognitiveGate suggests asking user: %s", _eval_result.adjustments_note)
+            except Exception as e:
+                logger.debug("Cognitive evaluation failed (non-fatal): %s", e)
+        # === End ===
 
         # Background memory/skill review — runs AFTER the response is delivered
         # so it never competes with the user's task for model attention.
