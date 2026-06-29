@@ -976,6 +976,24 @@ The user has requested that this compaction PRIORITISE preserving all informatio
 
         turns_to_summarize = messages[compress_start:compress_end]
 
+        # === DeepAgent: StarRoad Cognition 围栏保护 ===
+        # 检测 Cognitive Index 围栏段，跳过不压缩
+        _fence_start = "-----COGNITIVE_INDEX_START-----"
+        _filtered_turns = []
+        for _turn in turns_to_summarize:
+            _content = _turn.get("content", "")
+            if isinstance(_content, str) and _fence_start in _content:
+                # 跳过整个围栏段
+                continue
+            _filtered_turns.append(_turn)
+        if len(_filtered_turns) < len(turns_to_summarize):
+            logger.info(
+                "Cognitive index fence detected: skipped %d protected messages",
+                len(turns_to_summarize) - len(_filtered_turns),
+            )
+        turns_to_summarize = _filtered_turns
+        # === End ===
+
         if not self.quiet_mode:
             logger.info(
                 "Context compression triggered (%d tokens >= %d threshold)",

@@ -1041,3 +1041,25 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
     if not sections:
         return ""
     return "# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n" + "\n".join(sections)
+
+
+# === DeepAgent: StarRoad Cognition 认知引导段 ===
+COGNITIVE_LOOP_GUIDANCE = (
+    "\n## Cognitive Loop (StarRoad Cognition)\n\n"
+    "### 先内后外流程\n"
+    "面对复杂任务时，优先从内部知识开始：\n"
+    "1. 搜索记忆索引中的已有知识\n"
+    "2. 搜索历史对话中的相关讨论\n"
+    "3. 加载相关 skill\n\n"
+    "### 三层自评\n"
+    "每次行动完成后做检查：\n"
+    "- Layer 1 荣辱观：有没有隐瞒不确定性？有没有未经验证的论断？\n"
+    "- Layer 2 思维方式：有没有 step by step？有没有假设先行？\n"
+    "- Layer 3 三省吾身：有哪些可以改进？\n"
+)
+
+
+def build_cognitive_loop_guidance() -> str:
+    """返回认知循环引导段，供注入 system prompt。"""
+    return COGNITIVE_LOOP_GUIDANCE
+# === End ===
