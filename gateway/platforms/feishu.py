@@ -1136,6 +1136,11 @@ class FeishuAdapter(BasePlatformAdapter):
                 32,
                 int(os.getenv("HERMES_FEISHU_DEDUP_CACHE_SIZE", str(_DEFAULT_DEDUP_CACHE_SIZE))),
             ),
+            require_mention=os.getenv("FEISHU_REQUIRE_MENTION", "true").strip().lower() not in (
+                "false",
+                "0",
+                "no",
+            ),
             text_batch_delay_seconds=float(
                 os.getenv("HERMES_FEISHU_TEXT_BATCH_DELAY_SECONDS", str(_DEFAULT_TEXT_BATCH_DELAY_SECONDS))
             ),
@@ -1187,6 +1192,7 @@ class FeishuAdapter(BasePlatformAdapter):
         self._bot_open_id = settings.bot_open_id
         self._bot_user_id = settings.bot_user_id
         self._bot_name = settings.bot_name
+        self._require_mention = settings.require_mention
         self._dedup_cache_size = settings.dedup_cache_size
         self._text_batch_delay_seconds = settings.text_batch_delay_seconds
         self._text_batch_split_delay_seconds = settings.text_batch_split_delay_seconds
