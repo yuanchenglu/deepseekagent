@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [hermes, setup, configuration, multi-agent, spawning, cli, gateway, development]
-    homepage: https://github.com/NousResearch/hermes-agent
+    homepage: https://github.com/yuanchenglu/DeepAgent
     related_skills: [claude-code, codex, opencode]
 ---
 
