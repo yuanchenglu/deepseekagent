@@ -915,7 +915,7 @@ class AIAgent:
                 if "openrouter" in effective_base.lower():
                     client_kwargs["default_headers"] = {
                         "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-                        "X-OpenRouter-Title": "Hermes Agent",
+                        "X-OpenRouter-Title": "DeepSeek Agent",
                         "X-OpenRouter-Categories": "productivity,cli-agent",
                     }
                 elif "api.githubcopilot.com" in effective_base.lower():
@@ -958,7 +958,7 @@ class AIAgent:
                         "base_url": OPENROUTER_BASE_URL,
                         "default_headers": {
                             "HTTP-Referer": "https://hermes-agent.nousresearch.com",
-                            "X-OpenRouter-Title": "Hermes Agent",
+                            "X-OpenRouter-Title": "DeepSeek Agent",
                             "X-OpenRouter-Categories": "productivity,cli-agent",
                         },
                     }

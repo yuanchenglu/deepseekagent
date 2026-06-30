@@ -44,7 +44,7 @@
 
         meta = with pkgs.lib; {
           description = "AI agent with advanced tool-calling capabilities";
-          homepage = "https://github.com/NousResearch/hermes-agent";
+          homepage = "https://github.com/yuanchenglu/DeepAgent";
           mainProgram = "hermes";
           license = licenses.mit;
           platforms = platforms.unix;
