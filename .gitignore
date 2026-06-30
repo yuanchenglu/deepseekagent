@@ -62,3 +62,18 @@ mini-swe-agent/
 .direnv/
 result
 website/static/api/skills-index.json
+
+# Build artifacts
+*.egg-info/
+
+# OMO planner artifacts
+.omo/
+
+# Auto-generated
+.update_check
+
+# Personal fork artifacts
+yuanchenglu/
+
+# macOS
+.DS_Store
