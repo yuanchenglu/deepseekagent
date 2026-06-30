@@ -158,7 +158,7 @@
 
 <header class="hero">
   <h1>honcho<span>-integration-spec</span></h1>
-  <p class="subtitle">Comparison of Hermes Agent vs. openclaw-honcho — and a porting spec for bringing Hermes patterns into other Honcho integrations.</p>
+  <p class="subtitle">Comparison of DeepSeek Agent vs. openclaw-honcho — and a porting spec for bringing Hermes patterns into other Honcho integrations.</p>
   <div class="meta">
     <span>hermes-agent / openclaw-honcho</span>
     <span>Python + TypeScript</span>
@@ -188,7 +188,7 @@
 <section id="overview">
   <h2>Overview</h2>
 
-  <p>Two independent Honcho integrations have been built for two different agent runtimes: <strong>Hermes Agent</strong> (Python, baked into the runner) and <strong>openclaw-honcho</strong> (TypeScript plugin via hook/tool API). Both use the same Honcho peer paradigm — dual peer model, <code>session.context()</code>, <code>peer.chat()</code> — but they made different tradeoffs at every layer.</p>
+  <p>Two independent Honcho integrations have been built for two different agent runtimes: <strong>DeepSeek Agent</strong> (Python, baked into the runner) and <strong>openclaw-honcho</strong> (TypeScript plugin via hook/tool API). Both use the same Honcho peer paradigm — dual peer model, <code>session.context()</code>, <code>peer.chat()</code> — but they made different tradeoffs at every layer.</p>
 
   <p>This document maps those tradeoffs and defines a porting spec: a set of Hermes-originated patterns, each stated as an integration-agnostic interface, that any Honcho integration can adopt regardless of runtime or language.</p>
 
@@ -262,7 +262,7 @@ flowchart TD
       <thead>
         <tr>
           <th>Dimension</th>
-          <th>Hermes Agent</th>
+          <th>DeepSeek Agent</th>
           <th>openclaw-honcho</th>
         </tr>
       </thead>
@@ -339,7 +339,7 @@ flowchart TD
         </tr>
         <tr>
           <td><strong>AI peer name in identity</strong></td>
-          <td>Replaces "Hermes Agent" in DEFAULT_AGENT_IDENTITY when configured.</td>
+          <td>Replaces "DeepSeek Agent" in DEFAULT_AGENT_IDENTITY when configured.</td>
           <td>Not implemented.</td>
         </tr>
         <tr>

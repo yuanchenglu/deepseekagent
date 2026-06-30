@@ -224,5 +224,5 @@ HERMES_LOG_LEVEL=DEBUG hermes acp
 ## Further Reading
 
 - [ACP Specification](https://github.com/anysphere/acp)
-- [Hermes Agent Documentation](https://github.com/NousResearch/hermes-agent)
+- [Hermes Agent Documentation](https://github.com/yuanchenglu/DeepAgent)
 - Run `hermes --help` for all CLI options

@@ -29,7 +29,7 @@ Configuration in config.yaml::
           client_secret: "secret"               # confidential clients only
           scope: "read write"                   # default: server-provided
           redirect_port: 0                      # 0 = auto-pick free port
-          client_name: "My Custom Client"       # default: "Hermes Agent"
+          client_name: "My Custom Client"       # default: "DeepSeek Agent"
 """
 
 import asyncio
@@ -424,7 +424,7 @@ def build_oauth_auth(
     _oauth_port = redirect_port
 
     # --- Client metadata ---
-    client_name = cfg.get("client_name", "Hermes Agent")
+    client_name = cfg.get("client_name", "DeepSeek Agent")
     scope = cfg.get("scope")
     redirect_uri = f"http://127.0.0.1:{redirect_port}/callback"
 

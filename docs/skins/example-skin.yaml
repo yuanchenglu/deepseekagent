@@ -80,7 +80,7 @@ spinner:
 # ── Branding ────────────────────────────────────────────────────────────────
 # Text strings used throughout the CLI interface.
 branding:
-  agent_name: "Hermes Agent"          # Banner title, about display
+  agent_name: "DeepSeek Agent"          # Banner title, about display
   welcome: "Welcome! Type your message or /help for commands."
   goodbye: "Goodbye! ⚕"              # Exit message
   response_label: " ⚕ Hermes "       # Response box header label
