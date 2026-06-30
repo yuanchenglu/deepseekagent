@@ -3,15 +3,15 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'Hermes Agent',
-  tagline: 'The self-improving AI agent',
+  title: 'DeepSeek Agent',
+  tagline: 'AI 智能助手，即装即用',
   favicon: 'img/favicon.ico',
 
-  url: 'https://hermes-agent.nousresearch.com',
-  baseUrl: '/docs/',
+  url: 'https://deepseekagent.starseas.org',
+  baseUrl: '/',
 
-  organizationName: 'NousResearch',
-  projectName: 'hermes-agent',
+  organizationName: '7ColorAI',
+  projectName: 'deepagent',
 
   onBrokenLinks: 'warn',
 
@@ -47,9 +47,9 @@ const config: Config = {
       'classic',
       {
         docs: {
-          routeBasePath: '/',  // Docs at the root of /docs/
+          routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/NousResearch/hermes-agent/edit/main/website/',
+          editUrl: 'https://github.com/yuanchenglu/DeepAgent/edit/main/website/',
         },
         blog: false,
         theme: {
@@ -72,9 +72,9 @@ const config: Config = {
       },
     },
     navbar: {
-      title: 'Hermes Agent',
+      title: 'DeepSeek Agent',
       logo: {
-        alt: 'Hermes Agent',
+        alt: 'DeepSeek Agent',
         src: 'img/logo.png',
       },
       items: [
@@ -82,26 +82,16 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'docs',
           position: 'left',
-          label: 'Docs',
+          label: '文档',
         },
         {
           to: '/skills',
-          label: 'Skills',
+          label: '技能',
           position: 'left',
         },
         {
-          href: 'https://hermes-agent.nousresearch.com',
-          label: 'Home',
-          position: 'right',
-        },
-        {
-          href: 'https://github.com/NousResearch/hermes-agent',
+          href: 'https://github.com/yuanchenglu/DeepAgent',
           label: 'GitHub',
-          position: 'right',
-        },
-        {
-          href: 'https://discord.gg/NousResearch',
-          label: 'Discord',
           position: 'right',
         },
       ],
@@ -110,31 +100,28 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: '文档',
           items: [
-            { label: 'Getting Started', to: '/getting-started/quickstart' },
-            { label: 'User Guide', to: '/user-guide/cli' },
-            { label: 'Developer Guide', to: '/developer-guide/architecture' },
-            { label: 'Reference', to: '/reference/cli-commands' },
+            { label: '快速开始', to: '/getting-started/quickstart' },
+            { label: '用户指南', to: '/user-guide/cli' },
+            { label: '开发指南', to: '/developer-guide/architecture' },
+            { label: '参考', to: '/reference/cli-commands' },
           ],
         },
         {
-          title: 'Community',
+          title: '社区',
           items: [
-            { label: 'Discord', href: 'https://discord.gg/NousResearch' },
-            { label: 'GitHub Discussions', href: 'https://github.com/NousResearch/hermes-agent/discussions' },
-            { label: 'Skills Hub', href: 'https://agentskills.io' },
+            { label: 'GitHub', href: 'https://github.com/yuanchenglu/DeepAgent' },
           ],
         },
         {
-          title: 'More',
+          title: '更多',
           items: [
-            { label: 'GitHub', href: 'https://github.com/NousResearch/hermes-agent' },
-            { label: 'Nous Research', href: 'https://nousresearch.com' },
+            { label: '7ColorAI', href: '#' },
           ],
         },
       ],
-      copyright: `Built by <a href="https://nousresearch.com">Nous Research</a> · MIT License · ${new Date().getFullYear()}`,
+      copyright: `由 <a href="#">7ColorAI</a> 构建 · MIT License · ${new Date().getFullYear()}`,
     },
     prism: {
       theme: prismThemes.github,
