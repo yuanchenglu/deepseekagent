@@ -45,12 +45,12 @@ export const en: Translations = {
   },
 
   app: {
-    brand: "Hermes Agent",
-    brandShort: "HA",
+    brand: "DeepSeek Agent",
+    brandShort: "DA",
     webUi: "Web UI",
     footer: {
-      name: "Hermes Agent",
-      org: "Nous Research",
+      name: "DeepSeek Agent",
+      org: "7ColorAI",
     },
     nav: {
       status: "Status",
