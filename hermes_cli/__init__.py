@@ -1,5 +1,5 @@
 """
-Hermes CLI - Unified command-line interface for Hermes Agent.
+DeepAgent CLI - Unified command-line interface for DeepSeek Agent.
 
 Provides subcommands for:
 - hermes chat          - Interactive chat (same as ./hermes)

@@ -1,5 +1,5 @@
 """
-Configuration management for Hermes Agent.
+Configuration management for DeepSeek Agent.
 
 Config files are stored in ~/.hermes/ for easy access:
 - ~/.hermes/config.yaml  - All settings (model, toolsets, terminal, etc.)

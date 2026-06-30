@@ -1,4 +1,4 @@
-"""``hermes debug`` — debug tools for Hermes Agent.
+"""``deepagent debug`` — debug tools for DeepSeek Agent.
 
 Currently supports:
     hermes debug share    Upload debug report (system info + logs) to a
