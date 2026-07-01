@@ -88,3 +88,4 @@ embedded/workspace/
 
 # Brand replace temporary task file
 .brand-replace-task.md
+dist/releases/

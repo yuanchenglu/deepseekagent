@@ -3,23 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DeepAgent — An Agent That Grows With You</title>
+    <title>DeepAgent — 为 DeepSeek 定制的 AI Agent</title>
     <meta
       name="description"
-      content="An open-source agent that grows with you — learns your projects, builds its own skills, and reaches you wherever you are. By Nous Research."
+      content="为 DeepSeek 深度定制的 AI Agent — 一条命令安装，开箱即用。基于 Hermes + OpenCode 二次开发。"
     />
     <meta name="theme-color" content="#0A0E1A" />
 
-    <meta property="og:title" content="DeepAgent — AI Agent Framework" />
+    <meta property="og:title" content="DeepAgent — 为 DeepSeek 定制的 AI Agent" />
     <meta
       property="og:description"
-      content="An open-source agent that grows with you. Install it, give it your messaging accounts, and it becomes a persistent personal agent — learning your projects, building its own skills, and reaching you wherever you are."
+      content="为 DeepSeek 深度定制的 AI Agent — 一条命令安装，开箱即用。内置虚拟研发团队，WebUI + Desktop 双界面，多平台消息网关。"
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://hermes-agent.nousresearch.com" />
+    <meta property="og:url" content="https://deepseekagent.starseas.org" />
     <meta
       property="og:image"
-      content="https://hermes-agent.nousresearch.com/hermes-agent-banner.png"
+      content="https://deepseekagent.starseas.org/deepseekagent-banner.png"
     />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -48,9 +48,9 @@
     <nav class="nav">
       <div class="nav-inner">
         <a href="#" class="nav-logo">
-          <img src="nous-logo.png" alt="Nous Research" class="nav-nous-logo" />
+          <img src="nous-logo.png" alt="7ColorAI" class="nav-nous-logo" />
           <span class="nav-brand"
-            >DeepAgent <span class="nav-by">by Nous Research</span></span
+            >DeepAgent <span class="nav-by">by 7ColorAI</span></span
           >
         </a>
         <div class="nav-links">
@@ -62,12 +62,6 @@
             target="_blank"
             rel="noopener"
             >GitHub</a
-          >
-          <a
-            href="https://discord.gg/NousResearch"
-            target="_blank"
-            rel="noopener"
-            >Discord</a
           >
         </div>
         <button
@@ -89,12 +83,6 @@
             target="_blank"
             rel="noopener"
             >GitHub</a
-          >
-          <a
-            href="https://discord.gg/NousResearch"
-            target="_blank"
-            rel="noopener"
-            >Discord</a
           >
         </div>
       </div>
@@ -118,15 +106,13 @@
 </pre>
 
         <h1 class="hero-title">
-          An agent that<br />
-          <span class="hero-gradient">grows with you.</span>
+          DeepAgent — 为 DeepSeek<br />
+          <span class="hero-gradient">定制的 AI Agent</span>
         </h1>
 
         <p class="hero-subtitle">
-          It's not a coding copilot tethered to an IDE or a chatbot wrapper
-          around a single API. It's an <strong>autonomous agent</strong> that
-          lives on your server, remembers what it learns, and gets more capable
-          the longer it runs.
+          一条命令安装，开箱即用。不是 IDE 里的编程助手，也不是包装单一 API 的聊天工具。
+          这是一个<strong>AI Native Agent</strong>，运行在你的服务器上，记住它学到的东西，运行越久越强大。
         </p>
 
         <div class="hero-install">
@@ -151,7 +137,7 @@
               <span class="install-prompt" id="install-prompt">$</span>
               <code id="install-command"
                 >curl -fsSL
-                https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh
+                https://deepseekagent.starseas.org/install.sh
                 | bash</code
               >
               <button
@@ -186,7 +172,7 @@
 
         <div class="hero-links">
           <a
-            href="https://portal.nousresearch.com"
+            href="https://github.com/yuanchenglu/DeepAgent/releases"
             class="btn btn-primary"
             target="_blank"
             rel="noopener"
@@ -201,11 +187,33 @@
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <polyline points="10 17 15 12 10 7" />
-              <line x1="15" y1="12" x2="3" y2="12" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Sign Up on Nous Portal
+            下载 macOS (Apple Silicon)
+          </a>
+          <a
+            href="https://github.com/yuanchenglu/DeepAgent/releases"
+            class="btn btn-secondary"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            下载 macOS (Intel)
           </a>
         </div>
       </div>
@@ -237,12 +245,12 @@
                     class="copy-btn"
                     id="step1-copy"
                     onclick="copyText(this)"
-                    data-text="curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash"
+                    data-text="curl -fsSL https://deepseekagent.starseas.org/install.sh | bash"
                   >
                     Copy
                   </button>
                 </div>
-                <pre><code id="step1-command">curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash</code></pre>
+                <pre><code id="step1-command">curl -fsSL https://deepseekagent.starseas.org/install.sh | bash</code></pre>
               </div>
               <p class="step-note" id="step1-note">
                 Installs uv, Python 3.11, clones the repo, sets up everything.
@@ -273,8 +281,7 @@ deepagent setup
 deepagent model</code></pre>
               </div>
               <p class="step-note">
-                Connect to Nous Portal (OAuth), OpenRouter (API key), or your
-                own endpoint.
+                连接 DeepSeek API、OpenRouter，或自定义端点。
               </p>
             </div>
           </div>
@@ -423,11 +430,10 @@ deepagent gateway install</code></pre>
                   />
                 </svg>
               </div>
-              <h3>Lives Where You Do</h3>
+              <h3>为 DeepSeek 深度定制</h3>
             </div>
             <p>
-              Telegram, Discord, Slack, WhatsApp, and CLI from a single gateway
-              — start on one, pick up on another.
+              针对 DeepSeek 模型深度优化，充分发挥 DeepSeek 在推理和代码生成方面的能力。
             </p>
           </div>
 
@@ -448,11 +454,10 @@ deepagent gateway install</code></pre>
                   <polyline points="16 7 22 7 22 13" />
                 </svg>
               </div>
-              <h3>Grows the Longer It Runs</h3>
+              <h3>AI Native Agent</h3>
             </div>
             <p>
-              Persistent memory and auto-generated skills — it learns your
-              projects and never forgets how it solved a problem.
+              不是 IDE 插件，不是聊天机器人封装。是一个自主运行的 Agent，记住它学到的东西，运行越久越强大。
             </p>
           </div>
 
@@ -473,11 +478,10 @@ deepagent gateway install</code></pre>
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
-              <h3>Scheduled Automations</h3>
+              <h3>内置虚拟研发团队</h3>
             </div>
             <p>
-              Natural language cron scheduling for reports, backups, and
-              briefings — running unattended through the gateway.
+              内置 OpenCode 研发小组，CEO 指挥隔离的研发团队执行复杂编程任务。
             </p>
           </div>
 
@@ -500,11 +504,10 @@ deepagent gateway install</code></pre>
                   <path d="M18 3v12a9 9 0 0 1-9-9" />
                 </svg>
               </div>
-              <h3>Delegates & Parallelizes</h3>
+              <h3>WebUI + Desktop 双界面</h3>
             </div>
             <p>
-              Isolated subagents with their own conversations, terminals, and
-              Python RPC scripts for zero-context-cost pipelines.
+              Web 工作台 + Electron 桌面应用，提供聊天、模型管理、设置等完整功能。
             </p>
           </div>
 
@@ -525,11 +528,10 @@ deepagent gateway install</code></pre>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Real Sandboxing</h3>
+              <h3>多平台消息网关</h3>
             </div>
             <p>
-              Five backends — local, Docker, SSH, Singularity, Modal — with
-              container hardening and namespace isolation.
+              Telegram、Discord、Slack、WhatsApp，单一网关连接所有平台。
             </p>
           </div>
 
@@ -553,11 +555,10 @@ deepagent gateway install</code></pre>
                   />
                 </svg>
               </div>
-              <h3>Full Web & Browser Control</h3>
+              <h3>基于 Hermes + OpenCode 二次开发</h3>
             </div>
             <p>
-              Web search, browser automation, vision, image generation,
-              text-to-speech, and multi-model reasoning.
+              融合 Hermes Agent 的成熟架构与 OpenCode 的强大能力，打造更强大的 AI Agent。
             </p>
           </div>
         </div>
@@ -599,10 +600,10 @@ deepagent gateway install</code></pre>
                 Telegram, Discord, Slack, WhatsApp, Signal, Email, and CLI — all
                 from a single gateway. Connect to
                 <a
-                  href="https://portal.nousresearch.com"
+                  href="https://deepseek.starseas.org"
                   target="_blank"
                   rel="noopener"
-                  >Nous Portal</a
+                  >DeepSeek API</a
                 >, OpenRouter, or any OpenAI-compatible API.
               </p>
             </div>
@@ -650,12 +651,22 @@ deepagent gateway install</code></pre>
 
     <footer class="footer">
       <div class="container">
+        <div class="footer-links">
+          <a
+            href="https://github.com/yuanchenglu/DeepAgent"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <a href="/docs/" target="_blank" rel="noopener">Docs</a>
+          <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>
+        </div>
         <p class="footer-copy">
           Built by
-          <a href="https://nousresearch.com" target="_blank" rel="noopener"
-            >Nous Research</a
+          <a href="https://7colorai.com" target="_blank" rel="noopener"
+            >7ColorAI</a
           >
-          &middot; MIT License &middot; 2026
+          &middot; MIT License &middot; &copy; 2026
         </p>
       </div>
     </footer>

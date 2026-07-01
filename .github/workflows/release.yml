@@ -1,0 +1,188 @@
+# ============================================================================
+# DeepAgent — Release Build & Publish Workflow
+# ============================================================================
+# 手动触发的 Release 流水线：构建 tarball + Desktop DMG → GitHub Releases + R2。
+#
+# Phase 6.5 of the release-installation plan (docs/specs/05-Release-Installation.md)
+#
+# 使用方式:
+#   gh workflow run release.yml -f version=0.9.0
+#   gh workflow run release.yml -f version=0.9.0 -f dry_run=true   # 仅构建不上传
+#
+# 输出物:
+#   - deepagent-{version}.tar.gz + .sha256  → GitHub Releases + R2
+#   - Deep.Agent-{version}-arm64.dmg        → GitHub Releases + R2
+#   - Deep.Agent-{version}-x64.dmg          → GitHub Releases + R2
+#
+# 所需 Secrets:
+#   CF_ACCOUNT_ID          — Cloudflare account ID (用于 R2 endpoint)
+#   CF_R2_ACCESS_KEY_ID    — R2 S3 兼容 API access key
+#   CF_R2_SECRET_ACCESS_KEY — R2 S3 兼容 API secret key
+#   GITHUB_TOKEN            — 自动注入，无需手动配置
+# ============================================================================
+
+name: Release Build & Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.9.0-alpha.1)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (build only, no upload to GitHub Releases or R2)'
+        required: false
+        default: false
+        type: boolean
+
+# ============================================================================
+# 权限声明
+# ============================================================================
+permissions:
+  contents: write    # 允许 gh release create
+
+# ============================================================================
+# Jobs
+# ============================================================================
+jobs:
+
+  # --------------------------------------------------------------------------
+  # Job 1: Build Release Tarball
+  # --------------------------------------------------------------------------
+  build-tarball:
+    name: Build Release Tarball
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write VERSION file
+        run: echo "${{ inputs.version }}" > VERSION
+
+      - name: Build tarball
+        run: |
+          chmod +x scripts/build-release.sh
+          SKIP_OPENCODE_CHECK=1 bash scripts/build-release.sh --version "${{ inputs.version }}"
+
+      - name: List build artifacts
+        run: ls -lh dist/releases/
+
+      - name: Upload tarball & checksum as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-tarball
+          path: dist/releases/*
+
+  # --------------------------------------------------------------------------
+  # Job 2: Build Desktop DMG (macOS ARM64 + x64, parallel matrix)
+  # --------------------------------------------------------------------------
+  build-dmg:
+    name: Build Desktop DMG (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x64
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '23'
+
+      - name: Install npm dependencies
+        working-directory: webui
+        run: npm ci --ignore-scripts
+
+      - name: Build WebUI (client + server)
+        working-directory: webui
+        run: npm run build
+
+      - name: Build DMG with electron-builder
+        working-directory: webui
+        run: |
+          npx electron-builder \
+            --config electron/electron-builder.config.js \
+            --mac \
+            --${{ matrix.arch }}
+
+      - name: List DMG artifacts
+        run: ls -lh webui/dist/electron-output/
+
+      - name: Upload DMG as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-${{ matrix.arch }}
+          path: webui/dist/electron-output/*
+
+  # --------------------------------------------------------------------------
+  # Job 3: Publish to GitHub Releases & Cloudflare R2
+  # --------------------------------------------------------------------------
+  publish:
+    name: Publish to GitHub Releases & R2
+    needs: [build-tarball, build-dmg]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed for changelog / release notes
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List downloaded artifacts
+        run: |
+          echo "=== release-tarball ==="
+          ls -lh release-tarball/
+          echo ""
+          echo "=== dmg-arm64 ==="
+          ls -lh dmg-arm64/ || echo "(empty)"
+          echo ""
+          echo "=== dmg-x64 ==="
+          ls -lh dmg-x64/ || echo "(empty)"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            --title "DeepAgent v${{ inputs.version }}" \
+            --notes "See [CHANGELOG](docs/releases/CHANGELOG.md) for details." \
+            release-tarball/* dmg-arm64/* dmg-x64/*
+
+      - name: Upload assets to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          ENDPOINT_URL="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+
+          echo "Uploading tarball + checksum to R2..."
+          for f in release-tarball/*; do
+            echo "  uploading: ${f##*/}"
+            aws s3 cp "$f" "s3://${BUCKET}/${f##*/}" \
+              --endpoint-url "$ENDPOINT_URL" \
+              --region auto
+          done
+
+          echo "Uploading DMGs to R2..."
+          for f in dmg-arm64/* dmg-x64/*; do
+            echo "  uploading: ${f##*/}"
+            aws s3 cp "$f" "s3://${BUCKET}/${f##*/}" \
+              --endpoint-url "$ENDPOINT_URL" \
+              --region auto
+          done
+
+          echo "R2 upload complete."
