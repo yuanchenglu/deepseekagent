@@ -18,6 +18,15 @@ const config = {
   directories: {
     output: 'dist/electron-output',
     buildResources: 'electron/build',
+    app: '.',
+  },
+  extraMetadata: {
+    main: 'electron/main.js',
+  },
+
+  directories: {
+    output: 'dist/electron-output',
+    buildResources: 'electron/build',
   },
 
   files: [
@@ -29,12 +38,15 @@ const config = {
    * extraResources includes the built web client (dist/).
    * The Electron main process resolves dist/client/index.html
    * via process.resourcesPath.
+   * 
+   * NOTE: electron-output/ MUST be excluded to prevent recursive nesting
+   * when electron-builder copies extraResources into the app bundle.
    */
   extraResources: [
     {
       from: 'dist',
       to: 'dist',
-      filter: ['**/*'],
+      filter: ['client/**/*', 'server/**/*', 'mcu/**/*'],
     },
   ],
 
