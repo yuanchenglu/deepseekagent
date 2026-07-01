@@ -2840,12 +2840,16 @@ def cmd_import(args):
 
 def cmd_version(args):
     """Show version."""
-    print(f"DeepSeek Agent v{__version__} ({__release_date__})")
-    print(f"Project: {PROJECT_ROOT}")
-    
-    # Show Python version
+    from hermes_cli import update as _update_mod
+
+    if _update_mod.is_release_install():
+        ver = _update_mod.get_current_version()
+        print(f"DeepSeek Agent v{ver} (release install)")
+        print(f"Install: {_update_mod._get_deepagent_home()}")
+    else:
+        print(f"DeepSeek Agent v{__version__} ({__release_date__})")
     print(f"Python: {sys.version.split()[0]}")
-    
+
     # Check for key dependencies
     try:
         import openai
@@ -2853,21 +2857,25 @@ def cmd_version(args):
     except ImportError:
         print("OpenAI SDK: Not installed")
 
-    # Show update status (synchronous — acceptable since user asked for version info)
-    try:
-        from hermes_cli.banner import check_for_updates
-        from hermes_cli.config import recommended_update_command
-        behind = check_for_updates()
-        if behind and behind > 0:
-            commits_word = "commit" if behind == 1 else "commits"
-            print(
-                f"Update available: {behind} {commits_word} behind — "
-                f"run '{recommended_update_command()}'"
-            )
-        elif behind == 0:
-            print("Up to date")
-    except Exception:
-        pass
+    # Show update status
+    if _update_mod.is_release_install():
+        print()
+        _update_mod.cmd_check(args)
+    else:
+        try:
+            from hermes_cli.banner import check_for_updates
+            from hermes_cli.config import recommended_update_command
+            behind = check_for_updates()
+            if behind and behind > 0:
+                commits_word = "commit" if behind == 1 else "commits"
+                print(
+                    f"Update available: {behind} {commits_word} behind — "
+                    f"run '{recommended_update_command()}'"
+                )
+            elif behind == 0:
+                print("Up to date")
+        except Exception:
+            pass
 
 
 def cmd_uninstall(args):
@@ -3618,6 +3626,19 @@ def cmd_update(args):
 
     if is_managed():
         managed_error("update DeepSeek Agent")
+        return
+
+    # Detect release install mode — delegate to tarball-based update module.
+    # The update module is self-contained with no circular imports.
+    from hermes_cli import update as _update_mod
+
+    if _update_mod.is_release_install():
+        if getattr(args, "check", False):
+            _update_mod.cmd_check(args)
+        elif getattr(args, "rollback", False):
+            _update_mod.cmd_rollback(args)
+        else:
+            _update_mod.cmd_update_release(args)
         return
 
     gateway_mode = getattr(args, "gateway", False)
@@ -5840,11 +5861,31 @@ Examples:
     update_parser = subparsers.add_parser(
         "update",
         help="Update DeepSeek Agent to the latest version",
-        description="Pull the latest changes from git and reinstall dependencies"
+        description=(
+            "Update DeepSeek Agent. In source (git) installs, pulls latest changes from git. "
+            "In release installs, downloads the latest tarball from R2/GitHub. "
+            "Supports version check, update, and rollback."
+        ),
     )
     update_parser.add_argument(
         "--gateway", action="store_true", default=False,
         help="Gateway mode: use file-based IPC for prompts instead of stdin (used internally by /update)"
+    )
+    update_parser.add_argument(
+        "--check", action="store_true", default=False,
+        help="Check for updates without downloading"
+    )
+    update_parser.add_argument(
+        "--rollback", action="store_true", default=False,
+        help="Rollback to the previous version from backup"
+    )
+    update_parser.add_argument(
+        "--to", metavar="TIMESTAMP", default=None,
+        help="Rollback to a specific backup timestamp (used with --rollback)"
+    )
+    update_parser.add_argument(
+        "--force", action="store_true", default=False,
+        help="Force update even if already up to date (release mode only)"
     )
     update_parser.set_defaults(func=cmd_update)
     
