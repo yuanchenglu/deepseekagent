@@ -1219,4 +1219,7 @@ main() {
     cleanup
 }
 
-main "$@"
+# 仅在直接执行时运行 main，被 source 时不执行（便于测试）
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
