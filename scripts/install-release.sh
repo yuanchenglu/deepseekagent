@@ -157,14 +157,17 @@ detect_os() {
                 if [ -f /etc/os-release ]; then
                     . /etc/os-release
                     DISTRO="$ID"
+                    OS_VERSION="$VERSION_ID"
                 else
                     DISTRO="unknown"
+                    OS_VERSION=""
                 fi
             fi
             ;;
         Darwin*)
             OS="macos"
             DISTRO="macos"
+            OS_VERSION=$(sw_vers -productVersion 2>/dev/null || echo "unknown")
             ;;
         CYGWIN*|MINGW*|MSYS*)
             OS="windows"
@@ -176,11 +179,71 @@ detect_os() {
         *)
             OS="unknown"
             DISTRO="unknown"
+            OS_VERSION=""
             log_warn "未知操作系统，尝试继续..."
             ;;
     esac
 
-    log_success "检测到操作系统: $OS ($DISTRO)"
+    log_success "检测到操作系统: $OS ($DISTRO${OS_VERSION:+ $OS_VERSION})"
+}
+
+# 检测 CPU 架构（用于选择正确的二进制包）
+detect_arch() {
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64|amd64)
+            ARCH_SHORT="x64"
+            ;;
+        aarch64|arm64)
+            ARCH_SHORT="arm64"
+            ;;
+        armv7l)
+            ARCH_SHORT="arm"
+            ;;
+        *)
+            ARCH_SHORT="$ARCH"
+            log_warn "未知架构: $ARCH，尝试继续..."
+            ;;
+    esac
+    log_success "检测到架构: $ARCH ($ARCH_SHORT)"
+}
+
+# 检查基础工具依赖是否齐全
+check_prerequisites() {
+    local missing=false
+    log_info "检查基础工具..."
+
+    for cmd in curl tar; do
+        if ! command -v "$cmd" &>/dev/null; then
+            log_error "缺少必需工具: $cmd"
+            missing=true
+        fi
+    done
+
+    if [ "$missing" = true ]; then
+        log_error "请安装上述缺失工具后重新运行。"
+        case "$OS" in
+            macos)
+                log_info "  brew install curl tar"
+                ;;
+            linux)
+                log_info "  sudo apt install curl tar   # Debian/Ubuntu"
+                log_info "  sudo dnf install curl tar   # Fedora"
+                ;;
+        esac
+        exit 1
+    fi
+
+    # rsync 非必需（有降级方案）
+    if ! command -v rsync &>/dev/null; then
+        log_warn "rsync 未安装，将使用 cp -r 替代（较慢）"
+        HAS_RSYNC=false
+    else
+        HAS_RSYNC=true
+        log_success "rsync 已安装"
+    fi
+
+    log_success "基础工具检查通过"
 }
 
 # 安装 uv（快速 Python 包管理器）
@@ -282,15 +345,24 @@ check_python() {
     fi
 }
 
-# 检查 Node.js（仅警告，WebUI 已预构建不需要）
+# 检查 Node.js（仅警告，Release 包中 WebUI 已预构建，运行时不需要 Node.js）
+# 根据 PRD 要求：不再自动安装，仅警告。Node.js 仅开发/构建 WebUI 时需要。
 check_node() {
+    local node_required_version="23"
     if command -v node &> /dev/null; then
         local found_ver
         found_ver=$(node --version 2>/dev/null)
-        log_success "Node.js $found_ver 已安装"
+        # 提取主版本号进行版本比较
+        local major_ver
+        major_ver=$(echo "$found_ver" | sed 's/v//' | cut -d. -f1)
+        if [ "$major_ver" -ge "$node_required_version" ] 2>/dev/null; then
+            log_success "Node.js $found_ver 已安装"
+        else
+            log_warn "Node.js $found_ver 版本过低，开发 WebUI 需要 v${node_required_version}+"
+        fi
     else
-        log_warn "Node.js 未安装（仅开发时需要，Release 版 WebUI 已预构建）"
-        log_info "如果需要开发/构建 WebUI，请手动安装 Node.js 23+"
+        log_warn "Node.js 未安装（Release 版 WebUI 已预构建，运行时不需要）"
+        log_info "如需开发/构建 WebUI，请手动安装 Node.js ${node_required_version}+"
     fi
 }
 
@@ -302,12 +374,17 @@ check_node() {
 # ============================================================================
 
 # 获取最新版本号（当 VERSION=latest 时调用）
+# 纯 bash 实现（不依赖 python3），通过 sed/awk 从 GitHub API JSON 响应中提取 tag_name
 fetch_latest_version() {
     log_info "正在获取最新版本号..."
-    # 从 GitHub API 获取最新 release 的 tag 名
     local api_url="https://api.github.com/repos/${GH_REPO}/releases/latest"
     local latest
-    latest=$(curl -fsSL "$api_url" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])" 2>/dev/null || echo "")
+
+    # curl 获取 JSON → grep 找到 "tag_name" 行 → sed 提取引号内的值
+    latest=$(curl -fsSL "$api_url" 2>/dev/null \
+        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | sed 's/"tag_name"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/')
+
     if [ -n "$latest" ]; then
         # tag 名通常为 v0.9.0 格式，去掉前缀 v
         VERSION="${latest#v}"
@@ -892,6 +969,8 @@ main() {
     echo ""
     echo -e "${BLUE}${BOLD}[Step 1/8] 系统环境检测${NC}"
     detect_os
+    detect_arch
+    check_prerequisites
     install_uv
     check_python
     check_node
@@ -899,7 +978,7 @@ main() {
     # ---- Step 2: 下载 Release 包 ----
     echo ""
     echo -e "${BLUE}${BOLD}[Step 2/8] 下载 Release 包${NC}"
-    if [ "$VERSION" = "latest" ] || [ "$VERSION" = "DEFAULT_VERSION" ]; then
+    if [ "$VERSION" = "latest" ]; then
         fetch_latest_version
     fi
     download_release
