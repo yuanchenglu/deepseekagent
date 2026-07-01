@@ -869,7 +869,7 @@ print('Config toggle: cognitive.enabled (default: false)')
 - [x] Phase 1 完成后: 所有 5 个模块测试通过 (`pytest tests/agent/ -v`），每个模块至少 4 个测试
 - [x] Phase 2 完成后: `prompt_builder.build_cognitive_loop_guidance()` 返回非空引导段；context_compressor 跳过围栏段
 - [x] Phase 3 完成后: `cognitive.enabled: false` 时 agent 正常运行不受影响；`true` 时认知模块正确初始化
-- [x] Phase 4 完成后: `~/.deepagent/memories/MAP.md` 在首次启动时自动创建（需 `cognitive.enabled: true` 触发）
+- [x] Phase 4 完成后: `~/.deepagent/memories/MAP.md` 在首次启动时自动创建（已验证通过：`MemoryIndex().build_initial_index()` 自动生成含 4 个 section 的完整 MAP.md）
 - [x] 全量回归: `python -m pytest tests/ -q -m "not integration"` — 1171 passed, 6 failed（均为既有问题：`test_auxiliary_client.py` 4 个、`test_credential_pool.py` 1 个、`test_auxiliary_named_custom_providers.py` 1 个，StarRoad 零影响）✅
 - [x] 所有新增代码使用 `# === DeepAgent: StarRoad Cognition ===` 标记
 - [x] 所有新增代码含中文注释
@@ -910,13 +910,20 @@ print('Config toggle: cognitive.enabled (default: false)')
 | 围栏保护测试修复 | ✅ 已修 | `test_context_compressor_fence.py` 参数名 `context_length` → `config_context_length` |
 | 向后兼容冒烟 | ✅ 通过 | 代码审计确认 `get_hermes_home` 别名存在，`HERMES_HOME` 环境变量仍可读 |
 
-### 剩余关注项
+### 已验证通过
 
-| 事项 | 类型 | 说明 |
-|------|------|------|
-| MAP.md 实际触发 | 📋 验证 | 需在 `cognitive.enabled: true` 下确认首次初始化创建 |
-| 向后兼容端到端测试 | 📋 可选 | 在仅有 `HERMES_HOME`（无 `DEEPAGENT_HOME`）的旧环境中验证 profile 功能 |
-| 已知局限迭代 | 🔄 未来 | 5 项已知局限（见上表）留待二期优化 |
+| 事项 | 结果 | 验证详情 |
+|------|------|---------|
+| MAP.md 自动创建 | ✅ 通过 | `build_initial_index()` → MAP.md 自动生成，含 4 个 section（关键知识领域 / 研究笔记 / 参考资料 / 其他），index_summary 围栏包裹正确 |
+| 向后兼容 | ✅ 通过 | `HERMES_HOME=/tmp/hermes-legacy-test` → `get_hermes_home()` 正确返回 `/tmp/hermes-legacy-test` |
+
+所有任务已全部验证通过，本计划正式关闭。
+
+### 未来参考
+
+| 事项 | 说明 |
+|------|------|
+| 已知局限迭代 | 5 项已知局限（见上文）留待 StarRoad 二期优化 |
 
 ### 删除的计划
 
