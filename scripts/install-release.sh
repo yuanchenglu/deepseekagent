@@ -553,6 +553,32 @@ download_release() {
 }
 
 # ============================================================================
+# 复制辅助函数：优先使用 rsync（快速、增量），不可用时降级到 cp -r
+# ============================================================================
+copy_with_fallback() {
+    local src="$1"
+    local dst="$2"
+    shift 2
+    local rsync_args=("$@")
+
+    if [ "${HAS_RSYNC:-false}" = true ]; then
+        if [ ${#rsync_args[@]} -gt 0 ]; then
+            rsync -a --delete "${rsync_args[@]}" "$src" "$dst"
+        else
+            rsync -a "$src" "$dst"
+        fi
+    else
+        # rsync 不可用时的 cp 降级方案
+        if [ -d "$src" ]; then
+            mkdir -p "$dst"
+            cp -r "$src"/* "$dst/" 2>/dev/null || cp -r "$src" "$dst"
+        else
+            cp -r "$src" "$dst"
+        fi
+    fi
+}
+
+# ============================================================================
 # Step 3: 安装
 # ============================================================================
 # 判断全新安装 vs 更新安装，复制文件、uv sync 安装 Python 依赖。
@@ -596,14 +622,20 @@ install_release() {
         mkdir -p "$backup_dir"
 
         # 备份核心目录和文件（不备份 .env、config.yaml、用户 skills）
-        for item in "deepagent" "webui" "VERSION" "sessions.db" "skills/.bundled_manifest"; do
+        for item in "deepagent" "webui" "VERSION" "skills/.bundled_manifest"; do
             if [ -e "${INSTALL_DIR}/${item}" ]; then
                 local target_dir="$backup_dir/$(dirname "$item")"
                 mkdir -p "$target_dir"
-                cp -r "${INSTALL_DIR}/${item}" "$target_dir/" 2>/dev/null || true
+                copy_with_fallback "${INSTALL_DIR}/${item}" "$target_dir/"
             fi
         done
-        log_success "备份完成"
+
+        # 如果 sessions.db 存在也备份（非必需，但有助于回滚）
+        if [ -f "${INSTALL_DIR}/sessions.db" ]; then
+            cp "${INSTALL_DIR}/sessions.db" "$backup_dir/" 2>/dev/null || true
+        fi
+
+        log_success "备份完成（可回滚: $backup_dir）"
     fi
 
     # ---- 复制文件 ----
@@ -612,27 +644,24 @@ install_release() {
     # 创建安装目录
     mkdir -p "$INSTALL_DIR"/{deepagent,webui,skills,logs}
 
-    # 复制 deepagent Python 包（排除 venv，更新时保留用户 venv）
+    # 复制 deepagent Python 包（排除 __pycache__，更新时保留用户 venv）
     log_info "复制 deepagent 核心模块..."
     if [ -d "$extract_dir/deepagent" ]; then
-        # 使用 rsync 高效同步，排除 __pycache__ 和 .pyc
-        rsync -a --delete \
+        copy_with_fallback "$extract_dir/deepagent/" "${INSTALL_DIR}/deepagent/" \
             --exclude="__pycache__" \
             --exclude="*.pyc" \
             --exclude=".pyo" \
             --exclude="venv/" \
-            --exclude="*.egg-info/" \
-            "$extract_dir/deepagent/" "${INSTALL_DIR}/deepagent/"
+            --exclude=".venv/" \
+            --exclude="*.egg-info/"
         log_success "deepagent 核心模块已复制"
     fi
 
     # 复制预构建 WebUI
     if [ -d "$extract_dir/webui" ]; then
         log_info "复制 WebUI（预构建）..."
-        # 保留 dist/ 和 src/ 目录结构
-        rsync -a --delete \
-            --exclude="node_modules" \
-            "$extract_dir/webui/" "${INSTALL_DIR}/webui/"
+        copy_with_fallback "$extract_dir/webui/" "${INSTALL_DIR}/webui/" \
+            --exclude="node_modules"
         log_success "WebUI 已复制"
     fi
 
@@ -640,7 +669,7 @@ install_release() {
     if [ -d "$extract_dir/skills" ]; then
         log_info "复制系统 skills..."
         mkdir -p "${INSTALL_DIR}/skills"
-        rsync -a "$extract_dir/skills/" "${INSTALL_DIR}/skills/" 2>/dev/null || true
+        copy_with_fallback "$extract_dir/skills/" "${INSTALL_DIR}/skills/"
         log_success "系统 skills 已复制"
     fi
 
@@ -649,75 +678,91 @@ install_release() {
     log_success "版本文件已更新: $VERSION"
 
     # ---- uv sync 安装 Python 依赖 ----
-    if [ -f "${INSTALL_DIR}/deepagent/pyproject.toml" ] || [ -f "${INSTALL_DIR}/deepagent/setup.py" ] || [ -f "${INSTALL_DIR}/deepagent/setup.cfg" ]; then
-        local pkg_dir="${INSTALL_DIR}/deepagent"
-
+    local pkg_dir="${INSTALL_DIR}/deepagent"
+    if [ -f "$pkg_dir/pyproject.toml" ] || [ -f "$pkg_dir/setup.py" ] || [ -f "$pkg_dir/setup.cfg" ]; then
         if [ -n "${UV_CMD:-}" ] && [ "$DISTRO" != "termux" ]; then
-            log_info "使用 uv sync 安装 Python 依赖..."
-            # 确保有 venv
-            if [ ! -d "${INSTALL_DIR}/.venv" ]; then
-                $UV_CMD venv "${INSTALL_DIR}/.venv" --python "$PYTHON_VERSION"
-            fi
-
-            # 在 venv 上下文中安装 deepagent 包
-            if $UV_CMD pip install --python "${INSTALL_DIR}/.venv/bin/python" -e "$pkg_dir" 2>/dev/null; then
+            log_info "使用 uv sync 安装 Python 依赖（读取 $pkg_dir/pyproject.toml）..."
+            # uv sync 在 deepagent/ 目录内执行，自动创建 .venv 并安装所有依赖
+            if (cd "$pkg_dir" && $UV_CMD sync 2>/dev/null); then
                 log_success "Python 依赖安装完成 (uv sync)"
             else
-                log_warn "uv sync 部分失败，尝试降级安装方式..."
-                # 降级：仅安装核心依赖
-                "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
-            fi
-        else
-            # 无 uv 时使用标准 pip
-            if [ "$DISTRO" = "termux" ] || [ -z "${UV_CMD:-}" ]; then
-                log_info "使用 pip 安装 Python 依赖..."
+                log_warn "uv sync 失败，尝试 uv pip install 降级方案..."
+                # 降级方案：手动创建 venv + pip install
                 if [ ! -d "${INSTALL_DIR}/.venv" ]; then
-                    "$PYTHON_PATH" -m venv "${INSTALL_DIR}/.venv"
+                    $UV_CMD venv "${INSTALL_DIR}/.venv" --python "$PYTHON_VERSION"
                 fi
-                "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
-                "${INSTALL_DIR}/.venv/bin/python" -m pip install -e "$pkg_dir" 2>/dev/null || {
-                    log_warn "pip 安装不完整，尝试最小安装..."
+                $UV_CMD pip install --python "${INSTALL_DIR}/.venv/bin/python" -e "$pkg_dir" 2>/dev/null || {
+                    log_warn "uv pip install 也失败，尝试 pip 最小安装..."
                     "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
                 }
-                log_success "Python 依赖安装完成 (pip)"
             fi
+        else
+            # 无 uv 时使用标准 pip（Termux 等场景）
+            log_info "使用 pip 安装 Python 依赖..."
+            if [ ! -d "${INSTALL_DIR}/.venv" ]; then
+                "$PYTHON_PATH" -m venv "${INSTALL_DIR}/.venv"
+            fi
+            "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+            "${INSTALL_DIR}/.venv/bin/python" -m pip install -e "$pkg_dir" 2>/dev/null || {
+                log_warn "pip 安装不完整，尝试最小安装..."
+                "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
+            }
+            log_success "Python 依赖安装完成 (pip)"
         fi
     else
         log_warn "未找到 pyproject.toml 或 setup.py，跳过 Python 依赖安装"
-        log_info "请稍后手动运行: cd ${INSTALL_DIR}/deepagent && pip install -e ."
+        log_info "请稍后手动运行: cd $pkg_dir && pip install -e ."
     fi
+}
 
-    # ---- 创建符号链接 ----
+# ---- 创建 deepagent 符号链接（单独函数，便于测试/维护） ----
+create_symlink() {
+    log_info "创建 deepagent 命令符号链接..."
+
     local command_link_dir
     command_link_dir="$(get_command_link_dir)"
     mkdir -p "$command_link_dir"
 
-    # 确定 deepagent 可执行文件路径
+    # 依次搜索可能安装 deepagent CLI 的位置
     local deepagent_bin=""
-    if [ -x "${INSTALL_DIR}/.venv/bin/deepagent" ]; then
-        deepagent_bin="${INSTALL_DIR}/.venv/bin/deepagent"
-    elif [ -x "${INSTALL_DIR}/deepagent/deepagent" ]; then
-        deepagent_bin="${INSTALL_DIR}/deepagent/deepagent"
-    elif [ -f "${INSTALL_DIR}/deepagent/deepagent" ]; then
-        deepagent_bin="${INSTALL_DIR}/deepagent/deepagent"
-    fi
+    local search_paths=(
+        "${INSTALL_DIR}/deepagent/.venv/bin/deepagent"
+        "${INSTALL_DIR}/.venv/bin/deepagent"
+        "${INSTALL_DIR}/deepagent/deepagent"
+    )
+
+    for path in "${search_paths[@]}"; do
+        if [ -x "$path" ]; then
+            deepagent_bin="$path"
+            break
+        fi
+    done
 
     if [ -n "$deepagent_bin" ]; then
         ln -sf "$deepagent_bin" "$command_link_dir/deepagent"
-        log_success "符号链接创建: $(get_command_link_display_dir)/deepagent"
+        log_success "符号链接创建: $(get_command_link_display_dir)/deepagent → $deepagent_bin"
     else
-        # 如果找不到 deepagent 可执行文件，创建一个指向 venv 模块的包装脚本
-        log_info "创建 deepagent 包装脚本..."
+        # 找不到 deepagent 可执行文件，创建包装脚本
+        # 确定 Python 路径：优先使用 deepagent 目录内的 .venv
+        local python_path="${INSTALL_DIR}/deepagent/.venv/bin/python"
+        if [ ! -x "$python_path" ]; then
+            python_path="${INSTALL_DIR}/.venv/bin/python"
+        fi
+        if [ ! -x "$python_path" ]; then
+            python_path="$PYTHON_PATH"
+        fi
+
+        log_info "未找到 deepagent 二进制，创建包装脚本..."
         cat > "$command_link_dir/deepagent" << WRAPPER_EOF
 #!/bin/bash
-# DeepAgent CLI launcher (由 install-release.sh 生成)
-exec "${INSTALL_DIR}/.venv/bin/python" -m hermes_cli.main "\$@"
+# DeepAgent CLI launcher（由 install-release.sh 生成）
+exec "${python_path}" -m hermes_cli.main "\$@"
 WRAPPER_EOF
         chmod +x "$command_link_dir/deepagent"
         log_success "包装脚本已创建: $(get_command_link_display_dir)/deepagent"
     fi
 
-    log_success "文件安装完成"
+    log_success "命令符号链接设置完成"
 }
 
 # ============================================================================
@@ -1087,6 +1132,7 @@ main() {
     echo ""
     echo -e "${BLUE}${BOLD}[Step 3/8] 安装 DeepAgent${NC}"
     install_release
+    create_symlink
 
     # ---- Step 4: Skill 同步 ----
     echo ""
