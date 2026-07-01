@@ -604,6 +604,9 @@ install_release() {
 
     log_success "Release 包解压成功"
 
+    # 保存提取目录为全局变量，供后续步骤（sync_skills 等）使用
+    TMP_EXTRACT_DIR="$extract_dir"
+
     # 判断是全新安装还是更新安装
     if [ -f "$INSTALL_DIR/VERSION" ]; then
         local old_version
@@ -775,66 +778,113 @@ WRAPPER_EOF
 sync_skills() {
     log_info "同步系统 skills 到用户目录..."
 
-    local skills_sync_script="${INSTALL_DIR}/tools/skills_sync.py"
-    local bundled_skills_dir="${INSTALL_DIR}/skills"
+    # Release 包中 skills 的源目录（tarball 中解压出来的）
+    local bundled_skills_dir="${TMP_EXTRACT_DIR:-$extract_dir}/skills"
+    # 用户 skills 目标目录
+    local user_skills_dir="${INSTALL_DIR}/skills"
+    # manifest 文件：记录每个 skill 的原始哈希，用于检测用户修改
+    local manifest_file="${user_skills_dir}/.bundled_manifest"
+
+    # 如果临时提取目录中有 skills，优先用（刚解压的原始 bundle）
+    if [ ! -d "$bundled_skills_dir" ] && [ -d "${INSTALL_DIR}/deepagent/skills" ]; then
+        bundled_skills_dir="${INSTALL_DIR}/deepagent/skills"
+    fi
 
     # 创建用户 skills 目录
-    mkdir -p "${INSTALL_DIR}/skills"
+    mkdir -p "$user_skills_dir"
 
-    # 构建 .bundled_manifest（描述系统 bundled skills 的哈希清单）
-    if [ -d "$bundled_skills_dir" ]; then
-        log_info "生成 skills manifest..."
+    # 策略 A：优先使用 Hermes 的 skills_sync.py（基于 manifest hash 的智能同步）
+    local skills_sync_script="${INSTALL_DIR}/deepagent/tools/skills_sync.py"
+    if [ -f "$skills_sync_script" ] && [ -x "$(command -v python3 2>/dev/null || echo "${INSTALL_DIR}/deepagent/.venv/bin/python")" ]; then
+        local py_cmd
+        if [ -x "${INSTALL_DIR}/deepagent/.venv/bin/python" ]; then
+            py_cmd="${INSTALL_DIR}/deepagent/.venv/bin/python"
+        elif [ -x "${INSTALL_DIR}/.venv/bin/python" ]; then
+            py_cmd="${INSTALL_DIR}/.venv/bin/python"
+        else
+            py_cmd="python3"
+        fi
 
-        # 扫描 bundled skills 目录，为每个 skill 计算 MD5 哈希
-        local manifest_file="${INSTALL_DIR}/skills/.bundled_manifest"
-        : > "$manifest_file"  # 清空 manifest 文件
-
-        for skill_dir in "$bundled_skills_dir"/*/; do
-            [ -d "$skill_dir" ] || continue
-            local skill_name
-            skill_name=$(basename "$skill_dir")
-
-            # 计算整个 skill 目录的 MD5 哈希（递归）
-            local skill_hash
-            if command -v md5sum &> /dev/null; then
-                skill_hash=$(find "$skill_dir" -type f -exec md5sum {} + | sort -k2 | md5sum | cut -d' ' -f1)
-            elif command -v md5 &> /dev/null; then
-                skill_hash=$(find "$skill_dir" -type f -exec md5 -r {} + | sort -k2 | md5 -r | cut -d' ' -f1)
-            else
-                skill_hash="unknown"
-            fi
-
-            echo "${skill_name}:${skill_hash}" >> "$manifest_file"
-        done
-
-        log_success "Skills manifest 已生成（${#manifest_file}）"
-    else
-        log_warn "未找到 bundled skills 目录，跳过 skills 同步"
-    fi
-
-    # 尝试使用 skills_sync.py（如果存在）
-    if [ -f "$skills_sync_script" ] && [ -x "${INSTALL_DIR}/.venv/bin/python" ]; then
-        if "${INSTALL_DIR}/.venv/bin/python" "$skills_sync_script" 2>/dev/null; then
-            log_success "Skills 同步完成（Python sync）"
+        if $py_cmd "$skills_sync_script" 2>/dev/null; then
+            log_success "Skills 同步完成（Python skills_sync）"
             return 0
         fi
+        log_warn "Python skills_sync 失败，降级到 bash 同步..."
     fi
 
-    # 降级：简单目录复制（仅复制不存在的 skill 到用户目录）
-    if [ -d "$bundled_skills_dir" ]; then
-        for skill_dir in "$bundled_skills_dir"/*/; do
-            [ -d "$skill_dir" ] || continue
-            local skill_name
-            skill_name=$(basename "$skill_dir")
-            local user_skill_dir="${INSTALL_DIR}/skills/${skill_name}"
+    # 策略 B：纯 bash 实现的 manifest 同步
+    if [ ! -d "$bundled_skills_dir" ]; then
+        log_warn "未找到 bundled skills 源目录，跳过 skills 同步"
+        return 0
+    fi
 
-            # 仅在用户目录中不存在该 skill 时才复制
-            if [ ! -d "$user_skill_dir" ]; then
-                cp -r "$skill_dir" "$user_skill_dir" 2>/dev/null || true
+    log_info "使用 bash 方式同步 skills（manifest 驱动）..."
+
+    # 读取旧的 manifest（记录已同步 skill 的哈希值）
+    local old_manifest=""
+    if [ -f "$manifest_file" ]; then
+        old_manifest=$(cat "$manifest_file")
+    fi
+
+    # 扫描 bundled skills，构建新 manifest
+    local new_manifest=""
+    local has_md5=false
+    command -v md5sum &>/dev/null && has_md5=true
+    command -v md5 &>/dev/null && has_md5=true
+
+    for skill_dir in "$bundled_skills_dir"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local skill_name
+        skill_name=$(basename "$skill_dir")
+
+        # 计算 bundled skill 的 MD5 哈希（所有文件递归）
+        local skill_hash
+        if command -v md5sum &>/dev/null; then
+            skill_hash=$(find "$skill_dir" -type f -exec md5sum {} + | sort -k2 | md5sum | cut -d' ' -f1 2>/dev/null || echo "unknown")
+        elif command -v md5 &>/dev/null; then
+            skill_hash=$(find "$skill_dir" -type f -exec md5 -r {} + | sort -k2 | md5 -r | cut -d' ' -f1 2>/dev/null || echo "unknown")
+        else
+            skill_hash="unknown"
+        fi
+
+        new_manifest="${new_manifest}${skill_name}:${skill_hash}"$'\n'
+
+        # 判断是否需要同步该 skill
+        local user_skill_dir="${user_skills_dir}/${skill_name}"
+        local old_hash
+        old_hash=$(echo "$old_manifest" | grep "^${skill_name}:" | cut -d: -f2-)
+
+        if [ ! -d "$user_skill_dir" ]; then
+            # 全新 skill，直接复制
+            log_info "  新增 skill: ${skill_name}"
+            cp -r "$skill_dir" "$user_skills_dir/" 2>/dev/null || true
+        elif [ -z "$old_hash" ] || [ "$skill_hash" != "$old_hash" ]; then
+            # 旧 manifest 无此记录或 bundled 已更新 → 检查用户是否改过
+            local user_hash
+            if command -v md5sum &>/dev/null; then
+                user_hash=$(find "$user_skill_dir" -type f -exec md5sum {} + | sort -k2 | md5sum | cut -d' ' -f1 2>/dev/null || echo "")
+            elif command -v md5 &>/dev/null; then
+                user_hash=$(find "$user_skill_dir" -type f -exec md5 -r {} + | sort -k2 | md5 -r | cut -d' ' -f1 2>/dev/null || echo "")
             fi
-        done
-        log_success "Skills 同步完成（目录复制）"
-    fi
+
+            if [ -n "$old_hash" ] && [ -n "$user_hash" ] && [ "$user_hash" != "$old_hash" ]; then
+                # 用户改过 → 不覆盖
+                log_info "  保留（用户已修改）: ${skill_name}"
+            else
+                # 用户未改 → 安全更新
+                log_info "  更新 skill: ${skill_name}"
+                rm -rf "$user_skill_dir"
+                cp -r "$skill_dir" "$user_skills_dir/" 2>/dev/null || true
+            fi
+        else
+            # 哈希一致 → 最新，跳过
+            :
+        fi
+    done
+
+    # 写入新 manifest
+    echo "$new_manifest" > "$manifest_file"
+    log_success "Skills manifest 已更新: $manifest_file"
 }
 
 # ============================================================================
