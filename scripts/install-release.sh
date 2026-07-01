@@ -395,6 +395,114 @@ fetch_latest_version() {
     fi
 }
 
+# 用 curl 下载文件，失败时重试一次
+# 参数：$1=URL, $2=输出路径, $3=描述（用于日志）
+curl_with_retry() {
+    local url="$1"
+    local output="$2"
+    local desc="$3"
+    local max_attempts=2
+    local attempt=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        log_info "下载${desc}（尝试 $attempt/$max_attempts）"
+        if curl -fsSL --connect-timeout 15 --max-time 180 "$url" -o "$output" 2>/dev/null; then
+            return 0
+        fi
+        if [ "$attempt" -lt "$max_attempts" ]; then
+            log_warn "下载失败，3 秒后重试..."
+            sleep 3
+        fi
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
+# 检测可用的 SHA256 校验工具，设置 SHA256_CMD 和 SHA256_CHECK_FLAG
+detect_sha256_cmd() {
+    if command -v sha256sum &>/dev/null; then
+        SHA256_CMD="sha256sum"
+        SHA256_CHECK_FLAG="-c"
+    elif command -v shasum &>/dev/null; then
+        SHA256_CMD="shasum"
+        SHA256_CHECK_FLAG="-a 256 -c"
+    elif command -v openssl &>/dev/null; then
+        # openssl dgst 不支持 -c 模式，需要手动比较
+        SHA256_CMD="openssl dgst -sha256"
+        SHA256_CHECK_FLAG=""
+    else
+        SHA256_CMD=""
+        SHA256_CHECK_FLAG=""
+    fi
+}
+
+# 验证文件的 SHA256 校验和
+# 参数：$1=文件路径, $2=校验和文件路径（格式：hash  filename）
+# 返回：0=验证通过, 1=验证失败
+verify_sha256() {
+    local file="$1"
+    local sha_file="$2"
+
+    if [ -z "${SHA256_CMD:-}" ]; then
+        log_warn "无可用 SHA256 工具，跳过校验和验证"
+        return 0
+    fi
+
+    if [ ! -f "$sha_file" ]; then
+        log_warn "校验和文件不存在: $sha_file，跳过验证"
+        return 0
+    fi
+
+    log_info "验证 SHA256 校验和..."
+
+    local check_dir
+    check_dir=$(dirname "$file")
+
+    if [ -n "$SHA256_CHECK_FLAG" ]; then
+        # sha256sum / shasum 支持 -c 模式：读取校验和文件并逐行校验
+        if (cd "$check_dir" && $SHA256_CMD $SHA256_CHECK_FLAG "$(basename "$sha_file")" 2>/dev/null); then
+            log_success "校验和验证通过 ✓"
+            return 0
+        fi
+    else
+        # openssl 降级：手动计算并比较
+        local expected_hash
+        local actual_hash
+        # 校验和文件格式：第一列为哈希值
+        expected_hash=$(awk '{print $1}' "$sha_file" 2>/dev/null)
+        actual_hash=$($SHA256_CMD "$file" 2>/dev/null | awk '{print $NF}')
+        if [ "$expected_hash" = "$actual_hash" ]; then
+            log_success "校验和验证通过 ✓"
+            return 0
+        fi
+    fi
+
+    # 验证失败：显示详细信息
+    log_error "校验和验证失败！文件可能已损坏或被篡改。"
+    log_info "文件: $file"
+    log_info "预期校验和: $(cat "$sha_file" 2>/dev/null)"
+    log_info "实际 SHA256: $(sha256sum "$file" 2>/dev/null || shasum -a 256 "$file" 2>/dev/null || openssl dgst -sha256 "$file" 2>/dev/null)"
+    return 1
+}
+
+# 获取校验和文件并验证
+# 参数：$1=tarball 路径, $2=版本号
+# 从 GitHub Releases 获取校验和（与主源 R2 构成不同信任域）
+download_and_verify() {
+    local tarball="$1"
+    local ver="$2"
+    local sha_url="${GH_BASE_URL}/v${ver}/deepagent-${ver}.sha256"
+    local sha_file
+    sha_file="$(dirname "$tarball")/deepagent-${ver}.sha256"
+
+    if curl -fsSL --connect-timeout 10 --max-time 30 "$sha_url" -o "$sha_file" 2>/dev/null; then
+        verify_sha256 "$tarball" "$sha_file"
+    else
+        log_warn "无法获取校验和文件（$sha_url），跳过验证"
+        return 0
+    fi
+}
+
 # 下载 Release tarball
 download_release() {
     local version_display="${VERSION}"
@@ -408,48 +516,40 @@ download_release() {
 
     log_info "下载版本: v${version_display}"
 
-    # 尝试从主源（R2）下载
-    log_info "正在从主源下载: ${r2_url}"
-    if curl -fsSL --connect-timeout 10 --max-time 120 "$r2_url" -o "$TARBALL_PATH"; then
+    # 先检测可用的 SHA256 工具
+    detect_sha256_cmd
+
+    # 策略 A: 尝试从主源（R2）下载 → 从 GitHub 获取校验和（不同信任域）
+    if curl_with_retry "$r2_url" "$TARBALL_PATH" "（主源 R2）"; then
         log_success "从主源下载成功"
-
-        # 从 GitHub 获取 SHA256 校验和（不同信任域）
-        local sha_url="${GH_BASE_URL}/v${VERSION}/deepagent-${VERSION}.sha256"
-        local sha_file="${TMP_DIR}/deepagent-${VERSION}.sha256"
-
-        if curl -fsSL --connect-timeout 10 --max-time 30 "$sha_url" -o "$sha_file" 2>/dev/null; then
-            log_info "验证 SHA256 校验和..."
-            if (cd "$TMP_DIR" && sha256sum -c "$(basename "$sha_file")" 2>/dev/null) || \
-               (cd "$TMP_DIR" && shasum -a 256 -c "$(basename "$sha_file")" 2>/dev/null); then
-                log_success "校验和验证通过 ✓"
-            else
-                log_error "校验和验证失败！下载的文件可能已损坏或被篡改。"
-                log_info "文件: $TARBALL_PATH"
-                log_info "预期校验和: $(cat "$sha_file")"
-                log_info "实际 SHA256: $(sha256sum "$TARBALL_PATH" 2>/dev/null || shasum -a 256 "$TARBALL_PATH" 2>/dev/null)"
-                rm -rf "$TMP_DIR"
-                exit 1
-            fi
-        else
-            log_warn "无法获取校验和文件，跳过验证"
-            log_info "校验和 URL 不可用: $sha_url"
-        fi
-    else
-        # 主源下载失败，尝试备用源（GitHub Releases）
-        log_warn "主源下载失败，尝试备用源..."
-        log_info "正在从 GitHub Releases 下载: ${gh_url}"
-
-        if curl -fsSL --connect-timeout 10 --max-time 120 "$gh_url" -o "$TARBALL_PATH"; then
-            log_success "从备用源（GitHub Releases）下载成功"
-        else
-            log_error "下载失败！主源和备用源均不可用。"
-            log_info "请检查网络连接后重试。"
-            log_info "主源: $r2_url"
-            log_info "备用: $gh_url"
+        download_and_verify "$TARBALL_PATH" "$VERSION" || {
             rm -rf "$TMP_DIR"
             exit 1
-        fi
+        }
+        return 0
     fi
+
+    # 策略 B: 主源失败，尝试备用源（GitHub Releases）
+    log_warn "主源下载失败，尝试备用源..."
+    log_info "备用源 URL: ${gh_url}"
+
+    if curl_with_retry "$gh_url" "$TARBALL_PATH" "（备用源 GitHub）"; then
+        log_success "从备用源（GitHub Releases）下载成功"
+        # 备用源也尝试校验（同一信任域，但聊胜于无）
+        download_and_verify "$TARBALL_PATH" "$VERSION" || {
+            rm -rf "$TMP_DIR"
+            exit 1
+        }
+        return 0
+    fi
+
+    # 两个源都失败
+    log_error "下载失败！主源和备用源均不可用。"
+    log_info "请检查网络连接后重试。"
+    log_info "主源: $r2_url"
+    log_info "备用: $gh_url"
+    rm -rf "$TMP_DIR"
+    exit 1
 }
 
 # ============================================================================
