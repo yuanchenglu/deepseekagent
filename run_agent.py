@@ -950,7 +950,7 @@ class AIAgent:
                         raise RuntimeError(
                             f"Provider '{_explicit}' is set in config.yaml but no API key "
                             f"was found. Set the {_explicit.upper()}_API_KEY environment "
-                            f"variable, or switch to a different provider with `hermes model`."
+                            f"variable, or switch to a different provider with `deepagent model`."
                         )
                     # Final fallback: try raw OpenRouter key
                     client_kwargs = {
@@ -1835,7 +1835,7 @@ class AIAgent:
                 msg = (
                     "⚠ No auxiliary LLM provider configured — context "
                     "compression will drop middle turns without a summary. "
-                    "Run `hermes setup` or set OPENROUTER_API_KEY."
+                    "Run `deepagent setup` or set OPENROUTER_API_KEY."
                 )
                 self._compression_warning = msg
                 self._emit_status(msg)

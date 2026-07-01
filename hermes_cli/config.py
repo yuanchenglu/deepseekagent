@@ -111,7 +111,7 @@ def get_managed_update_command() -> Optional[str]:
 
 def recommended_update_command() -> str:
     """Return the best update command for the current installation."""
-    return get_managed_update_command() or "hermes update"
+    return get_managed_update_command() or "deepagent update"
 
 
 def format_managed_message(action: str = "modify this Hermes installation") -> str:

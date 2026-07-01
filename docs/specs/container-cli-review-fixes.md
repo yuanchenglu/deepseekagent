@@ -153,14 +153,14 @@ def _exec_in_container(container_info: dict, cli_args: list):
                     f'    commands = [{{ command = "{runtime}"; options = [ "NOPASSWD" ]; }}];\n'
                     f'  }}];\n'
                     f"\n"
-                    f"Or run: sudo hermes {' '.join(cli_args)}",
+                    f"Or run: sudo deepagent {' '.join(cli_args)}",
                     file=sys.stderr,
                 )
                 sys.exit(1)
         else:
             print(
                 f"Error: container '{container_name}' not found via {backend}.\n"
-                f"The container may be running under root. Try: sudo hermes {' '.join(cli_args)}",
+                f"The container may be running under root. Try: sudo deepagent {' '.join(cli_args)}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -236,7 +236,7 @@ def get_container_exec_info() -> Optional[dict]:
     if _is_inside_container():
         return None
 
-    container_mode_file = get_hermes_home() / ".container-mode"
+    container_mode_file = get_deepagent_home() / ".container-mode"
 
     try:
         with open(container_mode_file, "r") as f:
@@ -272,7 +272,7 @@ chown -h ${user}:${cfg.group} "${symlinkPath}"
 
 `ln -sfn` handles: existing symlink (replaces), doesn't exist (creates), and after the `mv` above (creates). The only case that needs special handling is a real directory, because `ln -sfn` cannot atomically replace a directory.
 
-Note: there is a theoretical race between the `[ -d ... ]` check and the `mv` (something could create/remove the directory in between). In practice this is a NixOS activation script running as root during `nixos-rebuild switch` — no other process should be touching `~/.hermes` at that moment. Not worth adding locking for.
+Note: there is a theoretical race between the `[ -d ... ]` check and the `mv` (something could create/remove the directory in between). In practice this is a NixOS activation script running as root during `nixos-rebuild switch` — no other process should be touching `~/.deepagent` at that moment. Not worth adding locking for.
 
 ### Sudoers — document, don't auto-configure
 
@@ -297,8 +297,8 @@ The existing test file (`tests/hermes_cli/test_container_aware_cli.py`) has 16 t
 - `test_get_container_exec_info_returns_metadata` — unchanged
 - `test_get_container_exec_info_none_inside_container` — unchanged
 - `test_get_container_exec_info_none_without_file` — unchanged
-- `test_get_container_exec_info_skipped_when_hermes_dev` — unchanged
-- `test_get_container_exec_info_not_skipped_when_hermes_dev_zero` — unchanged
+- `test_get_container_exec_info_skipped_when_deepagent_dev` — unchanged
+- `test_get_container_exec_info_not_skipped_when_deepagent_dev_zero` — unchanged
 - `test_get_container_exec_info_defaults` — unchanged
 - `test_get_container_exec_info_docker_backend` — unchanged
 
@@ -316,7 +316,7 @@ The existing test file (`tests/hermes_cli/test_container_aware_cli.py`) has 16 t
 
 - `test_exec_in_container_tty_retries_on_container_failure` — retry loop removed
 - `test_exec_in_container_non_tty_retries_silently_exits_126` — retry loop removed
-- `test_exec_in_container_propagates_hermes_exit_code` — no subprocess.run to check exit codes; execvp replaces the process. Note: exit code propagation still works correctly — when `os.execvp` succeeds, the container's process *becomes* this process, so its exit code is the process exit code by OS semantics. No application code needed, no test needed. A comment in the function docstring documents this intent for future readers.
+- `test_exec_in_container_propagates_deepagent_exit_code` — no subprocess.run to check exit codes; execvp replaces the process. Note: exit code propagation still works correctly — when `os.execvp` succeeds, the container's process *becomes* this process, so its exit code is the process exit code by OS semantics. No application code needed, no test needed. A comment in the function docstring documents this intent for future readers.
 
 ---
 

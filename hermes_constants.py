@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 
-def get_hermes_home() -> Path:
+def get_deepagent_home() -> Path:
     """返回 DeepAgent 主目录（默认：~/.deepagent）。
 
     优先读 DEEPAGENT_HOME 环境变量，fallback 到 HERMES_HOME（向后兼容），
@@ -18,6 +18,10 @@ def get_hermes_home() -> Path:
     return Path(os.getenv("DEEPAGENT_HOME",
                os.getenv("HERMES_HOME",
                Path.home() / ".deepagent")))
+
+
+# 兼容旧调用，逐步迁移
+get_hermes_home = get_deepagent_home
 
 
 def get_default_hermes_root() -> Path:

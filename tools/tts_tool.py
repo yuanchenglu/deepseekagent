@@ -607,7 +607,7 @@ def text_to_speech_tool(
                 return json.dumps({
                     "success": False,
                     "error": "Mistral provider selected but 'mistralai' package not installed. "
-                             "Run: pip install 'hermes-agent[mistral]'"
+                             "Run: pip install 'deepagent[mistral]'"
                 }, ensure_ascii=False)
             logger.info("Generating speech with Mistral Voxtral TTS...")
             _generate_mistral_tts(text, file_str, tts_config)
@@ -617,7 +617,7 @@ def text_to_speech_tool(
                 return json.dumps({
                     "success": False,
                     "error": "NeuTTS provider selected but neutts is not installed. "
-                             "Run hermes setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."
+                             "Run deepagent setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."
                 }, ensure_ascii=False)
             logger.info("Generating speech with NeuTTS (local)...")
             _generate_neutts(text, file_str, tts_config)

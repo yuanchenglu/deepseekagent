@@ -57,9 +57,9 @@ def get_current_session_key(default: str = "default") -> str:
 # via shell expansions like $HOME or $HERMES_HOME.
 _SSH_SENSITIVE_PATH = r'(?:~|\$home|\$\{home\})/\.ssh(?:/|$)'
 _HERMES_ENV_PATH = (
-    r'(?:~\/\.hermes/|'
-    r'(?:\$home|\$\{home\})/\.hermes/|'
-    r'(?:\$hermes_home|\$\{hermes_home\})/)'
+    r'(?:~\/\.(?:hermes|deepagent)/|'
+    r'(?:\$home|\$\{home\})/\.(?:hermes|deepagent)/|'
+    r'(?:\$(?:hermes|deepagent)_home|\$\{(?:hermes|deepagent)_home\})/)'
     r'\.env\b'
 )
 _SENSITIVE_WRITE_TARGET = (
@@ -104,15 +104,15 @@ DANGEROUS_PATTERNS = [
     # Gateway lifecycle protection: prevent the agent from killing its own
     # gateway process.  These commands trigger a gateway restart/stop that
     # terminates all running agents mid-work.
-    (r'\bhermes\s+gateway\s+(stop|restart)\b', "stop/restart hermes gateway (kills running agents)"),
-    (r'\bhermes\s+update\b', "hermes update (restarts gateway, kills running agents)"),
+    (r'\b(?:hermes|deepagent)\s+gateway\s+(stop|restart)\b', "stop/restart hermes/deepagent gateway (kills running agents)"),
+    (r'\b(?:hermes|deepagent)\s+update\b', "hermes/deepagent update (restarts gateway, kills running agents)"),
     # Gateway protection: never start gateway outside systemd management
-    (r'gateway\s+run\b.*(&\s*$|&\s*;|\bdisown\b|\bsetsid\b)', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
-    (r'\bnohup\b.*gateway\s+run\b', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway')"),
+    (r'gateway\s+run\b.*(&\s*$|&\s*;|\bdisown\b|\bsetsid\b)', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway' or 'deepagent gateway restart')"),
+    (r'\bnohup\b.*gateway\s+run\b', "start gateway outside systemd (use 'systemctl --user restart hermes-gateway' or 'deepagent gateway restart')"),
     # Self-termination protection: prevent agent from killing its own process
-    (r'\b(pkill|killall)\b.*\b(hermes|gateway|cli\.py)\b', "kill hermes/gateway process (self-termination)"),
+    (r'\b(pkill|killall)\b.*\b(hermes|deepagent|gateway|cli\.py)\b', "kill hermes/deepagent/gateway process (self-termination)"),
     # Self-termination via kill + command substitution (pgrep/pidof).
-    # The name-based pattern above catches `pkill hermes` but not
+    # The name-based pattern above catches `pkill hermes`/`pkill deepagent` but not
     # `kill -9 $(pgrep -f hermes)` because the substitution is opaque
     # to regex at detection time. Catch the structural pattern instead.
     (r'\bkill\b.*\$\(\s*pgrep\b', "kill process via pgrep expansion (self-termination)"),

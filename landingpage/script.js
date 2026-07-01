@@ -1,5 +1,5 @@
 // =========================================================================
-// Hermes Agent Landing Page — Interactions
+// DeepAgent Landing Page — Interactions
 // =========================================================================
 
 // --- Platform install commands ---
@@ -384,7 +384,7 @@ class TerminalDemo {
   }
 }
 
-// --- Noise Overlay (ported from hermes-chat NoiseOverlay) ---
+// --- Noise Overlay (ported from deepagent-chat) ---
 function initNoiseOverlay() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   if (typeof THREE === "undefined") return;

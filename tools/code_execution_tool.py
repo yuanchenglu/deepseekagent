@@ -1294,7 +1294,7 @@ _TOOL_DOC_LINES = [
 def build_execute_code_schema(enabled_sandbox_tools: set = None) -> dict:
     """Build the execute_code schema with description listing only enabled tools.
 
-    When tools are disabled via ``hermes tools`` (e.g. web is turned off),
+    When tools are disabled via ``deepagent tools`` (e.g. web is turned off),
     the schema description should NOT mention web_search / web_extract —
     otherwise the model thinks they are available and keeps trying to use them.
     """

@@ -1,6 +1,6 @@
-# Hermes Agent - Development Guide
+# DeepAgent - Development Guide
 
-Instructions for AI coding assistants and developers working on the hermes-agent codebase.
+Instructions for AI coding assistants and developers working on the deepagent codebase.
 
 ## Development Environment
 
@@ -11,7 +11,7 @@ source venv/bin/activate  # ALWAYS activate before running Python
 ## Project Structure
 
 ```
-hermes-agent/
+deepagent/
 ├── run_agent.py          # AIAgent class — core conversation loop
 ├── model_tools.py        # Tool orchestration, discover_builtin_tools(), handle_function_call()
 ├── toolsets.py           # Toolset definitions, _HERMES_CORE_TOOLS list
@@ -28,14 +28,14 @@ hermes-agent/
 │   ├── skill_commands.py     # Skill slash commands (shared CLI/gateway)
 │   └── trajectory.py         # Trajectory saving helpers
 ├── hermes_cli/           # CLI subcommands and setup
-│   ├── main.py           # Entry point — all `hermes` subcommands
+│   ├── main.py           # Entry point — all `deepagent` subcommands
 │   ├── config.py         # DEFAULT_CONFIG, OPTIONAL_ENV_VARS, migration
 │   ├── commands.py       # Slash command definitions + SlashCommandCompleter
 │   ├── callbacks.py      # Terminal callbacks (clarify, sudo, approval)
 │   ├── setup.py          # Interactive setup wizard
 │   ├── skin_engine.py    # Skin/theme engine — CLI visual customization
-│   ├── skills_config.py  # `hermes skills` — enable/disable skills per platform
-│   ├── tools_config.py   # `hermes tools` — enable/disable tools per platform
+│   ├── skills_config.py  # `deepagent skills` — enable/disable skills per platform
+│   ├── tools_config.py   # `deepagent tools` — enable/disable tools per platform
 │   ├── skills_hub.py     # `/skills` slash command (search, browse, install)
 │   ├── models.py         # Model catalog, provider model lists
 │   ├── model_switch.py   # Shared /model switch pipeline (CLI + gateway)
@@ -63,7 +63,7 @@ hermes-agent/
 └── batch_runner.py       # Parallel batch processing
 ```
 
-**User config:** `~/.hermes/config.yaml` (settings), `~/.hermes/.env` (API keys)
+**User config:** `~/.deepagent/config.yaml` (settings), `~/.deepagent/.env` (API keys)
 
 ## File Dependency Chain
 
@@ -132,7 +132,7 @@ Messages follow OpenAI format: `{"role": "system/user/assistant/tool", ...}`. Re
 - `load_cli_config()` in cli.py merges hardcoded defaults + user config YAML
 - **Skin engine** (`hermes_cli/skin_engine.py`) — data-driven CLI theming; initialized from `display.skin` config key at startup; skins customize banner colors, spinner faces/verbs/wings, tool prefix, response box, branding text
 - `process_command()` is a method on `HermesCLI` — dispatches on canonical command name resolved via `resolve_command()` from the central registry
-- Skill slash commands: `agent/skill_commands.py` scans `~/.hermes/skills/`, injects as **user message** (not system prompt) to preserve prompt caching
+- Skill slash commands: `agent/skill_commands.py` scans `~/.deepagent/skills/`, injects as **user message** (not system prompt) to preserve prompt caching
 
 ### Slash Command Registry (`hermes_cli/commands.py`)
 
@@ -142,7 +142,7 @@ All slash commands are defined in a central `COMMAND_REGISTRY` list of `CommandD
 - **Gateway** — `GATEWAY_KNOWN_COMMANDS` frozenset for hook emission, `resolve_command()` for dispatch
 - **Gateway help** — `gateway_help_lines()` generates `/help` output
 - **Telegram** — `telegram_bot_commands()` generates the BotCommand menu
-- **Slack** — `slack_subcommand_map()` generates `/hermes` subcommand routing
+- **Slack** — `slack_subcommand_map()` generates `/deepagent` subcommand routing
 - **Autocomplete** — `COMMANDS` flat dict feeds `SlashCommandCompleter`
 - **CLI help** — `COMMANDS_BY_CATEGORY` dict feeds `show_help()`
 
@@ -241,7 +241,7 @@ The registry handles schema collection, dispatch, availability checking, and err
 | Loader | Used by | Location |
 |--------|---------|----------|
 | `load_cli_config()` | CLI mode | `cli.py` |
-| `load_config()` | `hermes tools`, `hermes setup` | `hermes_cli/config.py` |
+| `load_config()` | `deepagent tools`, `deepagent setup` | `hermes_cli/config.py` |
 | Direct YAML load | Gateway | `gateway/run.py` |
 
 ---
@@ -254,7 +254,7 @@ The skin engine (`hermes_cli/skin_engine.py`) provides data-driven CLI visual cu
 
 ```
 hermes_cli/skin_engine.py    # SkinConfig dataclass, built-in skins, YAML loader
-~/.hermes/skins/*.yaml       # User-installed custom skins (drop-in)
+~/.deepagent/skins/*.yaml       # User-installed custom skins (drop-in)
 ```
 
 - `init_skin_from_config()` — called at CLI startup, reads `display.skin` from config
@@ -286,7 +286,7 @@ hermes_cli/skin_engine.py    # SkinConfig dataclass, built-in skins, YAML loader
 
 ### Built-in skins
 
-- `default` — Classic Hermes gold/kawaii (the current look)
+- `default` — Classic DeepAgent gold/kawaii (the current look)
 - `ares` — Crimson/bronze war-god theme with custom spinner wings
 - `mono` — Clean grayscale monochrome
 - `slate` — Cool blue developer-focused theme
@@ -308,7 +308,7 @@ Add to `_BUILTIN_SKINS` dict in `hermes_cli/skin_engine.py`:
 
 ### User skins (YAML)
 
-Users create `~/.hermes/skins/<name>.yaml`:
+Users create `~/.deepagent/skins/<name>.yaml`:
 
 ```yaml
 name: cyberpunk
@@ -338,7 +338,7 @@ Activate with `/skin cyberpunk` or `display.skin: cyberpunk` in config.yaml.
 ## Important Policies
 ### Prompt Caching Must Not Break
 
-Hermes-Agent ensures caching remains valid throughout a conversation. **Do NOT implement changes that would:**
+DeepAgent ensures caching remains valid throughout a conversation. **Do NOT implement changes that would:**
 - Alter past context mid-conversation
 - Change toolsets mid-conversation
 - Reload memories or rebuild system prompts mid-conversation
@@ -365,7 +365,7 @@ in config.yaml (or `HERMES_BACKGROUND_NOTIFICATIONS` env var):
 
 ## Profiles: Multi-Instance Support
 
-Hermes supports **profiles** — multiple fully isolated instances, each with its own
+DeepAgent supports **profiles** — multiple fully isolated instances, each with its own
 `HERMES_HOME` directory (config, API keys, memory, sessions, skills, gateway, etc.).
 
 The core mechanism: `_apply_profile_override()` in `hermes_cli/main.py` sets
@@ -375,36 +375,36 @@ automatically scope to the active profile.
 ### Rules for profile-safe code
 
 1. **Use `get_hermes_home()` for all HERMES_HOME paths.** Import from `hermes_constants`.
-   NEVER hardcode `~/.hermes` or `Path.home() / ".hermes"` in code that reads/writes state.
+   NEVER hardcode `~/.deepagent` or `Path.home() / ".deepagent"` in code that reads/writes state.
    ```python
    # GOOD
    from hermes_constants import get_hermes_home
    config_path = get_hermes_home() / "config.yaml"
 
    # BAD — breaks profiles
-   config_path = Path.home() / ".hermes" / "config.yaml"
+   config_path = Path.home() / ".deepagent" / "config.yaml"
    ```
 
 2. **Use `display_hermes_home()` for user-facing messages.** Import from `hermes_constants`.
-   This returns `~/.hermes` for default or `~/.hermes/profiles/<name>` for profiles.
+   This returns `~/.deepagent` for default or `~/.deepagent/profiles/<name>` for profiles.
    ```python
    # GOOD
    from hermes_constants import display_hermes_home
    print(f"Config saved to {display_hermes_home()}/config.yaml")
 
    # BAD — shows wrong path for profiles
-   print("Config saved to ~/.hermes/config.yaml")
+   print("Config saved to ~/.deepagent/config.yaml")
    ```
 
 3. **Module-level constants are fine** — they cache `get_hermes_home()` at import time,
    which is AFTER `_apply_profile_override()` sets the env var. Just use `get_hermes_home()`,
-   not `Path.home() / ".hermes"`.
+   not `Path.home() / ".deepagent"`.
 
 4. **Tests that mock `Path.home()` must also set `HERMES_HOME`** — since code now uses
-   `get_hermes_home()` (reads env var), not `Path.home() / ".hermes"`:
+   `get_hermes_home()` (reads env var), not `Path.home() / ".deepagent"`:
    ```python
    with patch.object(Path, "home", return_value=tmp_path), \
-        patch.dict(os.environ, {"HERMES_HOME": str(tmp_path / ".hermes")}):
+        patch.dict(os.environ, {"HERMES_HOME": str(tmp_path / ".deepagent")}):
        ...
    ```
 
@@ -415,15 +415,15 @@ automatically scope to the active profile.
    See `gateway/platforms/telegram.py` for the canonical pattern.
 
 6. **Profile operations are HOME-anchored, not HERMES_HOME-anchored** — `_get_profiles_root()`
-   returns `Path.home() / ".hermes" / "profiles"`, NOT `get_hermes_home() / "profiles"`.
-   This is intentional — it lets `hermes -p coder profile list` see all profiles regardless
+   returns `Path.home() / ".deepagent" / "profiles"`, NOT `get_hermes_home() / "profiles"`.
+   This is intentional — it lets `deepagent -p coder profile list` see all profiles regardless
    of which one is active.
 
 ## Known Pitfalls
 
-### DO NOT hardcode `~/.hermes` paths
+### DO NOT hardcode `~/.deepagent` paths
 Use `get_hermes_home()` from `hermes_constants` for code paths. Use `display_hermes_home()`
-for user-facing print/log messages. Hardcoding `~/.hermes` breaks profiles — each profile
+for user-facing print/log messages. Hardcoding `~/.deepagent` breaks profiles — each profile
 has its own `HERMES_HOME` directory. This was the source of 5 bugs fixed in PR #3575.
 
 ### DO NOT use `simple_term_menu` for interactive menus
@@ -438,8 +438,8 @@ Leaks as literal `?[K` text under `prompt_toolkit`'s `patch_stdout`. Use space-p
 ### DO NOT hardcode cross-tool references in schema descriptions
 Tool schema descriptions must not mention tools from other toolsets by name (e.g., `browser_navigate` saying "prefer web_search"). Those tools may be unavailable (missing API keys, disabled toolset), causing the model to hallucinate calls to non-existent tools. If a cross-reference is needed, add it dynamically in `get_tool_definitions()` in `model_tools.py` — see the `browser_navigate` / `execute_code` post-processing blocks for the pattern.
 
-### Tests must not write to `~/.hermes/`
-The `_isolate_hermes_home` autouse fixture in `tests/conftest.py` redirects `HERMES_HOME` to a temp dir. Never hardcode `~/.hermes/` paths in tests.
+### Tests must not write to `~/.deepagent/`
+The `_isolate_hermes_home` autouse fixture in `tests/conftest.py` redirects `HERMES_HOME` to a temp dir. Never hardcode `~/.deepagent/` paths in tests.
 
 **Profile tests**: When testing profile features, also mock `Path.home()` so that
 `_get_profiles_root()` and `_get_default_hermes_home()` resolve within the temp dir.
@@ -447,7 +447,7 @@ Use the pattern from `tests/hermes_cli/test_profiles.py`:
 ```python
 @pytest.fixture
 def profile_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".deepagent"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("HERMES_HOME", str(home))
