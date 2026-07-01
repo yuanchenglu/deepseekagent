@@ -6,9 +6,9 @@
 #
 # 功能:
 #   1. 接收一个描述任务的 JSON 文件路径（含有 task_id、instruction）
-#   2. 在 workspace/ 下创建结构化任务记录（task_{task_id}.json）
-#   3. 模拟执行（MVP 阶段，后续替换为真实 OpenCode 调用）
-#   4. 输出结构化 JSON 结果到 stdout
+#   2. 提取 task_id 和 instruction
+#   3. 用隔离的 OpenCode 二进制执行 instruction
+#   4. 记录运行日志到 workspace/last_run.log
 #
 # 隔离原则:
 #   - 不读取 ~/.config/opencode 或任何用户本地配置
@@ -49,22 +49,13 @@ if [ -z "$TASK_ID" ]; then
     TASK_ID="$(date +%s)-$$"
 fi
 
-# --- 创建任务工作文件（JSON 格式） ---
-{
-    echo "{"
-    echo "  \"task_id\": \"${TASK_ID}\","
-    echo "  \"status\": \"completed\","
-    echo "  \"started_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
-    echo "  \"instruction\": $(echo "$INSTRUCTION_RAW" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo "\"${INSTRUCTION_RAW}\""),"
-    echo "  \"result\": {"
-    echo "    \"summary\": \"模拟执行完成 — 内置研发小组已收到任务\","
-    echo "    \"changed_files\": 0,"
-    echo "    \"output\": \"(MVP 模拟模式，无实际代码变更)\""
-    echo "  }"
-    echo "}"
-} > "$OUTPUT_DIR/task_${TASK_ID}.json"
+# --- 调用隔离的 OpenCode 执行任务 ---
+echo "[DeepAgent Embedded] Invoking isolated OpenCode for task ${TASK_ID}..."
+OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
+    "$SCRIPT_DIR/opencode/macos-arm64/opencode" \
+    run "$INSTRUCTION_RAW" 2>&1
 
-# --- 更新最近运行日志 ---
+# 记录运行日志
 {
     echo "=== DeepAgent Code Mode Task Run ==="
     echo "Task ID: ${TASK_ID}"
@@ -72,6 +63,3 @@ fi
     echo "Instruction: ${INSTRUCTION_RAW}"
     echo "=== End of run ==="
 } > "$OUTPUT_DIR/last_run.log"
-
-# --- 输出结构化结果到 stdout（供 dispatcher 解析） ---
-cat "$OUTPUT_DIR/task_${TASK_ID}.json"

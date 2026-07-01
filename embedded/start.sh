@@ -23,10 +23,12 @@ case "$ACTION" in
         shift
         TASK_DESC="$*"
         echo "[DeepAgent Embedded] Running task: ${TASK_DESC:0:80}..."
-        # 创建临时任务文件并调用 run_task.sh
-        TASK_FILE=$(mktemp "${SCRIPT_DIR}/workspace/tmp_task_XXXXXX.txt")
-        echo "$TASK_DESC" > "$TASK_FILE"
-        exec "$SCRIPT_DIR/run_task.sh" "$TASK_FILE"
+        echo "[DeepAgent Embedded] Invoking isolated OpenCode..."
+        # 直接调用隔离的 OpenCode 二进制，不经过 run_task.sh
+        # OPENCODE_CONFIG_DIR 确保不会使用用户本地的 ~/.config/opencode
+        OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
+            "$SCRIPT_DIR/opencode/macos-arm64/opencode" \
+            run "$TASK_DESC"
         ;;
 
     list)
