@@ -75,6 +75,9 @@ website/static/api/skills-index.json
 # Personal fork artifacts
 yuanchenglu/
 
+# Embedded OpenCode workspace runtime data
+embedded/workspace/
+
 # macOS
 .DS_Store
 # Project-level oh-my-openagent config & tooling (user-specific)

@@ -1,0 +1,8 @@
+# DeepAgent 嵌入式研发小组配置
+# 与用户本地 OpenCode 完全隔离
+# 此配置文件仅由 embedded/run_task.sh 和 embedded/start.sh 读取
+
+model: deepseek-v4-flash
+workspace: ../workspace
+skills_dir: ../skills
+isolation: true
