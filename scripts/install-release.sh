@@ -1067,35 +1067,41 @@ maybe_download_dmg() {
     read -r dmg_answer < /dev/tty 2>/dev/null || dmg_answer="n"
 
     if [[ $dmg_answer =~ ^[Yy]$ ]]; then
-        local dmg_name="DeepAgent-${VERSION}-arm64.dmg"
-        local dmg_url="${R2_BASE_URL}/${dmg_name}"
-        local dmg_path="${HOME}/Downloads/${dmg_name}"
+        # 按当前架构尝试下载，失败后尝试另一种架构
+        local dmg_arches=("${ARCH_SHORT}" "arm64" "x64")
+        local dmg_downloaded=false
+        local dmg_path=""
 
-        log_info "正在下载桌面版 DMG..."
-        log_info "URL: ${dmg_url}"
+        for arch_try in "${dmg_arches[@]}"; do
+            local dmg_name="DeepAgent-${VERSION}-${arch_try}.dmg"
+            local dmg_url="${R2_BASE_URL}/${dmg_name}"
+            dmg_path="${HOME}/Downloads/${dmg_name}"
 
-        if curl -fsSL --connect-timeout 10 --max-time 180 "$dmg_url" -o "$dmg_path"; then
-            log_success "DMG 已下载到: ${dmg_path}"
+            log_info "尝试下载: ${dmg_name}"
+            if curl -fsSL --connect-timeout 10 --max-time 180 "$dmg_url" -o "$dmg_path" 2>/dev/null; then
+                log_success "DMG 已下载: ${dmg_path}"
+                dmg_downloaded=true
+                break
+            fi
+            log_info "  ${dmg_name} 不可用"
+        done
 
-            # 挂载 DMG 并打开 Finder
+        if [ "$dmg_downloaded" = true ]; then
             log_info "挂载 DMG..."
             if hdiutil attach "$dmg_path" -mountpoint "/Volumes/DeepAgent" 2>/dev/null; then
-                log_success "DMG 已挂载"
-                # 打开 Finder 窗口提示用户拖拽安装
+                log_success "DMG 已挂载，桌面版安装：请将 DeepAgent.app 拖到 Applications 文件夹"
                 open "/Volumes/DeepAgent" 2>/dev/null || true
                 echo ""
-                log_info "📋 请将 DeepAgent.app 拖到 Applications 文件夹完成桌面版安装"
-                log_info "（关掉 Finder 窗口即可跳过，不影响终端使用）"
+                log_info "📋 如果关掉 Finder 窗口，桌面版延期到下次安装。不影响终端使用。"
             else
-                log_warn "DMG 挂载失败，文件已保存到 ${dmg_path}"
-                log_info "请手动打开 DMG 安装桌面版"
+                log_warn "DMG 挂载失败，可手动打开安装: open ${dmg_path}"
             fi
         else
-            log_warn "DMG 下载失败，跳过桌面版安装"
-            log_info "稍后可手动下载: ${dmg_url}"
+            log_warn "桌面版暂未发布，暂无 DMG 下载"
+            log_info "CLI 版本不受影响，输入 deepagent 即可使用"
         fi
     else
-        log_info "已跳过桌面版安装。如需安装，请访问: https://deepseekagent.starseas.org/download"
+        log_info "已跳过桌面版安装。输入 deepagent 即可使用 CLI 版本。"
     fi
 }
 
