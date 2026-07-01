@@ -11,6 +11,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
+    "ignoreDeprecations": "6.0",
     "noFallthroughCasesInSwitch": true
   },
   "include": ["packages/client/src/**/*.ts", "packages/client/src/**/*.tsx", "packages/client/src/**/*.vue"]
