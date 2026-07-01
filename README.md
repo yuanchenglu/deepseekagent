@@ -1,178 +1,115 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
+  <img src="assets/banner.png" alt="Deep Agent" width="100%">
 </p>
 
-# DeepSeek Agent ☤
+# Deep Agent ☤
 
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-deepagent.starseas.org-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://github.com/yuanchenglu/DeepAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
 </p>
 
-**The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
+**Deep Agent 是基于 Hermes 深度改造的数字分身（CEO）产品**，核心目标是通过 **Harness 层** 让 DeepSeek 模型在真实场景下达到顶级水平。
 
-Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
-
-<table>
-<tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
-<tr><td><b>Lives where you do</b></td><td>Telegram, Discord, Slack, WhatsApp, Signal, and CLI — all from a single gateway process. Voice memo transcription, cross-platform conversation continuity.</td></tr>
-<tr><td><b>A closed learning loop</b></td><td>Agent-curated memory with periodic nudges. Autonomous skill creation after complex tasks. Skills self-improve during use. FTS5 session search with LLM summarization for cross-session recall. <a href="https://github.com/plastic-labs/honcho">Honcho</a> dialectic user modeling. Compatible with the <a href="https://agentskills.io">agentskills.io</a> open standard.</td></tr>
-<tr><td><b>Scheduled automations</b></td><td>Built-in cron scheduler with delivery to any platform. Daily reports, nightly backups, weekly audits — all in natural language, running unattended.</td></tr>
-<tr><td><b>Delegates and parallelizes</b></td><td>Spawn isolated subagents for parallel workstreams. Write Python scripts that call tools via RPC, collapsing multi-step pipelines into zero-context-cost turns.</td></tr>
-<tr><td><b>Runs anywhere, not just your laptop</b></td><td>Six terminal backends — local, Docker, SSH, Daytona, Singularity, and Modal. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
-<tr><td><b>Research-ready</b></td><td>Batch trajectory generation, Atropos RL environments, trajectory compression for training the next generation of tool-calling models.</td></tr>
-</table>
-
----
-
-## Quick Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/yuanchenglu/DeepAgent/main/scripts/install.sh | bash
-```
-
-Works on Linux, macOS, WSL2, and Android via Termux. The installer handles the platform-specific setup for you.
-
-> **Android / Termux:** The tested manual path is documented in the [Termux guide](https://hermes-agent.nousresearch.com/docs/getting-started/termux). On Termux, Hermes installs a curated `.[termux]` extra because the full `.[all]` extra currently pulls Android-incompatible voice dependencies.
+> **Modern + Harness + Scene = Agent**
 >
-> **Windows:** Native Windows is not supported. Please install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and run the command above.
+> - Modern 只决定下限
+> - Harness 层的深度优化决定上限
 
-After installation:
+## 核心定位
 
-```bash
-source ~/.bashrc    # reload shell (or: source ~/.zshrc)
-hermes              # start chatting!
-```
+- **用户 = 董事长**
+- **Deep Agent = CEO 数字分身**
+- 研发任务 → 指挥**内置的、完全隔离的** OpenCode 研发小组执行
+- 非研发任务 → Deep Agent 直接处理
 
----
-
-## Getting Started
-
-```bash
-hermes              # Interactive CLI — start a conversation
-hermes model        # Choose your LLM provider and model
-hermes tools        # Configure which tools are enabled
-hermes config set   # Set individual config values
-hermes gateway      # Start the messaging gateway (Telegram, Discord, etc.)
-hermes setup        # Run the full setup wizard (configures everything at once)
-hermes claw migrate # Migrate from OpenClaw (if coming from OpenClaw)
-hermes update       # Update to the latest version
-hermes doctor       # Diagnose any issues
-```
-
-📖 **[Full documentation →](https://hermes-agent.nousresearch.com/docs/)**
-
-## CLI vs Messaging Quick Reference
-
-Hermes has two entry points: start the terminal UI with `hermes`, or run the gateway and talk to it from Telegram, Discord, Slack, WhatsApp, Signal, or Email. Once you're in a conversation, many slash commands are shared across both interfaces.
-
-| Action | CLI | Messaging platforms |
-|---------|-----|---------------------|
-| Start chatting | `hermes` | Run `hermes gateway setup` + `hermes gateway start`, then send the bot a message |
-| Start fresh conversation | `/new` or `/reset` | `/new` or `/reset` |
-| Change model | `/model [provider:model]` | `/model [provider:model]` |
-| Set a personality | `/personality [name]` | `/personality [name]` |
-| Retry or undo the last turn | `/retry`, `/undo` | `/retry`, `/undo` |
-| Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]` |
-| Browse skills | `/skills` or `/<skill-name>` | `/skills` or `/<skill-name>` |
-| Interrupt current work | `Ctrl+C` or send a new message | `/stop` or send a new message |
-| Platform-specific status | `/platforms` | `/status`, `/sethome` |
-
-For the full command lists, see the [CLI guide](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and the [Messaging Gateway guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging).
+用户不应该感知到底层用了 OpenCode，也不应该被自己本地的 OpenCode 配置干扰。
 
 ---
 
-## Documentation
-
-All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**:
-
-| Section | What's Covered |
-|---------|---------------|
-| [Quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart) | Install → setup → first conversation in 2 minutes |
-| [CLI Usage](https://hermes-agent.nousresearch.com/docs/user-guide/cli) | Commands, keybindings, personalities, sessions |
-| [Configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration) | Config file, providers, models, all options |
-| [Messaging Gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging) | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
-| [Security](https://hermes-agent.nousresearch.com/docs/user-guide/security) | Command approval, DM pairing, container isolation |
-| [Tools & Toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools) | 40+ tools, toolset system, terminal backends |
-| [Skills System](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills) | Procedural memory, Skills Hub, creating skills |
-| [Memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory) | Persistent memory, user profiles, best practices |
-| [MCP Integration](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) | Connect any MCP server for extended capabilities |
-| [Cron Scheduling](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron) | Scheduled tasks with platform delivery |
-| [Context Files](https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files) | Project context that shapes every conversation |
-| [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture) | Project structure, agent loop, key classes |
-| [Contributing](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) | Development setup, PR process, code style |
-| [CLI Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands) | All commands and flags |
-| [Environment Variables](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) | Complete env var reference |
-
----
-
-## Migrating from OpenClaw
-
-If you're coming from OpenClaw, Hermes can automatically import your settings, memories, skills, and API keys.
-
-**During first-time setup:** The setup wizard (`hermes setup`) automatically detects `~/.openclaw` and offers to migrate before configuration begins.
-
-**Anytime after install:**
+## 快速开始
 
 ```bash
-hermes claw migrate              # Interactive migration (full preset)
-hermes claw migrate --dry-run    # Preview what would be migrated
-hermes claw migrate --preset user-data   # Migrate without secrets
-hermes claw migrate --overwrite  # Overwrite existing conflicts
+deepagent
 ```
 
-What gets imported:
-- **SOUL.md** — persona file
-- **Memories** — MEMORY.md and USER.md entries
-- **Skills** — user-created skills → `~/.hermes/skills/openclaw-imports/`
-- **Command allowlist** — approval patterns
-- **Messaging settings** — platform configs, allowed users, working directory
-- **API keys** — allowlisted secrets (Telegram, OpenRouter, OpenAI, Anthropic, ElevenLabs)
-- **TTS assets** — workspace audio files
-- **Workspace instructions** — AGENTS.md (with `--workspace-target`)
+更多命令：
+- `deepagent model`
+- `deepagent gateway`
+- `deepagent setup`
+- `deepagent webui start`   — 启动 WebUI 工作台 (http://localhost:8648)
+- `deepagent webui status`  — 查看 WebUI 状态
+- `deepagent webui stop`    — 停止 WebUI
 
-See `hermes claw migrate --help` for all options, or use the `openclaw-migration` skill for an interactive agent-guided migration with dry-run previews.
-
----
-
-## Contributing
-
-We welcome contributions! See the [Contributing Guide](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) for development setup, code style, and PR process.
-
-Quick start for contributors:
-
-```bash
-git clone https://github.com/yuanchenglu/DeepAgent.git
-cd hermes-agent
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv venv --python 3.11
-source venv/bin/activate
-uv pip install -e ".[all,dev]"
-python -m pytest tests/ -q
-```
-
-> **RL Training (optional):** To work on the RL/Tinker-Atropos integration:
+> 💡 **WebUI** 是 DeepAgent 的默认 Web 工作台，提供聊天、模型管理、设置等功能。
+> 安装时会自动构建。默认账号: `admin` / `123456`。
+>
+> ### 🖥️ 桌面应用（Electron）
+>
+> DeepAgent WebUI 可打包为独立的桌面应用（基于 Electron），无需通过浏览器访问。
+>
+> #### 启动（开发模式）
+>
 > ```bash
-> git submodule update --init tinker-atropos
-> uv pip install -e "./tinker-atropos"
+> cd webui
+> npx electron electron/main.js
 > ```
+>
+> #### 打包为安装包
+>
+> ```bash
+> # 安装依赖后一键打包（当前平台）
+> ./scripts/package-electron.sh
+>
+> # 或指定平台
+> ./scripts/package-electron.sh --mac     # macOS DMG
+> ./scripts/package-electron.sh --linux   # Linux AppImage/Deb
+>
+> # 也可通过 npm 脚本
+> cd webui
+> npm run electron:build          # 当前平台
+> npm run electron:build:mac      # macOS 专用
+> npm run electron:build:linux    # Linux 专用
+> ```
+>
+> 打包产物输出至 `webui/dist/electron-output/`。
+>
+> #### 相关文件
+>
+> | 文件 | 说明 |
+> |------|------|
+> | `webui/electron/main.js` | Electron 主进程，创建窗口并加载 `dist/client/index.html` |
+> | `webui/electron/preload.js` | 预加载脚本，通过 contextBridge 暴露桌面 API |
+> | `webui/electron/electron-builder.config.js` | electron-builder 打包配置 |
+> | `scripts/package-electron.sh` | 打包入口脚本 |
+>
+> > **注意**：此 Electron 打包方案是**轻量版**。如需要完整功能（内嵌 Python 运行时、自动更新、托盘图标等），请参考 `packages/desktop/`（通过 `npm run build:desktop` 构建）。
 
 ---
 
-## Community
+## MVP 四大方向（当前进展）
 
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📚 [Skills Hub](https://agentskills.io)
-- 🐛 [Issues](https://github.com/yuanchenglu/DeepAgent/issues)
-- 💡 [Discussions](https://github.com/yuanchenglu/DeepAgent/discussions)
-- 🔌 [HermesClaw](https://github.com/AaronWong1999/hermesclaw) — Community WeChat bridge: Run Hermes Agent and OpenClaw on the same WeChat account.
+| 方向 | 文档 | 开发状态 |
+|------|------|----------|
+| 上游同步 + 品牌统一 | [01-Upstream...](docs/specs/01-Upstream-Sync-and-Branding.md) | 脚本已创建 |
+| 桌面客户端 | [02-Desktop-Client.md](docs/specs/02-Desktop-Client.md) | PRD 完成 |
+| **Code 模式（核心）** | [03-Code-Mode-Implementation.md](docs/specs/03-Code-Mode-Implementation.md) | **骨架已落地** |
+| 工程质量 & Harness | [04-Engineering-and-Harness.md](docs/specs/04-Engineering-and-Harness.md) | PRD 完成 |
+
+详见 `docs/specs/MVP-PRD-Overview.md` 和 `IMPLEMENTATION-STATUS.md`。
 
 ---
 
-## License
+## 项目结构亮点（开发中）
 
-MIT — see [LICENSE](LICENSE).
+- `webui/` — 默认 Web 工作台（基于 Hermes Web UI）
+- `embedded/` — 内置、隔离的研发小组（OpenCode 等）
+- `deepagent_code_mode/` — Code 模式核心（dispatcher + session）
+- `scripts/brand-replace.py` — 品牌清理工具
+- `scripts/setup-webui.sh` — WebUI 安装脚本
+- `scripts/start-webui.sh` — WebUI 启动管理脚本
+- 完整 PRD 体系在 `docs/specs/`
 
-Built by [Nous Research](https://nousresearch.com).
+---
+
+**当前目标**：尽快把 MVP 四个方向的可执行骨架跑通，让 Deep Agent 真正具备“CEO 指挥内置研发小组”的能力。
