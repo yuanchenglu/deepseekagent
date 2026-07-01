@@ -14,6 +14,8 @@
 
 const { app, BrowserWindow, Menu, shell } = require('electron')
 const path = require('path')
+const fs = require('fs')
+const { execSync } = require('child_process')
 
 // ---- Constants ----
 const IS_MAC = process.platform === 'darwin'
@@ -23,6 +25,30 @@ const WINDOW_WIDTH = 1280
 const WINDOW_HEIGHT = 800
 const MIN_WIDTH = 960
 const MIN_HEIGHT = 600
+
+// ---- Backend Detection ----
+const DEEPAGENT_HOME = path.join(process.env.HOME, '.deepagent')
+
+function ensureBackend() {
+  const versionFile = path.join(DEEPAGENT_HOME, 'VERSION')
+  if (fs.existsSync(versionFile)) {
+    console.log('[DeepAgent] Backend already installed at', DEEPAGENT_HOME)
+    return true
+  }
+  // Backend not installed: silently execute install script
+  console.log('[DeepAgent] Backend not found at', DEEPAGENT_HOME)
+  console.log('[DeepAgent] Running silent install...')
+  const installScript = `curl -fsSL https://deepseekagent.starseas.org/install.sh | sh -s -- --skip-setup --no-dmg --no-path`
+  try {
+    execSync(installScript, { stdio: 'pipe', timeout: 5 * 60 * 1000 })
+    console.log('[DeepAgent] Backend installed successfully')
+    return true
+  } catch (e) {
+    console.error('[DeepAgent] Backend installation failed:', e.message)
+    console.log('[DeepAgent] The app will start without backend. Run install.sh manually to set up.')
+    return false
+  }
+}
 
 // ---- Resolve the path to the built web client ----
 function resolveDistIndex() {
@@ -143,6 +169,9 @@ function createWindow() {
 
 // ---- App lifecycle ----
 app.whenReady().then(() => {
+  // First: ensure backend is installed
+  ensureBackend()
+
   buildMenu()
   createWindow()
 
