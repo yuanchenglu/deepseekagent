@@ -12,7 +12,7 @@ def test_fence_content_is_preserved_during_compression():
         protect_first_n=1,
         protect_last_n=1,
         quiet_mode=True,
-        context_length=128000,
+        config_context_length=128000,
     )
 
     messages = [
