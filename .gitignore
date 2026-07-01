@@ -77,3 +77,8 @@ yuanchenglu/
 
 # macOS
 .DS_Store
+# Project-level oh-my-openagent config & tooling (user-specific)
+.opencode/
+
+# Brand replace temporary task file
+.brand-replace-task.md
