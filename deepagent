@@ -2,10 +2,60 @@
 """
 DeepAgent CLI launcher.
 
-This wrapper should behave like the installed `deepagent` command, including
+This wrapper behaves like the installed `deepagent` command, including
 subcommands such as `gateway`, `cron`, and `doctor`.
+
+Extended with `webui` subcommand for DeepAgent's default workbench.
 """
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def get_script_dir() -> Path:
+    """Return the project root directory where this script lives."""
+    return Path(__file__).resolve().parent
+
+
+def get_webui_script(name: str) -> str:
+    """Return absolute path to a webui script."""
+    return str(get_script_dir() / "scripts" / name)
+
+
+def cmd_webui(args: list[str]) -> int:
+    """Handle the `deepagent webui <action>` subcommand."""
+    action = args[0] if args else "help"
+    valid_actions = {"start", "stop", "status", "restart", "help"}
+
+    if action not in valid_actions:
+        print(f"Unknown webui action: {action}")
+        print("Usage: deepagent webui {start|stop|status|restart}")
+        return 1
+
+    script = get_webui_script("start-webui.sh")
+    if not os.path.isfile(script):
+        print(f"Error: {script} not found.")
+        print("Make sure the DeepAgent repository is complete.")
+        return 1
+
+    result = subprocess.run(
+        ["bash", script, action],
+        cwd=get_script_dir(),
+    )
+    return result.returncode
+
+
+def main() -> None:
+    """Main entry point with webui subcommand interception."""
+    if len(sys.argv) > 1 and sys.argv[1] == "webui":
+        sys.exit(cmd_webui(sys.argv[2:]))
+
+    # Fall through to the standard Hermes CLI
+    from hermes_cli.main import main as hermes_main
+    hermes_main()
+
+
 if __name__ == "__main__":
-    from hermes_cli.main import main
     main()

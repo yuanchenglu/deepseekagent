@@ -352,6 +352,32 @@ else
 fi
 
 # ============================================================================
+# WebUI — default workbench
+# ============================================================================
+
+echo ""
+echo -e "${CYAN}→${NC} Setting up WebUI (default workbench)..."
+echo -e "${YELLOW}ℹ${NC} This will install npm dependencies and build the WebUI."
+echo -e "${YELLOW}ℹ${NC} Requires Node.js 23+."
+echo ""
+
+if ! command -v node &> /dev/null; then
+    echo -e "${YELLOW}⚠${NC} Node.js not found — skipping WebUI setup."
+    echo "  To set up WebUI later, run:"
+    echo "    ./scripts/setup-webui.sh"
+else
+    if [ -f "$SCRIPT_DIR/scripts/setup-webui.sh" ]; then
+        bash "$SCRIPT_DIR/scripts/setup-webui.sh" || {
+            echo -e "${YELLOW}⚠${NC} WebUI setup failed (non-fatal)."
+            echo "  To retry later, run:"
+            echo "    ./scripts/setup-webui.sh"
+        }
+    else
+        echo -e "${YELLOW}⚠${NC} scripts/setup-webui.sh not found — skipping."
+    fi
+fi
+
+# ============================================================================
 # Done
 # ============================================================================
 
@@ -380,6 +406,8 @@ else
 fi
 echo "Other commands:"
 echo "  deepagent status        # Check configuration"
+echo "  deepagent webui start   # Start WebUI workbench (port 8648)"
+echo "  deepagent webui status  # Check WebUI status"
 if is_termux; then
     echo "  deepagent gateway       # Run gateway in foreground"
 else
