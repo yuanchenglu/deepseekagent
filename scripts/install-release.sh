@@ -975,14 +975,7 @@ setup_path() {
     command_link_dir="$(get_command_link_dir)"
     command_link_display_dir="$(get_command_link_display_dir)"
 
-    # 检查 ~/.local/bin 是否已在 PATH 中
-    if echo "$PATH" | tr ':' '\n' | grep -q "^$command_link_dir$"; then
-        log_info "$command_link_display_dir 已在 PATH 中"
-        export PATH="$command_link_dir:$PATH"
-        return 0
-    fi
-
-    # 检测用户登录 shell
+    # 检测用户登录 shell（无论 PATH 中是否已有，都确保 shell config 有持久配置）
     local shell_configs=()
     local is_fish=false
     local login_shell
@@ -1055,59 +1048,201 @@ setup_path() {
 # ============================================================================
 
 maybe_download_dmg() {
-    # 仅在 macOS 上提供 DMG 提示
+    # 桌面版下载是安装流程的一部分，不是可选步骤
+    # 安装过程自动尝试下载，失败不阻塞流程
+    DMG_INSTALLED=false
+
+    # 仅在 macOS 上提供 DMG
     [ "$OS" != "macos" ] && return 0
-    # 非交互式模式跳过
-    [ "$IS_INTERACTIVE" = false ] && return 0
 
     echo ""
-    log_info "🖥️  DeepAgent 桌面版（可选）..."
-    log_info "DeepAgent 提供 macOS 桌面应用（基于 Electron），可作为独立窗口使用。"
-    echo ""
-    printf "是否下载桌面版 DMG？[y/N] "
-    read -r dmg_answer < /dev/tty 2>/dev/null || dmg_answer="n"
+    log_info "🖥️  下载 DeepAgent 桌面版..."
 
-    if [[ $dmg_answer =~ ^[Yy]$ ]]; then
-        # 按当前架构尝试下载，失败后尝试另一种架构
-        local dmg_arches=("${ARCH_SHORT}" "arm64" "x64")
-        local dmg_downloaded=false
-        local dmg_path=""
+    # 按优先级尝试架构：当前架构优先，然后回退
+    local dmg_arches=()
+    if [ "$ARCH_SHORT" = "arm64" ]; then
+        dmg_arches=("arm64" "x64")
+    else
+        dmg_arches=("x64" "arm64")
+    fi
 
-        for arch_try in "${dmg_arches[@]}"; do
-            local dmg_name="DeepAgent-${VERSION}-${arch_try}.dmg"
-            local dmg_url="${R2_BASE_URL}/${dmg_name}"
-            dmg_path="${HOME}/Downloads/${dmg_name}"
+    local dmg_downloaded=false
+    local dmg_path=""
 
-            log_info "尝试下载: ${dmg_name}"
-            if curl -fsSL --connect-timeout 10 --max-time 180 "$dmg_url" -o "$dmg_path" 2>/dev/null; then
-                log_success "DMG 已下载: ${dmg_path}"
-                dmg_downloaded=true
-                break
-            fi
-            log_info "  ${dmg_name} 不可用"
-        done
+    for arch_try in "${dmg_arches[@]}"; do
+        local dmg_name="DeepAgent-${VERSION}-${arch_try}.dmg"
+        local dmg_url="${R2_BASE_URL}/${dmg_name}"
+        dmg_path="${HOME}/Downloads/${dmg_name}"
 
-        if [ "$dmg_downloaded" = true ]; then
-            log_info "挂载 DMG..."
-            if hdiutil attach "$dmg_path" -mountpoint "/Volumes/DeepAgent" 2>/dev/null; then
-                log_success "DMG 已挂载，桌面版安装：请将 DeepAgent.app 拖到 Applications 文件夹"
-                open "/Volumes/DeepAgent" 2>/dev/null || true
-                echo ""
-                log_info "📋 如果关掉 Finder 窗口，桌面版延期到下次安装。不影响终端使用。"
-            else
-                log_warn "DMG 挂载失败，可手动打开安装: open ${dmg_path}"
-            fi
+        log_info "Trying: ${dmg_name}"
+        if curl -fsSL --connect-timeout 10 --max-time 180 "$dmg_url" -o "$dmg_path" 2>/dev/null; then
+            log_success "DMG downloaded: ${dmg_path}"
+            dmg_downloaded=true
+            break
+        fi
+        log_info "  ${dmg_name} not available"
+    done
+
+    if [ "$dmg_downloaded" = true ]; then
+        DMG_INSTALLED=true
+        log_info "Mounting DMG..."
+        if hdiutil attach "$dmg_path" -mountpoint "/Volumes/DeepAgent" 2>/dev/null; then
+            log_success "DMG mounted. To install: drag DeepAgent.app to Applications"
+            open "/Volumes/DeepAgent" 2>/dev/null || true
+            echo ""
+            log_info "If you close the window, install later from: ${dmg_path}"
         else
-            log_warn "桌面版暂未发布，暂无 DMG 下载"
-            log_info "CLI 版本不受影响，输入 deepagent 即可使用"
+            log_warn "DMG mount failed. Install manually: open ${dmg_path}"
         fi
     else
-        log_info "已跳过桌面版安装。输入 deepagent 即可使用 CLI 版本。"
+        log_warn "Desktop DMG not available for download yet"
+        log_info "CLI version is unaffected — run 'deepagent' to start"
     fi
 }
 
 # ============================================================================
-# Step 8: 完成提示
+# Step 8: 自动启动
+# ============================================================================
+# 安装完成后自动启动 DeepAgent WebUI（或桌面版），打开浏览器。
+# 用户无需手动输入命令。
+# ============================================================================
+
+auto_start() {
+    local webui_port=8648
+    local webui_url="http://localhost:${webui_port}"
+
+    echo ""
+    log_info "Starting DeepAgent..."
+
+    # 判断优先启动桌面版还是 WebUI
+    if [ "$DMG_INSTALLED" = true ] && [ -d "/Applications/DeepAgent.app" ]; then
+        log_info "Opening DeepAgent desktop app..."
+        open "/Applications/DeepAgent.app" 2>/dev/null || true
+    else
+        # 启动 WebUI 服务（需要 Node.js）
+        local node_cmd=""
+        if command -v node &>/dev/null; then
+            node_cmd="node"
+        elif [ -x "${INSTALL_DIR}/webui/bin/node" ]; then
+            node_cmd="${INSTALL_DIR}/webui/bin/node"
+        fi
+
+        if [ -n "$node_cmd" ] && [ -f "${INSTALL_DIR}/webui/bin/hermes-web-ui.mjs" ]; then
+            log_info "Starting WebUI server..."
+            mkdir -p "${INSTALL_DIR}/logs"
+            nohup "$node_cmd" "${INSTALL_DIR}/webui/bin/hermes-web-ui.mjs" \
+                start --port "$webui_port" \
+                >> "${INSTALL_DIR}/logs/webui.log" 2>&1 &
+            local webui_pid=$!
+            echo "$webui_pid" > "${INSTALL_DIR}/webui/server.pid" 2>/dev/null || true
+
+            # Wait up to 15s for server readiness
+            local waited=0
+            while [ $waited -lt 15 ]; do
+                if curl -s "http://127.0.0.1:${webui_port}/health" > /dev/null 2>&1; then
+                    break
+                fi
+                sleep 1
+                waited=$((waited + 1))
+            done
+            log_success "WebUI started (PID: $webui_pid)"
+        fi
+
+        # 打开浏览器
+        if command -v open &>/dev/null; then
+            open "${webui_url}" 2>/dev/null || true
+        elif command -v xdg-open &>/dev/null; then
+            xdg-open "${webui_url}" 2>/dev/null || true
+        fi
+    fi
+
+    echo ""
+    log_info "WebUI address: ${webui_url}"
+    log_info "Default login: admin / 123456"
+    log_info "CLI command:   deepagent"
+    log_info "You can also access the WebUI from any browser at the address above."
+}
+
+# ============================================================================
+# Step 9: 开机自启设置
+# ============================================================================
+# 询问用户是否设置开机自启。这是安装过程中唯一必需的用户交互。
+# macOS: LaunchAgents（plist）
+# Linux: systemd --user service（无需 sudo）
+# ============================================================================
+
+setup_autostart() {
+    local autostart_choice
+    echo ""
+    printf "Set DeepAgent to auto-start on boot? [Y/n] "
+    read -r autostart_choice < /dev/tty 2>/dev/null || autostart_choice="y"
+
+    if [[ $autostart_choice =~ ^[Yy]$ ]] || [[ -z $autostart_choice ]]; then
+        local link_dir
+        link_dir="$(get_command_link_dir)"
+
+        case "$OS" in
+            macos)
+                local plist_dir="$HOME/Library/LaunchAgents"
+                local plist_file="${plist_dir}/com.deepagent.plist"
+                mkdir -p "$plist_dir"
+                cat > "$plist_file" << PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.deepagent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${link_dir}/deepagent</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>WorkingDirectory</key>
+    <string>${INSTALL_DIR}</string>
+</dict>
+</plist>
+PLIST_EOF
+                launchctl load "$plist_file" 2>/dev/null || true
+                log_success "Auto-start configured (LaunchAgent)"
+                ;;
+            linux)
+                local systemd_dir="$HOME/.config/systemd/user"
+                local service_file="${systemd_dir}/deepagent.service"
+                mkdir -p "$systemd_dir"
+                cat > "$service_file" << SERVICE_EOF
+[Unit]
+Description=DeepAgent - AI Digital Twin
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${link_dir}/deepagent
+WorkingDirectory=${INSTALL_DIR}
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+SERVICE_EOF
+                systemctl --user daemon-reload 2>/dev/null || true
+                systemctl --user enable deepagent.service 2>/dev/null || true
+                log_success "Auto-start configured (systemd --user)"
+                ;;
+            *)
+                log_warn "Auto-start not supported on $OS yet"
+                log_info "Run 'deepagent' manually to start"
+                ;;
+        esac
+    else
+        log_info "Auto-start skipped. Run 'deepagent' to start."
+    fi
+}
+
+# ============================================================================
+# Step 10: 完成提示
 # ============================================================================
 
 print_success() {
@@ -1169,7 +1304,7 @@ main() {
 
     # ---- Step 1: 系统检测 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 1/8] 系统环境检测${NC}"
+    echo -e "${BLUE}${BOLD}[Step 1/10] 系统环境检测${NC}"
     detect_os
     detect_arch
     check_prerequisites
@@ -1179,7 +1314,7 @@ main() {
 
     # ---- Step 2: 下载 Release 包 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 2/8] 下载 Release 包${NC}"
+    echo -e "${BLUE}${BOLD}[Step 2/10] 下载 Release 包${NC}"
     if [ "$VERSION" = "latest" ]; then
         fetch_latest_version
     fi
@@ -1187,33 +1322,43 @@ main() {
 
     # ---- Step 3: 安装 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 3/8] 安装 DeepAgent${NC}"
+    echo -e "${BLUE}${BOLD}[Step 3/10] 安装 DeepAgent${NC}"
     install_release
     create_symlink
 
     # ---- Step 4: Skill 同步 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 4/8] 技能同步${NC}"
+    echo -e "${BLUE}${BOLD}[Step 4/10] 技能同步${NC}"
     sync_skills
 
     # ---- Step 5: 配置保留 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 5/8] 配置保留${NC}"
+    echo -e "${BLUE}${BOLD}[Step 5/10] 配置保留${NC}"
     setup_config
 
     # ---- Step 6: PATH 配置 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 6/8] PATH 配置${NC}"
+    echo -e "${BLUE}${BOLD}[Step 6/10] PATH 配置${NC}"
     setup_path
 
-    # ---- Step 7: Desktop DMG（macOS 可选） ----
+    # ---- Step 7: Desktop DMG ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 7/8] 桌面版安装（可选）${NC}"
+    echo -e "${BLUE}${BOLD}[Step 7/10] 桌面版安装${NC}"
     maybe_download_dmg
 
-    # ---- Step 8: 完成提示 ----
+    # ---- Step 8: 自动启动 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 8/8] 安装完成${NC}"
+    echo -e "${BLUE}${BOLD}[Step 8/10] 启动 DeepAgent${NC}"
+    auto_start
+
+    # ---- Step 9: 开机自启设置 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 9/10] 开机自启设置${NC}"
+    setup_autostart
+
+    # ---- Step 10: 完成提示 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 10/10] 安装完成${NC}"
     print_success
 
     # 清理临时文件
