@@ -113,10 +113,50 @@ print_banner() {
     echo -e "${NC}"
 }
 
-log_info()    { echo -e "${CYAN}→${NC} $1"; }
-log_success() { echo -e "${GREEN}✓${NC} $1"; }
-log_warn()    { echo -e "${YELLOW}⚠${NC} $1"; }
-log_error()   { echo -e "${RED}✗${NC} $1"; }
+log_info()    { echo -e "${CYAN}→${NC} $1"; log_install "INFO" "$1"; }
+log_success() { echo -e "${GREEN}✓${NC} $1"; log_install "OK" "$1"; }
+log_warn()    { echo -e "${YELLOW}⚠${NC} $1"; log_install "WARN" "$1"; }
+log_error()   { echo -e "${RED}✗${NC} $1"; log_install "ERROR" "$1"; }
+
+# ---- 本地安装日志 ----
+# 所有安装/更新操作都会记录到 INSTALL_DIR/install_update.log
+# 用于后续诊断，不上传任何用户隐私信息
+LOG_FILE=""
+init_log_file() {
+    local log_dir
+    if [ -n "${INSTALL_DIR:-}" ]; then
+        log_dir="$INSTALL_DIR"
+    elif [ -n "${DEEPAGENT_HOME:-}" ]; then
+        log_dir="$DEEPAGENT_HOME"
+    else
+        log_dir="$HOME/.deepagent"
+    fi
+    mkdir -p "$log_dir"
+    LOG_FILE="${log_dir}/install_update.log"
+    # 日志文件头（仅首次写入）
+    if [ ! -f "$LOG_FILE" ] || [ ! -s "$LOG_FILE" ]; then
+        {
+            echo "============================================"
+            echo " DeepAgent Install/Update Log"
+            echo " Started: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo " OS: ${OS:-unknown} (${DISTRO:-unknown})"
+            echo " Arch: ${ARCH:-unknown}"
+            echo " Version: ${VERSION:-unknown}"
+            echo "============================================"
+        } > "$LOG_FILE"
+    fi
+}
+
+log_install() {
+    [ -z "$LOG_FILE" ] && return
+    local level="$1"
+    local msg="$2"
+    local timestamp
+    timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    # 日志格式: [时间] [级别] 消息
+    # 不包含任何用户个人信息、环境变量值、文件路径（除了已知的 INSTALL_DIR）
+    echo "[${timestamp}] [${level}] ${msg}" >> "$LOG_FILE"
+}
 
 # 检测是否在 Termux（Android 终端模拟器）中运行
 is_termux() {
@@ -589,24 +629,38 @@ copy_with_fallback() {
 
 install_release() {
     local extract_dir="${TMP_DIR}/deepagent-${VERSION}"
+    local src_root="$TMP_DIR"
 
     log_info "解压 Release 包..."
     tar xzf "$TARBALL_PATH" -C "$TMP_DIR"
 
-    if [ ! -d "$extract_dir" ]; then
-        # 尝试查找解压后的唯一目录
-        extract_dir=$(ls -d "$TMP_DIR"/*/ 2>/dev/null | head -1)
-        if [ -z "$extract_dir" ] || [ ! -d "$extract_dir" ]; then
-            log_error "解压失败：无法找到解压后的目录"
+    # 检测 tarball 内部结构：
+    #   结构 A: tarball 有 deepagent-{VERSION}/ 外层目录（旧格式）
+    #   结构 B: 扁平 tarball，pyproject.toml 直接在根目录（build-release.sh 格式）
+    #   结构 C: 唯一的子目录（fallback）
+    if [ -d "$extract_dir" ]; then
+        src_root="$extract_dir"
+        log_success "Release 包解压成功（结构 A: deepagent-${VERSION}/）"
+    elif [ -f "$TMP_DIR/pyproject.toml" ]; then
+        src_root="$TMP_DIR"
+        log_success "Release 包解压成功（结构 B: 扁平 tarball）"
+    else
+        # Fallback: 尝试唯一的子目录
+        local first_subdir
+        first_subdir=$(ls -d "$TMP_DIR"/*/ 2>/dev/null | head -1)
+        if [ -n "$first_subdir" ] && [ -d "$first_subdir" ]; then
+            src_root="$first_subdir"
+            log_success "Release 包解压成功（结构 C: fallback 子目录）"
+        else
+            log_error "解压失败：无法识别 Release 包结构"
+            log_info "TMP_DIR 内容: $(ls -la "$TMP_DIR" 2>/dev/null | head -20)"
             rm -rf "$TMP_DIR"
             exit 1
         fi
     fi
 
-    log_success "Release 包解压成功"
-
     # 保存提取目录为全局变量，供后续步骤（sync_skills 等）使用
-    TMP_EXTRACT_DIR="$extract_dir"
+    TMP_EXTRACT_DIR="$src_root"
 
     # 判断是全新安装还是更新安装
     if [ -f "$INSTALL_DIR/VERSION" ]; then
@@ -648,38 +702,88 @@ install_release() {
     # 创建安装目录
     mkdir -p "$INSTALL_DIR"/{deepagent,webui,skills,logs}
 
-    # 复制 deepagent Python 包（排除 __pycache__，更新时保留用户 venv）
+    # ---- 复制 deepagent Python 包 ----
+    # 支持两种 tarball 结构：
+    #   A/C: deepagent/ 子目录包含所有 Python 源文件
+    #   B:   扁平结构，pyproject.toml 等文件在 src_root 根目录，需排除 skills/webui/VERSION
     log_info "复制 deepagent 核心模块..."
-    if [ -d "$extract_dir/deepagent" ]; then
-        copy_with_fallback "$extract_dir/deepagent/" "${INSTALL_DIR}/deepagent/" \
+    local deepagent_copied=false
+
+    if [ -d "$src_root/deepagent" ]; then
+        # 结构 A/C: deepagent/ 子目录
+        copy_with_fallback "$src_root/deepagent/" "${INSTALL_DIR}/deepagent/" \
             --exclude="__pycache__" \
             --exclude="*.pyc" \
             --exclude=".pyo" \
             --exclude="venv/" \
             --exclude=".venv/" \
             --exclude="*.egg-info/"
-        log_success "deepagent 核心模块已复制"
+        deepagent_copied=true
+        log_success "deepagent 核心模块已复制（deepagent/ 子目录）"
+    elif [ -f "$src_root/pyproject.toml" ]; then
+        # 结构 B: 扁平 tarball — 复制 pyproject.toml 和核心模块目录
+        # 需排除 skills/ webui/ VERSION（它们单独处理）
+        local da_dst="${INSTALL_DIR}/deepagent"
+        for _item in pyproject.toml uv.lock requirements.txt constraints-termux.txt \
+                      cli.py model_tools.py run_agent.py hermes_state.py \
+                      hermes_constants.py hermes_logging.py hermes_time.py utils.py \
+                      agent hermes_cli tools gateway cron acp_adapter plugins embedded; do
+            if [ -e "$src_root/$_item" ]; then
+                mkdir -p "$da_dst"
+                cp -r "$src_root/$_item" "$da_dst/"
+            fi
+        done
+        # 验证至少有核心文件被复制
+        if [ -f "$da_dst/pyproject.toml" ] && [ -d "$da_dst/hermes_cli" ]; then
+            deepagent_copied=true
+            log_success "deepagent 核心模块已复制（扁平结构）"
+        fi
     fi
 
-    # 复制预构建 WebUI
-    if [ -d "$extract_dir/webui" ]; then
+    if [ "$deepagent_copied" = false ]; then
+        log_error "安装失败：未找到 deepagent Python 模块源文件"
+        log_info "src_root 内容: $(ls "$src_root" 2>/dev/null | head -20)"
+        log_info "Release 包可能已损坏或结构不兼容"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+
+    # ---- 复制预构建 WebUI ----
+    if [ -d "$src_root/webui" ]; then
         log_info "复制 WebUI（预构建）..."
-        copy_with_fallback "$extract_dir/webui/" "${INSTALL_DIR}/webui/" \
+        copy_with_fallback "$src_root/webui/" "${INSTALL_DIR}/webui/" \
             --exclude="node_modules"
         log_success "WebUI 已复制"
+    else
+        log_warn "未找到 WebUI 目录，跳过（CLI 版本不受影响）"
     fi
 
-    # 复制系统 skills（manifest 同步在 Step 4 处理）
-    if [ -d "$extract_dir/skills" ]; then
+    # ---- 复制系统 skills ----
+    if [ -d "$src_root/skills" ]; then
         log_info "复制系统 skills..."
         mkdir -p "${INSTALL_DIR}/skills"
-        copy_with_fallback "$extract_dir/skills/" "${INSTALL_DIR}/skills/"
+        copy_with_fallback "$src_root/skills/" "${INSTALL_DIR}/skills/"
         log_success "系统 skills 已复制"
     fi
 
-    # 写版本文件
-    echo "$VERSION" > "${INSTALL_DIR}/VERSION"
+    # ---- 写版本文件 ----
+    if [ -f "$src_root/VERSION" ]; then
+        cp "$src_root/VERSION" "${INSTALL_DIR}/VERSION"
+    else
+        echo "$VERSION" > "${INSTALL_DIR}/VERSION"
+    fi
     log_success "版本文件已更新: $VERSION"
+
+    # ---- 安装后验证 ----
+    local py_file_count
+    py_file_count=$(find "${INSTALL_DIR}/deepagent" -type f -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$py_file_count" -lt 10 ]; then
+        log_error "安装失败：deepagent 目录 Python 文件过少（仅 $py_file_count 个 .py 文件）"
+        log_info "Release 包可能已损坏或不完整"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    log_success "安装内容验证通过（$py_file_count 个 Python 文件）"
 
     # ---- uv sync 安装 Python 依赖 ----
     local pkg_dir="${INSTALL_DIR}/deepagent"
@@ -780,7 +884,7 @@ sync_skills() {
     log_info "同步系统 skills 到用户目录..."
 
     # Release 包中 skills 的源目录（tarball 中解压出来的）
-    local bundled_skills_dir="${TMP_EXTRACT_DIR:-$extract_dir}/skills"
+    local bundled_skills_dir="${TMP_EXTRACT_DIR}/skills"
     # 用户 skills 目标目录
     local user_skills_dir="${INSTALL_DIR}/skills"
     # manifest 文件：记录每个 skill 的原始哈希，用于检测用户修改
@@ -1307,6 +1411,8 @@ main() {
     echo -e "${BLUE}${BOLD}[Step 1/10] 系统环境检测${NC}"
     detect_os
     detect_arch
+    init_log_file
+    log_install "START" "Installation started (version: ${VERSION:-latest})"
     check_prerequisites
     install_uv
     check_python
@@ -1360,6 +1466,9 @@ main() {
     echo ""
     echo -e "${BLUE}${BOLD}[Step 10/10] 安装完成${NC}"
     print_success
+
+    # 结束日志
+    log_install "DONE" "Installation completed successfully (version: ${VERSION:-latest})"
 
     # 清理临时文件
     cleanup
