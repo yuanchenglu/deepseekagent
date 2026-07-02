@@ -62,10 +62,11 @@ jobs:
       - name: Write VERSION file
         run: echo "${{ inputs.version }}" > VERSION
 
-      - name: Build tarball
+      - name: Build tarball (pre-release mode — skip pre-built checks)
         run: |
           chmod +x scripts/build-release.sh
-          SKIP_OPENCODE_CHECK=1 bash scripts/build-release.sh --version "${{ inputs.version }}"
+          SKIP_WEBUI_CHECK=1 SKIP_OPENCODE_CHECK=1 SKIP_SKILLS_MANIFEST=1 \
+            bash scripts/build-release.sh --version "${{ inputs.version }}"
 
       - name: List build artifacts
         run: ls -lh dist/releases/
@@ -100,7 +101,7 @@ jobs:
 
       - name: Install npm dependencies
         working-directory: webui
-        run: npm ci --ignore-scripts
+        run: npm install --ignore-scripts
 
       - name: Build WebUI (client + server)
         working-directory: webui
