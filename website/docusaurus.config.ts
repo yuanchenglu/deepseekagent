@@ -49,7 +49,7 @@ const config: Config = {
         docs: {
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/yuanchenglu/DeepAgent/edit/main/website/',
+          editUrl: 'https://github.com/yuanchenglu/deepseekagent/edit/main/website/',
         },
         blog: false,
         theme: {
@@ -90,7 +90,7 @@ const config: Config = {
           position: 'left',
         },
         {
-          href: 'https://github.com/yuanchenglu/DeepAgent',
+          href: 'https://github.com/yuanchenglu/deepseekagent',
           label: 'GitHub',
           position: 'right',
         },
@@ -111,7 +111,7 @@ const config: Config = {
         {
           title: '社区',
           items: [
-            { label: 'GitHub', href: 'https://github.com/yuanchenglu/DeepAgent' },
+            { label: 'GitHub', href: 'https://github.com/yuanchenglu/deepseekagent' },
           ],
         },
         {

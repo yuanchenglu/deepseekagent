@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [Google, Gmail, Calendar, Drive, Sheets, Docs, Contacts, Email, OAuth]
-    homepage: https://github.com/yuanchenglu/DeepAgent
+    homepage: https://github.com/yuanchenglu/deepseekagent
     related_skills: [himalaya]
 ---
 

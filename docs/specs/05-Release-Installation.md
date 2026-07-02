@@ -53,7 +53,7 @@ curl -fsSL https://deepseekagent.starseas.org/install.sh | sh
 
 ```
 1. 主源：Cloudflare R2 → https://deepseekagent.starseas.org/releases/deepagent-<version>.tar.gz
-2. 备用：GitHub Releases → https://github.com/yuanchenglu/DeepAgent/releases/download/v<version>/...
+2. 备用：GitHub Releases → https://github.com/yuanchenglu/deepseekagent/releases/download/v<version>/...
 3. 信任链加固：tarball 从 R2 下载，sha256 checksum 从 GitHub Releases 获取（不同信任域）
 4. 发布顺序：先上传 GitHub Releases → 确认成功后 → 再上传 R2（避免版本不一致竞态）
 ```

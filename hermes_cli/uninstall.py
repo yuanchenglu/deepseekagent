@@ -316,7 +316,7 @@ def run_uninstall(args):
         print(f"  {hermes_home}/")
         print()
         print("To reinstall later with your existing settings:")
-        print(color("  curl -fsSL https://raw.githubusercontent.com/yuanchenglu/DeepAgent/main/scripts/install.sh | bash", Colors.DIM))
+        print(color("  curl -fsSL https://raw.githubusercontent.com/yuanchenglu/deepseekagent/main/scripts/install.sh | bash", Colors.DIM))
         print()
     
     print(color("Reload your shell to complete the process:", Colors.YELLOW))

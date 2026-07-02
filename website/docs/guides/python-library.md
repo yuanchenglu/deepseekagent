@@ -15,19 +15,19 @@ Hermes isn't just a CLI tool. You can import `AIAgent` directly and use it progr
 Install Hermes directly from the repository:
 
 ```bash
-pip install git+https://github.com/yuanchenglu/DeepAgent.git
+pip install git+https://github.com/yuanchenglu/deepseekagent.git
 ```
 
 Or with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv pip install git+https://github.com/yuanchenglu/DeepAgent.git
+uv pip install git+https://github.com/yuanchenglu/deepseekagent.git
 ```
 
 You can also pin it in your `requirements.txt`:
 
 ```text
-hermes-agent @ git+https://github.com/yuanchenglu/DeepAgent.git
+hermes-agent @ git+https://github.com/yuanchenglu/deepseekagent.git
 ```
 
 :::tip

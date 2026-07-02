@@ -224,5 +224,5 @@ HERMES_LOG_LEVEL=DEBUG deepagent acp
 ## Further Reading
 
 - [ACP Specification](https://github.com/anysphere/acp)
-- [DeepAgent Agent Documentation](https://github.com/yuanchenglu/DeepAgent)
+- [DeepAgent Agent Documentation](https://github.com/yuanchenglu/deepseekagent)
 - Run `deepagent --help` for all CLI options

@@ -29,7 +29,7 @@ from typing import Optional
 
 # ---- Constants ----
 
-GH_REPO = "yuanchenglu/DeepAgent"
+GH_REPO = "yuanchenglu/deepseekagent"
 R2_BASE_URL = "https://deepseekagent.starseas.org/releases"
 GH_BASE_URL = f"https://github.com/{GH_REPO}/releases/download"
 GH_API_LATEST = f"https://api.github.com/repos/{GH_REPO}/releases/latest"
