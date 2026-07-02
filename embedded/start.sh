@@ -16,6 +16,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ---- 检测架构并选择对应的 OpenCode 二进制 ----
+ARCH="$(uname -m)"
+case "$ARCH" in
+    arm64|aarch64)  OPENCODE_BIN="$SCRIPT_DIR/opencode/macos-arm64/opencode" ;;
+    x86_64|amd64)   OPENCODE_BIN="$SCRIPT_DIR/opencode/macos-x64/opencode" ;;
+    *)              echo "[DeepAgent] Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+
+if [ ! -x "$OPENCODE_BIN" ]; then
+    echo "[DeepAgent] OpenCode binary not found at $OPENCODE_BIN"
+    echo "[DeepAgent] Run scripts/setup-embedded-opencode.sh to install"
+    exit 1
+fi
+
 ACTION="${1:-help}"
 
 case "$ACTION" in
@@ -27,7 +41,7 @@ case "$ACTION" in
         # 直接调用隔离的 OpenCode 二进制，不经过 run_task.sh
         # OPENCODE_CONFIG_DIR 确保不会使用用户本地的 ~/.config/opencode
         OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
-            "$SCRIPT_DIR/opencode/macos-arm64/opencode" \
+            "$OPENCODE_BIN" \
             run "$TASK_DESC"
         ;;
 
