@@ -89,3 +89,6 @@ embedded/workspace/
 # Brand replace temporary task file
 .brand-replace-task.md
 dist/releases/
+
+# OpenCode embedded binaries (download via setup-embedded-opencode.sh)
+embedded/opencode/macos-*/opencode
