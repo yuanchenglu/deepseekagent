@@ -287,7 +287,7 @@ print_manual_instructions() {
     echo "───────────────────────────────────────────────────────────"
     echo "   a. Cloudflare Dashboard → Workers & Pages → 创建"
     echo "   b. 选择 'Pages' → '连接到 Git'"
-    echo "   c. 选择 GitHub 仓库: yuanchenglu/DeepAgent"
+    echo "   c. 选择 GitHub 仓库: yuanchenglu/deepseekagent"
     echo "   d. 项目名称: ${PAGES_PROJECT}"
     echo "   e. 生产分支: main"
     echo "   f. 构建命令: npm run build（在 website/ 目录）"

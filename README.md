@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-deepagent.starseas.org-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://github.com/yuanchenglu/DeepAgent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://github.com/yuanchenglu/deepseekagent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
 **Deep Agent 是基于 Hermes 深度改造的数字分身（CEO）产品**，核心目标是通过 **Harness 层** 让 DeepSeek 模型在真实场景下达到顶级水平。

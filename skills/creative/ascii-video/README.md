@@ -2,7 +2,7 @@
 
 Renders any content as colored ASCII character video. Audio, video, images, text, or pure math in, MP4/GIF/PNG sequence out. Full RGB color per character cell, 1080p 24fps default. No GPU.
 
-Built for [Hermes Agent](https://github.com/yuanchenglu/DeepAgent). Usable in any coding agent. Canonical source lives here; synced to [`NousResearch/hermes-agent/skills/creative/ascii-video`](https://github.com/yuanchenglu/DeepAgent/tree/main/skills/creative/ascii-video) via PR.
+Built for [Hermes Agent](https://github.com/yuanchenglu/deepseekagent). Usable in any coding agent. Canonical source lives here; synced to [`NousResearch/hermes-agent/skills/creative/ascii-video`](https://github.com/yuanchenglu/deepseekagent/tree/main/skills/creative/ascii-video) via PR.
 
 ## What this is
 

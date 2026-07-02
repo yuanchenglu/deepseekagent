@@ -14,7 +14,7 @@ Run the one-line installer:
 
 ```bash
 # Linux / macOS / WSL2 / Android (Termux)
-curl -fsSL https://raw.githubusercontent.com/yuanchenglu/DeepAgent/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yuanchenglu/deepseekagent/main/scripts/install.sh | bash
 ```
 
 :::tip Android / Termux

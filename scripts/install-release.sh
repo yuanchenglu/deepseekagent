@@ -47,7 +47,7 @@ PYTHON_VERSION="3.11"
 # 主源：Cloudflare R2
 R2_BASE_URL="https://deepseekagent.starseas.org/releases"
 # 备用源：GitHub Releases（国内友好）
-GH_REPO="yuanchenglu/DeepAgent"
+GH_REPO="yuanchenglu/deepseekagent"
 GH_BASE_URL="https://github.com/${GH_REPO}/releases/download"
 
 # ---- 检测是否在交互式终端中运行 ----

@@ -63,7 +63,7 @@ If your skill is specialized, community-contributed, or niche, it's better suite
 ### Clone and install
 
 ```bash
-git clone --recurse-submodules https://github.com/yuanchenglu/DeepAgent.git
+git clone --recurse-submodules https://github.com/yuanchenglu/deepseekagent.git
 cd DeepAgent
 
 # Create venv with Python 3.11
@@ -639,7 +639,7 @@ test(tools): add unit tests for file_operations
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/yuanchenglu/DeepAgent/issues)
+- Use [GitHub Issues](https://github.com/yuanchenglu/deepseekagent/issues)
 - Include: OS, Python version, DeepAgent version (`deepagent version`), full error traceback
 - Include steps to reproduce
 - Check existing issues before creating duplicates

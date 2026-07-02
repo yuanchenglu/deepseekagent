@@ -223,7 +223,7 @@ const demoSequence = [
   { type: "prompt", text: "❯ " },
   {
     type: "type",
-    text: "Review the PR at yuanchenglu/DeepAgent#42 and fix any issues",
+    text: "Review the PR at yuanchenglu/deepseekagent#42 and fix any issues",
     delay: 30,
   },
   { type: "pause", ms: 600 },

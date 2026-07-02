@@ -153,7 +153,7 @@ Full automation templates gallery: [hermes-agent.nousresearch.com/docs/guides/au
 
 Documentation: [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com)
 
-GitHub: [github.com/yuanchenglu/DeepAgent](https://github.com/yuanchenglu/DeepAgent)
+GitHub: [github.com/yuanchenglu/deepseekagent](https://github.com/yuanchenglu/deepseekagent)
 
 ---
 

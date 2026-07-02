@@ -8,13 +8,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yuanchenglu/DeepAgent.git"
+    "url": "git+https://github.com/yuanchenglu/deepseekagent.git"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yuanchenglu/DeepAgent/issues"
+    "url": "https://github.com/yuanchenglu/deepseekagent/issues"
   },
-  "homepage": "https://github.com/yuanchenglu/DeepAgent#readme",
+  "homepage": "https://github.com/yuanchenglu/deepseekagent#readme",
   "dependencies": {
     "agent-browser": "^0.13.0",
     "@askjo/camofox-browser": "^1.5.2"
