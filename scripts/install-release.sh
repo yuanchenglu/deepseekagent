@@ -107,7 +107,8 @@ print_banner() {
     echo "┌─────────────────────────────────────────────────────────┐"
     echo "│          ☤ DeepAgent Release Installer                   │"
     echo "├─────────────────────────────────────────────────────────┤"
-    echo "│  基于 Hermes 深度改造的数字分身（CEO）产品                │"
+    echo "│  基于 Hermes + OpenCode， 专为 DeepSeek 所有物理特性，深度优化的  │"
+    echo "│  数字分身产品                                                │"
     echo "└─────────────────────────────────────────────────────────┘"
     echo -e "${NC}"
 }
@@ -405,7 +406,7 @@ curl_with_retry() {
     local attempt=1
 
     while [ "$attempt" -le "$max_attempts" ]; do
-        log_info "下载${desc}（尝试 $attempt/$max_attempts）"
+            log_info "${desc} (attempt ${attempt}/${max_attempts})"
         if curl -fsSL --connect-timeout 15 --max-time 180 "$url" -o "$output" 2>/dev/null; then
             return 0
         fi
@@ -498,7 +499,7 @@ download_and_verify() {
     if curl -fsSL --connect-timeout 10 --max-time 30 "$sha_url" -o "$sha_file" 2>/dev/null; then
         verify_sha256 "$tarball" "$sha_file"
     else
-        log_warn "无法获取校验和文件（$sha_url），跳过验证"
+        log_warn "Cannot fetch checksum file, skipping verification: $sha_url"
         return 0
     fi
 }
@@ -520,7 +521,7 @@ download_release() {
     detect_sha256_cmd
 
     # 策略 A: 尝试从主源（R2）下载 → 从 GitHub 获取校验和（不同信任域）
-    if curl_with_retry "$r2_url" "$TARBALL_PATH" "（主源 R2）"; then
+    if curl_with_retry "$r2_url" "$TARBALL_PATH" "(primary R2)"; then
         log_success "从主源下载成功"
         download_and_verify "$TARBALL_PATH" "$VERSION" || {
             rm -rf "$TMP_DIR"
@@ -533,7 +534,7 @@ download_release() {
     log_warn "主源下载失败，尝试备用源..."
     log_info "备用源 URL: ${gh_url}"
 
-    if curl_with_retry "$gh_url" "$TARBALL_PATH" "（备用源 GitHub）"; then
+    if curl_with_retry "$gh_url" "$TARBALL_PATH" "(fallback GitHub)"; then
         log_success "从备用源（GitHub Releases）下载成功"
         # 备用源也尝试校验（同一信任域，但聊胜于无）
         download_and_verify "$TARBALL_PATH" "$VERSION" || {
