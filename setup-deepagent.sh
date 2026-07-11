@@ -157,6 +157,18 @@ fi
 export VIRTUAL_ENV="$SCRIPT_DIR/venv"
 SETUP_PYTHON="$SCRIPT_DIR/venv/bin/python"
 
+# ----- Verify certifi CA bundle (prevents TLS connection failures) -----
+if ! "$SETUP_PYTHON" -c "import certifi; open(certifi.where())" 2>/dev/null; then
+    echo -e "${YELLOW}WRN${NC} certifi CA bundle missing -- reinstalling..."
+    "$SETUP_PYTHON" -m pip install --force-reinstall certifi 2>/dev/null || true
+    if "$SETUP_PYTHON" -c "import certifi; open(certifi.where())" 2>/dev/null; then
+        echo -e "${GREEN}OK${NC} certifi CA bundle fixed"
+    else
+        echo -e "${YELLOW}WRN${NC} certifi CA bundle still unavailable (non-fatal, TLS platforms may not connect)"
+    fi
+fi
+
+
 # ============================================================================
 # Dependencies
 # ============================================================================
@@ -279,6 +291,31 @@ else
 fi
 
 # ============================================================================
+
+
+# ============================================================================
+# Hermes conflict detection + data directory isolation
+# ============================================================================
+
+# Check if Hermes is installed on this machine
+if [ -d "$HOME/.hermes" ] && [ "${DEEPAGENT_HOME:-}" != "$HOME/.hermes" ]; then
+    echo ""
+    echo -e "${YELLOW}WRN${NC} Existing Hermes installation detected (~/.hermes/)"
+    echo -e "${CYAN}INF${NC} DeepAgent uses ~/.deepagent/ as isolated data directory"
+    echo -e "${CYAN}INF${NC} The two systems are fully isolated, no conflicts"
+    echo ""
+fi
+
+# Ensure DEEPAGENT_HOME is written to .env so CLI and Gateway use isolated directory
+if [ -f ".env" ]; then
+    if ! grep -q "DEEPAGENT_HOME" .env 2>/dev/null; then
+        echo "" >> .env
+        echo "# DeepAgent data directory (isolated from Hermes)" >> .env
+        echo "DEEPAGENT_HOME=\${DEEPAGENT_HOME:-\$HOME/.deepagent}" >> .env
+        echo -e "${GREEN}OK${NC} DEEPAGENT_HOME written to .env (default: ~/.deepagent)"
+    fi
+fi
+
 # PATH setup — symlink hermes into a user-facing bin dir
 # ============================================================================
 
