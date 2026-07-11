@@ -188,7 +188,6 @@ _APPROVAL_LABEL_MAP: Dict[str, str] = {
 }
 _FEISHU_BOT_MSG_TRACK_SIZE = 512                   # LRU size for tracking sent message IDs
 _FEISHU_REPLY_FALLBACK_CODES = frozenset({230011, 231003})  # reply target withdrawn/missing → create fallback
-_FEISHU_ACK_EMOJI = "OK"
 
 # QR onboarding constants
 _ONBOARD_ACCOUNTS_URLS = {
@@ -1847,7 +1846,6 @@ class FeishuAdapter(BasePlatformAdapter):
         loop = self._loop
         if (
             operator_type in {"bot", "app"}
-            or emoji_type == _FEISHU_ACK_EMOJI
             or not message_id
             or loop is None
             or bool(getattr(loop, "is_closed", lambda: False)())
@@ -2071,94 +2069,18 @@ class FeishuAdapter(BasePlatformAdapter):
 
     async def _handle_message_with_guards(self, event: MessageEvent) -> None:
         """Dispatch a single event through the agent pipeline with per-chat serialization
-        and a persistent ACK emoji reaction before processing starts.
+        and ensures per-chat serialization before processing starts.
 
         - Per-chat lock: ensures messages in the same chat are processed one at a time
           (matches openclaw's createChatQueue serial queue behaviour).
-        - ACK indicator: adds a CHECK reaction to the triggering message before handing
-          off to the agent and leaves it in place as a receipt marker.
         """
         chat_id = getattr(event.source, "chat_id", "") or "" if event.source else ""
         chat_lock = self._get_chat_lock(chat_id)
         async with chat_lock:
             message_id = event.message_id
-            if message_id:
-                await self._add_ack_reaction(message_id)
             await self.handle_message(event)
 
-    async def _add_ack_reaction(self, message_id: str) -> Optional[str]:
-        """Add a persistent ACK emoji reaction to signal the message was received."""
-        if not self._client or not message_id:
-            return None
-        try:
-            from lark_oapi.api.im.v1 import (  # lazy import — keeps optional dep optional
-                CreateMessageReactionRequest,
-                CreateMessageReactionRequestBody,
-            )
-            body = (
-                CreateMessageReactionRequestBody.builder()
-                .reaction_type({"emoji_type": _FEISHU_ACK_EMOJI})
-                .build()
-            )
-            request = (
-                CreateMessageReactionRequest.builder()
-                .message_id(message_id)
-                .request_body(body)
-                .build()
-            )
-            response = await asyncio.to_thread(self._client.im.v1.message_reaction.create, request)
-            if response and getattr(response, "success", lambda: False)():
-                data = getattr(response, "data", None)
-                return getattr(data, "reaction_id", None)
-            logger.warning(
-                "[Feishu] Failed to add ack reaction to %s: code=%s msg=%s",
-                message_id,
-                getattr(response, "code", None),
-                getattr(response, "msg", None),
-            )
-        except Exception:
-            logger.warning("[Feishu] Failed to add ack reaction to %s", message_id, exc_info=True)
-        return None
-
-    # =========================================================================
-    # Webhook server and security
-    # =========================================================================
-
-    def _record_webhook_anomaly(self, remote_ip: str, status: str) -> None:
-        """Increment the anomaly counter for remote_ip and emit a WARNING every threshold hits.
-
-        Mirrors openclaw's createWebhookAnomalyTracker: TTL 6 hours, log every 25 consecutive
-        error responses from the same IP.
-        """
-        now = time.time()
-        entry = self._webhook_anomaly_counts.get(remote_ip)
-        if entry is not None:
-            count, _last_status, first_seen = entry
-            if now - first_seen < _FEISHU_WEBHOOK_ANOMALY_TTL_SECONDS:
-                count += 1
-                if count % _FEISHU_WEBHOOK_ANOMALY_THRESHOLD == 0:
-                    logger.warning(
-                        "[Feishu] Webhook anomaly: %d consecutive error responses (%s) from %s "
-                        "over the last %.0fs",
-                        count,
-                        status,
-                        remote_ip,
-                        now - first_seen,
-                    )
-                self._webhook_anomaly_counts[remote_ip] = (count, status, first_seen)
-                return
-        # Either first occurrence or TTL expired — start fresh.
-        self._webhook_anomaly_counts[remote_ip] = (1, status, now)
-
-    def _clear_webhook_anomaly(self, remote_ip: str) -> None:
-        """Reset the anomaly counter for remote_ip after a successful request."""
-        self._webhook_anomaly_counts.pop(remote_ip, None)
-
-    # =========================================================================
-    # Inbound processing pipeline
-    # =========================================================================
-
-    async def _process_inbound_message(
+async def _process_inbound_message(
         self,
         *,
         data: Any,
