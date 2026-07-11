@@ -27,15 +27,15 @@ get_hermes_home = get_deepagent_home
 def get_default_hermes_root() -> Path:
     """Return the root Hermes directory for profile-level operations.
 
-    In standard deployments this is ``~/.hermes``.
+    默认部署路径为 ``~/.deepagent``.
 
-    In Docker or custom deployments where ``HERMES_HOME`` points outside
-    ``~/.hermes`` (e.g. ``/opt/data``), returns ``HERMES_HOME`` directly
+    在 Docker 或自定义部署中，``HERMES_HOME`` 可能指向
+    ``~/.deepagent``（如 ``/opt/data``）, returns ``HERMES_HOME`` directly
     — that IS the root.
 
-    In profile mode where ``HERMES_HOME`` is ``<root>/profiles/<name>``,
+    在 profile 模式下，``HERMES_HOME`` 为 ``<root>/profiles/<name>``,
     returns ``<root>`` so that ``profile list`` can see all profiles.
-    Works both for standard (``~/.hermes/profiles/coder``) and Docker
+    同时支持标准路径（``~/.deepagent/profiles/coder``）和 Docker
     (``/opt/data/profiles/coder``) layouts.
 
     Import-safe — no dependencies beyond stdlib.
@@ -47,7 +47,7 @@ def get_default_hermes_root() -> Path:
     env_path = Path(env_home)
     try:
         env_path.resolve().relative_to(native_home.resolve())
-        # HERMES_HOME is under ~/.hermes (normal or profile mode)
+        # HERMES_HOME 在 ~/.deepagent 下（标准或 profile 模式）
         return native_home
     except ValueError:
         pass
