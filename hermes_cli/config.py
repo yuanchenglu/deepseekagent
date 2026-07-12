@@ -425,6 +425,31 @@ DEFAULT_CONFIG = {
         "max_simple_words": 28,
         "cheap_model": {},
     },
+
+    # DeepAgent Harness: DeepSeek V4 Flash/Pro 智能路由配置
+    # 实现 Flash-first / Pro-on-checkpoint 路由策略
+    "deepseek_routing": {
+        "enabled": True,               # 是否启用智能路由
+        "flash_model": "deepseek-v4-flash",  # Flash 模型名
+        "pro_model": "deepseek-v4-pro",      # Pro 模型名
+        "flash_first": True,           # 默认 Flash 优先
+        "pro_on_checkpoint": True,     # Checkpoint 时升级 Pro
+        "pro_on_failure": True,        # 失败重试时升级 Pro
+    },
+
+    # DeepAgent Harness: Byte-Stable Prefix 配置
+    "prefix_stability": {
+        "enabled": True,
+        "freeze_after_build": True,
+        "track_fingerprint": True,
+    },
+
+    # DeepAgent Harness: Reasoning Content 管理配置
+    "reasoning_management": {
+        "enabled": True,
+        "strip_non_tool_reasoning": True,
+        "max_reasoning_chars": 8000,
+    },
     
     # Auxiliary model config — provider:model for each side task.
     # Format: provider is the provider name, model is the model slug.
