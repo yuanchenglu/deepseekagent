@@ -12,7 +12,7 @@
 - context_layout: Context Layout 管理器（sliding_window=128 近端锚点）
 - tool_schema_stabilizer: Tool Schema 稳定器（字节级确定性排序）
 """
-from .scene_router import SceneRouter, SceneType, route_instruction
+from .scene_router import SceneRouter, SceneType, route_instruction, route_enhanced
 from .prefix_manager import PrefixManager
 from .hard_constraint import HardConstraint, HardConstraintExtractor, extract_hard_constraints, format_constraints_for_prefix
 from .model_router import ModelRouter, ModelTier, RouteDecision
@@ -25,7 +25,7 @@ from .tool_schema_stabilizer import stabilize_tool_schemas, get_tools_fingerprin
 
 __all__ = [
     # 场景路由
-    "SceneRouter", "SceneType", "route_instruction",
+    "SceneRouter", "SceneType", "route_instruction", "route_enhanced",
     # Byte-Stable Prefix
     "PrefixManager",
     # 硬约束注入
