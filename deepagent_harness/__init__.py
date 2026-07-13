@@ -22,6 +22,7 @@ from .immune_system import ImmuneSystem, Violation, ImmuneResult
 from .starroad_cognition import StarRoadCognition, MEMORY_TIERS
 from .context_layout import ContextLayoutManager
 from .tool_schema_stabilizer import stabilize_tool_schemas, get_tools_fingerprint
+from .bidirectional_primitives import BidirectionalPrimitives, MetaDirectiveType, MetaDirective, MetaDirectiveResult, get_meta_directive_tools, is_meta_directive_tool_name
 
 __all__ = [
     # 场景路由
@@ -45,4 +46,7 @@ __all__ = [
     "ContextLayoutManager",
     # Tool Schema 稳定器
     "stabilize_tool_schemas", "get_tools_fingerprint",
+    # 双向 Agent 元指令
+    "BidirectionalPrimitives", "MetaDirectiveType", "MetaDirective",
+    "MetaDirectiveResult", "get_meta_directive_tools", "is_meta_directive_tool_name",
 ]
