@@ -164,8 +164,10 @@ class ContextLayoutManager:
             if msg.get("role") == "user":
                 content = msg.get("content", "")
                 if isinstance(content, str):
-                    # 避免重复注入
-                    if "[当前目标]" not in content[-200:] if len(content) > 200 else True:
+                    # 避免重复注入：检查内容末尾是否已有anchor标记
+                    # 只检查最近500字符即可，anchor总是加在末尾
+                    check_region = content[-500:] if len(content) > 500 else content
+                    if "[当前目标]" not in check_region:
                         msg["content"] = content + "\n\n---\n" + anchor
                 break
 
@@ -184,6 +186,7 @@ class ContextLayoutManager:
         """
         # 粗略估算：1 token ≈ 4 字符（中文约 2 字符/token，但保守用 4）
         def est(chars):
+            """将字符数粗略估算为token数（1 token ≈ 4字符）。"""
             return max(1, chars // 4)
 
         # stable_prefix: system prompt 长度
