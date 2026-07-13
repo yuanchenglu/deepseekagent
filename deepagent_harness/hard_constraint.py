@@ -121,7 +121,7 @@ class HardConstraintExtractor:
         for pattern in _PROHIBITION_PATTERNS:
             for match in pattern.finditer(text):
                 full_match = match.group(0).strip()
-                if self._is_false_positive(full_match):
+                if self._is_false_positive(full_match, text, match.start()):
                     continue
                 # 归一化：去除所有空白字符用于去重比较
                 normalized = re.sub(r"\s+", "", full_match)
@@ -140,7 +140,7 @@ class HardConstraintExtractor:
         for pattern in _REQUIREMENT_PATTERNS:
             for match in pattern.finditer(text):
                 full_match = match.group(0).strip()
-                if self._is_false_positive(full_match):
+                if self._is_false_positive(full_match, text, match.start()):
                     continue
                 normalized = re.sub(r"\s+", "", full_match)
                 if normalized in seen_texts:
@@ -211,12 +211,14 @@ class HardConstraintExtractor:
 
         return "\n".join(lines)
 
-    def _is_false_positive(self, text: str) -> bool:
+    def _is_false_positive(self, text: str, original_text: str = "", match_start: int = 0) -> bool:
         """
         判断匹配到的文本是否为误匹配（不是真正的约束）。
 
         入参:
-            text: 正则匹配到的完整文本（含触发词）
+            text:          正则匹配到的完整文本（含触发词）
+            original_text: 原始输入文本（用于检查匹配位置的上下文）
+            match_start:   匹配在原始文本中的起始位置
 
         返回:
             True 表示是误匹配（应该跳过），False 表示是真正的约束
@@ -225,10 +227,35 @@ class HardConstraintExtractor:
             - "我不需要你的帮助" → 是表达个人意愿，不是对 Agent 行为的约束
             - "你能不能帮我？" → 疑问句，不是指令
             - 代码块/引用中的"不要" → 是举例而非约束
+            - "不需要/不能/不要"前面紧邻"不"字形成双重否定
         """
         for fp_pattern in _FALSE_POSITIVE_PATTERNS:
             if fp_pattern.search(text):
                 return True
+
+        # 检查匹配位置前面是否有否定词（"不"字紧邻触发词）
+        # 如"我不需要帮助"中，"需要"前有"不"
+        if match_start > 0 and original_text:
+            prev_char = original_text[match_start - 1]
+            if prev_char == "不":
+                # 前面是"不"，这是否定表述而非约束
+                return True
+
+        # 检查匹配位置前一定范围内（10个字符）是否有元语言否定引述
+        # 如"我不是说禁止你使用工具"（禁止前有"不是说"，表示否定这个禁止）
+        # 如"我并没有说不要删除"（不要前有"并没有说"，引述性否定）
+        if match_start > 0 and original_text:
+            lookback_start = max(0, match_start - 12)
+            prefix_text = original_text[lookback_start:match_start]
+            NEGATION_META_PATTERNS = [
+                "不是说", "没说", "不是指", "并非说", "并不是说",
+                "没有说", "并不是", "并非是", "并不意味着", "不是在说",
+                "不是要", "并不是要", "不是让你", "并没有说",
+            ]
+            for neg_pat in NEGATION_META_PATTERNS:
+                if neg_pat in prefix_text:
+                    return True
+
         return False
 
     def _extract_keywords(self, action_text: str) -> List[str]:
