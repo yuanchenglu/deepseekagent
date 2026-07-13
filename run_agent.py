@@ -8702,6 +8702,7 @@ class AIAgent:
             has_retried_429 = False
             restart_with_compressed_messages = False
             restart_with_length_continuation = False
+            _routed_model = None
 
             finish_reason = "stop"
             response = None  # Guard against UnboundLocalError if all retries fail
@@ -8735,10 +8736,41 @@ class AIAgent:
                 except Exception as e:
                     logger.debug("Harness context layout injection failed: %s", e)
 
+            # === DeepAgent Harness: Flash/Pro model routing ===
+            if self._harness_enabled:
+                try:
+                    _mr = getattr(self, '_model_router', None)
+                    if _mr and hasattr(_mr, 'route'):
+                        _route_context = {
+                            "context_tokens": approx_tokens,
+                            "active_files": len(getattr(self, '_active_files', set())),
+                            "dependency_depth": getattr(self, '_dependency_depth', 0),
+                            "failures_so_far": retry_count,
+                            "tool_calls_so_far": api_call_count,
+                            "risk_level": "high" if (self._harness_strategy and
+                                self._harness_strategy.review_standard in ("deep", "max")) else "low",
+                            "requires_final_review": api_call_count == self.max_iterations - 1,
+                        }
+                        _route_decision = _mr.route(
+                            _route_context,
+                            instruction=str(api_messages[-1].get("content", ""))[:200] if api_messages else ""
+                        )
+                        _routed_model = _route_decision.model_name
+                        if _routed_model != self.model:
+                            logger.info(
+                                "Harness model route: %s -> %s | reason: %s",
+                                self.model, _routed_model, _route_decision.reason,
+                            )
+                except Exception as e:
+                    logger.debug("Harness model routing failed (non-fatal): %s", e)
+
             while retry_count < max_retries:
                 try:
                     self._reset_stream_delivery_tracking()
                     api_kwargs = self._build_api_kwargs(api_messages)
+                    # 应用模型路由决策
+                    if _routed_model and _routed_model != self.model:
+                        api_kwargs["model"] = _routed_model
                     if self._force_ascii_payload:
                         _sanitize_structure_non_ascii(api_kwargs)
                     if self.api_mode == "codex_responses":
