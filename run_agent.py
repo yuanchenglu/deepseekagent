@@ -1101,6 +1101,7 @@ class AIAgent:
             from deepagent_harness.starroad_cognition import StarRoadCognition
             from deepagent_harness.intent_router import IntentRouter
             from deepagent_harness.hard_constraint import HardConstraintExtractor
+            from deepagent_harness.bidirectional_primitives import BidirectionalPrimitives, get_meta_directive_tools
 
             # Byte-Stable Prefix 管理器
             self._prefix_manager = PrefixManager()
@@ -1128,6 +1129,8 @@ class AIAgent:
             self._immune_system = ImmuneSystem()
             # StarRoad 三层认知引擎
             self._starroad = StarRoadCognition()
+            # 双向 Agent 元指令基元
+            self._bidirectional_primitives = BidirectionalPrimitives()
             # 7+1 意图路由器
             self._intent_router = IntentRouter()
             # 硬约束提取器
@@ -1148,6 +1151,7 @@ class AIAgent:
             self._model_router = None
             self._immune_system = None
             self._starroad = None
+            self._bidirectional_primitives = None
             self._intent_router = None
             self._constraint_extractor = None
             self._harness_constraints = []
