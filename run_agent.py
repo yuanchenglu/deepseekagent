@@ -8552,10 +8552,9 @@ class AIAgent:
                         # Add reasoning_content for API compatibility (Moonshot AI, Novita, OpenRouter)
                         api_msg["reasoning_content"] = reasoning_text
 
-                # Remove 'reasoning' field - it's for trajectory storage only
-                # We've copied it to 'reasoning_content' for the API above
-                if "reasoning" in api_msg:
-                    api_msg.pop("reasoning")
+                # NOTE: 'reasoning' field is NOT popped here — it is preserved
+                # for ReasoningManager.filter_messages_for_api() which runs
+                # below after the loop. The pop happens after the filter.
                 # Remove finish_reason - not accepted by strict APIs (e.g. Mistral)
                 if "finish_reason" in api_msg:
                     api_msg.pop("finish_reason")
@@ -8588,6 +8587,12 @@ class AIAgent:
                 except Exception as e:
                     logger.debug("Harness reasoning filter failed (non-fatal): %s", e)
             # === End Harness reasoning ===
+
+            # Pop 'reasoning' field from all assistant messages AFTER filtering,
+            # so the filter could inspect/use reasoning content if needed.
+            for _filtered_msg in api_messages:
+                if _filtered_msg.get("role") == "assistant" and "reasoning" in _filtered_msg:
+                    _filtered_msg.pop("reasoning")
 
             # Build the final system message: cached prompt + ephemeral system prompt.
             # Ephemeral additions are API-call-time only (not persisted to session DB).
