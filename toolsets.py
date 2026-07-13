@@ -195,6 +195,12 @@ TOOLSETS = {
     # "honcho" toolset removed — Honcho is now a memory provider plugin.
     # Tools are injected via MemoryManager, not the toolset system.
 
+    "meta": {
+        "description": "Meta-directive tools for bidirectional Agent-Harness coordination: request context, upgrade model, trigger self-review, propose skills",
+        "tools": ["need_more_context", "request_specialized_model", "trigger_self_review", "propose_skill"],
+        "includes": []
+    },
+
     "homeassistant": {
         "description": "Home Assistant smart home control and monitoring",
         "tools": ["ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service"],
