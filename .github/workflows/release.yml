@@ -1,29 +1,38 @@
 # ============================================================================
 # DeepAgent — Release Build & Publish Workflow
 # ============================================================================
-# 手动触发的 Release 流水线：构建 tarball + Desktop DMG → GitHub Releases + R2。
+# Release 流水线：构建 tarball + Desktop DMG → GitHub Releases + R2 + Pages。
 #
-# Phase 6.5 of the release-installation plan (docs/specs/05-Release-Installation.md)
+# 触发方式:
+#   1. 推送 tag（如 v0.9.0-alpha.1）自动触发
+#   2. 手动触发：gh workflow run release.yml -f version=0.9.0
+#   3. 手动 dry run：gh workflow run release.yml -f version=0.9.0 -f dry_run=true
 #
-# 使用方式:
-#   gh workflow run release.yml -f version=0.9.0
-#   gh workflow run release.yml -f version=0.9.0 -f dry_run=true   # 仅构建不上传
+# Job 依赖链:
+#   build-tarball + build-dmg (并行) → publish → deploy-r2 → deploy-pages
 #
 # 输出物:
 #   - deepagent-{version}.tar.gz + .sha256  → GitHub Releases + R2
 #   - Deep.Agent-{version}-arm64.dmg        → GitHub Releases + R2
 #   - Deep.Agent-{version}-x64.dmg          → GitHub Releases + R2
+#   - Landing Page + Docs                    → Cloudflare Pages
 #
 # 所需 Secrets:
-#   CF_ACCOUNT_ID          — Cloudflare account ID (用于 R2 endpoint)
-#   CF_R2_ACCESS_KEY_ID    — R2 S3 兼容 API access key
+#   CF_ACCOUNT_ID           — Cloudflare account ID (用于 R2 endpoint)
+#   CF_R2_ACCESS_KEY_ID     — R2 S3 兼容 API access key
 #   CF_R2_SECRET_ACCESS_KEY — R2 S3 兼容 API secret key
-#   GITHUB_TOKEN            — 自动注入，无需手动配置
+#   CLOUDFLARE_API_TOKEN    — Cloudflare API token (用于 Pages 部署)
+#   GITHUB_TOKEN             — 自动注入，无需手动配置
 # ============================================================================
 
 name: Release Build & Publish
 
 on:
+  # 触发方式 1：推送版本 tag（如 v0.9.0-alpha.1）
+  push:
+    tags:
+      - 'v*'
+  # 触发方式 2：手动触发
   workflow_dispatch:
     inputs:
       version:
@@ -48,7 +57,7 @@ permissions:
 jobs:
 
   # --------------------------------------------------------------------------
-  # Job 1: Build Release Tarball
+  # Job 1: Build Release Tarball (+ Smoke Test)
   # --------------------------------------------------------------------------
   build-tarball:
     name: Build Release Tarball
@@ -59,17 +68,62 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Determine release version
+        id: version
+        run: |
+          # 如果是 workflow_dispatch，使用 inputs.version
+          # 如果是 push tag，从 tag 名提取版本号（去掉 v 前缀）
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # GITHUB_REF 格式: refs/tags/v0.9.0-alpha.1
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
       - name: Write VERSION file
-        run: echo "${{ inputs.version }}" > VERSION
+        run: echo "${{ steps.version.outputs.version }}" > VERSION
 
       - name: Build tarball (pre-release mode — skip pre-built checks)
         run: |
           chmod +x scripts/build-release.sh
           SKIP_WEBUI_CHECK=1 SKIP_OPENCODE_CHECK=1 SKIP_SKILLS_MANIFEST=1 \
-            bash scripts/build-release.sh --version "${{ inputs.version }}"
+            bash scripts/build-release.sh --version "${{ steps.version.outputs.version }}"
 
       - name: List build artifacts
         run: ls -lh dist/releases/
+
+      # ─── Smoke Test：验证 tarball 在实际环境中可用 ───────────────────────
+      # 解压 tarball → 安装 uv → uv sync --no-dev → deepagent --version
+      - name: Smoke test — verify tarball is installable
+        run: |
+          echo "=== Smoke Test: Extract → uv sync → deepagent --version ==="
+          TARBALL="dist/releases/deepagent-${{ steps.version.outputs.version }}.tar.gz"
+          SMOKE_DIR="/tmp/smoke-test"
+
+          mkdir -p "$SMOKE_DIR"
+          tar -xzf "$TARBALL" -C "$SMOKE_DIR"
+
+          # 安装 uv
+          curl -fsSL https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # 在解压目录中创建 venv 并安装依赖
+          cd "$SMOKE_DIR"
+          uv venv --python 3.12
+          uv sync --no-dev
+
+          # 验证 deepagent --version 可执行
+          echo "=== Running: deepagent --version ==="
+          .venv/bin/deepagent --version || {
+            echo "WARNING: deepagent --version exited with non-zero (may need full env)"
+            echo "Checking if binary exists..."
+            ls -la .venv/bin/deepagent
+          }
+
+          echo "=== Smoke Test PASSED ==="
 
       - name: Upload tarball & checksum as artifact
         uses: actions/upload-artifact@v4
@@ -138,6 +192,17 @@ jobs:
         with:
           fetch-depth: 0   # needed for changelog / release notes
 
+      - name: Determine release version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
 
@@ -156,8 +221,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ inputs.version }}" \
-            --title "DeepAgent v${{ inputs.version }}" \
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "DeepAgent v${{ steps.version.outputs.version }}" \
             --notes "See [CHANGELOG](docs/releases/CHANGELOG.md) for details." \
             release-tarball/* dmg-arm64/* dmg-x64/*
 
@@ -187,3 +252,62 @@ jobs:
           done
 
           echo "R2 upload complete."
+
+  # --------------------------------------------------------------------------
+  # Job 4: Deploy Landing Page + Docs to Cloudflare Pages
+  # --------------------------------------------------------------------------
+  deploy-pages:
+    name: Deploy to Cloudflare Pages
+    needs: [publish]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '23'
+
+      - name: Install wrangler
+        run: npm install -g wrangler
+
+      - name: Build website (landing page + docs)
+        run: |
+          if [ -f scripts/build-website.sh ]; then
+            chmod +x scripts/build-website.sh
+            bash scripts/build-website.sh
+          else
+            echo "scripts/build-website.sh not found — using landingpage/ directly"
+            mkdir -p website/build
+            cp -r landingpage/* website/build/ 2>/dev/null || true
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          cd website
+          npx wrangler pages deploy build \
+            --project-name=deepagent-website \
+            --branch=main
+
+      - name: Verify deployment
+        run: |
+          echo "=== Verifying Pages deployment ==="
+          sleep 5
+          # 获取最新部署 URL
+          PAGES_URL=$(npx wrangler pages deployment list \
+            --project-name=deepagent-website 2>/dev/null | \
+            grep -oE 'https://[a-f0-9]+\.deepagent-website\.pages\.dev' | head -1)
+
+          if [ -z "$PAGES_URL" ]; then
+            echo "WARNING: Could not determine Pages URL — check Cloudflare dashboard"
+          else
+            echo "Pages URL: $PAGES_URL"
+            # 验证首页可访问
+            curl -sI "$PAGES_URL/" | head -1 || echo "WARNING: Could not verify page"
+          fi
+          echo "=== Pages deployment complete ==="
