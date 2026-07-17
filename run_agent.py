@@ -1092,6 +1092,74 @@ class AIAgent:
         # Cached system prompt -- built once per session, only rebuilt on compression
         self._cached_system_prompt: Optional[str] = None
         
+        # === DeepAgent Harness: DeepSeek V4 适配层初始化 ===
+        try:
+            from deepagent_harness.prefix_manager import PrefixManager
+            from deepagent_harness.reasoning_manager import ReasoningManager
+            from deepagent_harness.model_router import ModelRouter
+            from deepagent_harness.immune_system import ImmuneSystem
+            from deepagent_harness.starroad_cognition import StarRoadCognition
+            from deepagent_harness.intent_router import IntentRouter
+            from deepagent_harness.hard_constraint import HardConstraintExtractor
+            from deepagent_harness.bidirectional_primitives import BidirectionalPrimitives, get_meta_directive_tools
+
+            # Byte-Stable Prefix 管理器
+            self._prefix_manager = PrefixManager()
+            # Reasoning Content 管理器（provider感知）
+            provider_name = (provider or "").lower() if provider else "deepseek"
+            self._reasoning_manager = ReasoningManager(provider=provider_name)
+            # Tool Schema 稳定器（确保跨轮次 schema 字节级一致，最大化 cache 命中）
+            from deepagent_harness.tool_schema_stabilizer import stabilize_tool_schemas, get_tools_fingerprint
+            self._stabilize_tool_schemas = stabilize_tool_schemas
+            self._get_tools_fingerprint = get_tools_fingerprint
+            self._tools_fingerprint: Optional[str] = None
+            # Context Layout 管理器（基于 sliding_window=128 布局关键信息）
+            from deepagent_harness.context_layout import ContextLayoutManager
+            self._context_layout = ContextLayoutManager(sliding_window=128)
+            # Flash/Pro 智能路由器（从config读取配置）
+            routing_config = {}
+            try:
+                from hermes_cli.config import load_config
+                _cfg = load_config()
+                routing_config = _cfg.get("deepseek_routing", {})
+            except Exception:
+                pass
+            self._model_router = ModelRouter(config=routing_config)
+            # Agent 免疫系统
+            self._immune_system = ImmuneSystem()
+            # StarRoad 三层认知引擎
+            self._starroad = StarRoadCognition()
+            # 双向 Agent 元指令基元
+            self._bidirectional_primitives = BidirectionalPrimitives()
+            # 7+1 意图路由器
+            self._intent_router = IntentRouter()
+            # 硬约束提取器
+            self._constraint_extractor = HardConstraintExtractor()
+            # Harness 运行时状态
+            self._harness_constraints: list = []
+            self._harness_intent = None
+            self._harness_strategy = None
+            self._harness_enabled = routing_config.get("enabled", False) or True  # 默认启用 Harness
+        except Exception as _he:
+            logger.debug("Harness init failed (non-fatal): %s", _he)
+            self._prefix_manager = None
+            self._reasoning_manager = None
+            self._stabilize_tool_schemas = None
+            self._get_tools_fingerprint = None
+            self._tools_fingerprint = None
+            self._context_layout = None
+            self._model_router = None
+            self._immune_system = None
+            self._starroad = None
+            self._bidirectional_primitives = None
+            self._intent_router = None
+            self._constraint_extractor = None
+            self._harness_constraints = []
+            self._harness_intent = None
+            self._harness_strategy = None
+            self._harness_enabled = False
+        # === End Harness ===
+        
         # Filesystem checkpoint manager (transparent — not a tool)
         from tools.checkpoint_manager import CheckpointManager
         self._checkpoint_mgr = CheckpointManager(
@@ -3506,10 +3574,32 @@ class AIAgent:
         
         Called after context compression events. Also reloads memory from disk
         so the rebuilt prompt captures any writes from this session.
+
+        DeepAgent Harness: When Byte-Stable Prefix is enabled (prefix frozen),
+        compression does NOT invalidate the system prompt. Instead, memory
+        updates are injected via turn tail (user message head) to preserve
+        prefix cache stability.
         """
-        self._cached_system_prompt = None
-        if self._memory_store:
-            self._memory_store.load_from_disk()
+        try:
+            _pm = getattr(self, '_prefix_manager', None)
+        except Exception:
+            _pm = None
+        if _pm and _pm.is_frozen:
+            # Byte-Stable Prefix: 不重建 system prompt，只重新加载 memory
+            # Memory 更新通过 turn tail 注入，不破坏前缀缓存
+            if self._memory_store:
+                self._memory_store.load_from_disk()
+                # 将 memory 更新通知注入到下一 turn 的 tail
+                _pm.inject_mid_session_change(
+                    "memory_update",
+                    "Memory has been updated. Check for new relevant information."
+                )
+            logger.debug("Harness: System prompt NOT invalidated (byte-stable prefix)")
+        else:
+            # 原始行为：清除缓存，下次 turn 重建
+            self._cached_system_prompt = None
+            if self._memory_store:
+                self._memory_store.load_from_disk()
 
     def _responses_tools(self, tools: Optional[List[Dict[str, Any]]] = None) -> Optional[List[Dict[str, Any]]]:
         """Convert chat-completions tool schemas to Responses function-tool schemas."""
@@ -6927,6 +7017,97 @@ class AIAgent:
         )
         return compressed, new_system_prompt
 
+    def _handle_meta_directive(
+        self, function_name: str, function_args: dict, effective_task_id: str
+    ) -> str:
+        """处理双向 Agent 元指令（Harness 层响应）。"""
+        import json as _json
+
+        try:
+            if function_name == "need_more_context":
+                what = function_args.get("what", "")
+                why = function_args.get("why", "")
+                suggested = function_args.get("suggested_sources", [])
+                context_parts = [f"[need_more_context] 你请求了更多信息：{what}"]
+                if why:
+                    context_parts.append(f"原因：{why}")
+                for src in suggested[:3]:
+                    if isinstance(src, str) and len(src) < 200:
+                        import os
+                        if os.path.isfile(src):
+                            try:
+                                with open(src, 'r') as f:
+                                    content = f.read(2000)
+                                context_parts.append(f"文件 {src} 内容：\n{content[:2000]}")
+                            except Exception:
+                                pass
+                _pm = getattr(self, '_prefix_manager', None)
+                if _pm:
+                    _pm.inject_mid_session_change(
+                        "context_request",
+                        "\n".join(context_parts) + "\n请根据以上信息继续。如果信息仍然不足，请使用 clarify 工具询问用户。"
+                    )
+                return _json.dumps({
+                    "status": "handled",
+                    "directive": "need_more_context",
+                    "message": "Context request noted. Additional context will be provided in the next turn.",
+                }, ensure_ascii=False)
+
+            elif function_name == "request_specialized_model":
+                model_type = function_args.get("model_type", "pro")
+                reason = function_args.get("reason", "")
+                _mr = getattr(self, '_model_router', None)
+                if _mr:
+                    if model_type == "pro_max":
+                        _mr.force_pro_max(reason)
+                    else:
+                        _mr.force_upgrade(reason)
+                return _json.dumps({
+                    "status": "handled",
+                    "directive": "request_specialized_model",
+                    "message": f"Model upgrade request noted: {model_type} ({reason})",
+                }, ensure_ascii=False)
+
+            elif function_name == "trigger_self_review":
+                focus = function_args.get("focus_areas", [])
+                confidence = function_args.get("confidence", "low")
+                _sr = getattr(self, '_starroad', None)
+                if _sr:
+                    review_prompt = _sr.get_l3_review_prompt({"goal": "self-review"})
+                    _pm2 = getattr(self, '_prefix_manager', None)
+                    if _pm2:
+                        _pm2.inject_mid_session_change(
+                            "self_review",
+                            f"[Self-Review Triggered]\n请对照以下检查清单进行自查：\n{review_prompt}"
+                        )
+                return _json.dumps({
+                    "status": "handled",
+                    "directive": "trigger_self_review",
+                    "message": f"Self-review triggered (confidence={confidence}, focus={focus})",
+                }, ensure_ascii=False)
+
+            elif function_name == "propose_skill":
+                skill_name = function_args.get("skill_name", "")
+                trigger = function_args.get("trigger", "")
+                steps = function_args.get("steps", [])
+                if skill_name and steps:
+                    _pm3 = getattr(self, '_prefix_manager', None)
+                    if _pm3:
+                        _pm3.inject_mid_session_change(
+                            "skill_proposal",
+                            f"[Skill Proposal] 提议固化 Skill「{skill_name}」：\n"
+                            f"触发条件：{trigger}\n步骤：{', '.join(steps[:5])}"
+                        )
+                return _json.dumps({
+                    "status": "handled",
+                    "directive": "propose_skill",
+                    "message": f"Skill '{skill_name}' proposed for固化",
+                }, ensure_ascii=False)
+
+            return _json.dumps({"error": f"Unknown meta directive: {function_name}"})
+        except Exception as _e:
+            return _json.dumps({"error": str(_e)})
+
     def _execute_tool_calls(self, assistant_message, messages: list, effective_task_id: str, api_call_count: int = 0) -> None:
         """Execute tool calls from the assistant message and append results to messages.
 
@@ -7028,6 +7209,11 @@ class AIAgent:
                 max_iterations=function_args.get("max_iterations"),
                 parent_agent=self,
             )
+        # === DeepAgent Harness: 双向 Agent 元指令处理 ===
+        elif function_name in ("need_more_context", "request_specialized_model",
+                              "trigger_self_review", "propose_skill"):
+            return self._handle_meta_directive(function_name, function_args, effective_task_id)
+        # === End Harness meta directives ===
         else:
             return handle_function_call(
                 function_name, function_args, effective_task_id,
@@ -7994,6 +8180,39 @@ class AIAgent:
                 logger.debug("Cognitive routing failed (non-fatal): %s", e)
         # === End ===
         
+        # === DeepAgent Harness: Pre-turn processing ===
+        # 在 System Prompt 构建前提取硬约束和意图分类
+        _harness_turn_tail = ""
+        if self._harness_enabled and self._cached_system_prompt is None:
+            try:
+                # 提取硬约束（从首条用户消息）
+                self._harness_constraints = self._constraint_extractor.extract(
+                    str(user_message), source="user_prompt"
+                )
+                # 场景分类+意图路由
+                from deepagent_harness.scene_router import SceneRouter
+                _scene_router = SceneRouter()
+                _scene_type = _scene_router.classify(str(user_message)).value
+                self._harness_intent, self._harness_strategy = (
+                    self._intent_router.classify_and_get_strategy(
+                        str(user_message), _scene_type
+                    )
+                )
+                logger.info(
+                    "Harness: scene=%s intent=%s model_hint=%s",
+                    _scene_type, self._harness_intent.value,
+                    self._harness_strategy.model_tier_hint,
+                )
+                # 初始化 Context Layout 管理器的任务上下文
+                if self._context_layout:
+                    self._context_layout.set_task_context(
+                        goal=str(user_message)[:100],
+                        constraints=[c.text for c in self._harness_constraints],
+                    )
+            except Exception as e:
+                logger.debug("Harness pre-turn processing failed (non-fatal): %s", e)
+        # === End Harness pre-turn ===
+        
         if not self.quiet_mode:
             self._safe_print(f"💬 Starting conversation: '{user_message[:60]}{'...' if len(user_message) > 60 else ''}'")
         
@@ -8046,6 +8265,40 @@ class AIAgent:
                         self._session_db.update_system_prompt(self.session_id, self._cached_system_prompt)
                     except Exception as e:
                         logger.debug("Session DB update_system_prompt failed: %s", e)
+
+                # === DeepAgent Harness: Byte-Stable Prefix 冻结 ===
+                # 在首次构建后追加 StarRoad L1 荣辱观（稳定内容）和硬约束（任务级稳定），然后冻结
+                try:
+                    _stable_extensions = []
+                    _sr = getattr(self, '_starroad', None)
+                    if _sr:
+                        # StarRoad L1 荣辱观（稳定，不随任务变化）
+                        _l1_section = _sr.get_l1_prompt_section()
+                        if _l1_section:
+                            _stable_extensions.append(_l1_section)
+                    # 硬约束（从首条用户消息提取，任务级别稳定）
+                    if self._harness_constraints:
+                        _ce = getattr(self, '_constraint_extractor', None)
+                        if _ce:
+                            _constraint_section = _ce.format_for_prefix(
+                                self._harness_constraints
+                            )
+                            if _constraint_section:
+                                _stable_extensions.append(_constraint_section)
+                    if _stable_extensions:
+                        self._cached_system_prompt += "\n\n" + "\n\n".join(_stable_extensions)
+                    # 冻结前缀
+                    _pm = getattr(self, '_prefix_manager', None)
+                    if _pm:
+                        _pm.freeze(self._cached_system_prompt)
+                        logger.info(
+                            "Harness: System prompt frozen, fingerprint=%s, length=%d chars",
+                            _pm.fingerprint,
+                            len(self._cached_system_prompt),
+                        )
+                except Exception as e:
+                    logger.debug("Harness prefix freeze failed (non-fatal): %s", e)
+                # === End Harness freeze ===
 
         active_system_prompt = self._cached_system_prompt
 
@@ -8266,6 +8519,30 @@ class AIAgent:
                             _injections.append(_fenced)
                     if _plugin_user_context:
                         _injections.append(_plugin_user_context)
+                    # === DeepAgent Harness: Turn tail 注入 ===
+                    # StarRoad L2 方法论（按意图类型）
+                    if self._harness_enabled and self._harness_intent:
+                        try:
+                            _sr = getattr(self, '_starroad', None)
+                            if _sr:
+                                _l2_section = _sr.get_l2_prompt_section(
+                                    self._harness_intent.value
+                                )
+                                if _l2_section:
+                                    _injections.append(_l2_section)
+                        except Exception:
+                            pass
+                    # PrefixManager 中的 mid-session 变更
+                    if self._harness_enabled:
+                        _pm = getattr(self, '_prefix_manager', None)
+                        if _pm and _pm.has_pending_injections:
+                            try:
+                                _tail = _pm.consume_turn_tail()
+                                if _tail:
+                                    _injections.append(_tail)
+                            except Exception:
+                                pass
+                    # === End Harness turn tail ===
                     if _injections:
                         _base = api_msg.get("content", "")
                         if isinstance(_base, str):
@@ -8279,10 +8556,9 @@ class AIAgent:
                         # Add reasoning_content for API compatibility (Moonshot AI, Novita, OpenRouter)
                         api_msg["reasoning_content"] = reasoning_text
 
-                # Remove 'reasoning' field - it's for trajectory storage only
-                # We've copied it to 'reasoning_content' for the API above
-                if "reasoning" in api_msg:
-                    api_msg.pop("reasoning")
+                # NOTE: 'reasoning' field is NOT popped here — it is preserved
+                # for ReasoningManager.filter_messages_for_api() which runs
+                # below after the loop. The pop happens after the filter.
                 # Remove finish_reason - not accepted by strict APIs (e.g. Mistral)
                 if "finish_reason" in api_msg:
                     api_msg.pop("finish_reason")
@@ -8297,6 +8573,30 @@ class AIAgent:
                 # Keep 'reasoning_details' - OpenRouter uses this for multi-turn reasoning context
                 # The signature field helps maintain reasoning continuity
                 api_messages.append(api_msg)
+
+            # === DeepAgent Harness: Reasoning Content 管理 ===
+            # 在发送 API 请求前过滤 reasoning 内容
+            _is_tool_loop = False
+            for _m in reversed(api_messages):
+                if _m.get("role") == "tool" or _m.get("tool_calls"):
+                    _is_tool_loop = True
+                    break
+            if self._harness_enabled:
+                try:
+                    _rm = getattr(self, '_reasoning_manager', None)
+                    if _rm:
+                        api_messages = _rm.filter_messages_for_api(
+                            api_messages, is_tool_loop=_is_tool_loop
+                        )
+                except Exception as e:
+                    logger.debug("Harness reasoning filter failed (non-fatal): %s", e)
+            # === End Harness reasoning ===
+
+            # Pop 'reasoning' field from all assistant messages AFTER filtering,
+            # so the filter could inspect/use reasoning content if needed.
+            for _filtered_msg in api_messages:
+                if _filtered_msg.get("role") == "assistant" and "reasoning" in _filtered_msg:
+                    _filtered_msg.pop("reasoning")
 
             # Build the final system message: cached prompt + ephemeral system prompt.
             # Ephemeral additions are API-call-time only (not persisted to session DB).
@@ -8406,15 +8706,75 @@ class AIAgent:
             has_retried_429 = False
             restart_with_compressed_messages = False
             restart_with_length_continuation = False
+            _routed_model = None
 
             finish_reason = "stop"
             response = None  # Guard against UnboundLocalError if all retries fail
             api_kwargs = None  # Guard against UnboundLocalError in except handler
 
+            # === DeepAgent Harness: Tool schema stabilization ===
+            if self._harness_enabled and self.tools:
+                try:
+                    _sts = getattr(self, '_stabilize_tool_schemas', None)
+                    _gtf = getattr(self, '_get_tools_fingerprint', None)
+                    if _sts and _gtf:
+                        self.tools = _sts(self.tools)
+                        new_fp = _gtf(self.tools)
+                        if self._tools_fingerprint is None:
+                            self._tools_fingerprint = new_fp
+                        elif self._tools_fingerprint != new_fp:
+                            logger.debug(
+                                "Harness: tools fingerprint changed %s -> %s",
+                                self._tools_fingerprint, new_fp,
+                            )
+                            self._tools_fingerprint = new_fp
+                except Exception as e:
+                    logger.debug("Harness tool schema stabilization failed: %s", e)
+
+            # === DeepAgent Harness: Context Layout anchor injection ===
+            if self._harness_enabled:
+                try:
+                    _cl = getattr(self, '_context_layout', None)
+                    if _cl:
+                        api_messages = _cl.inject_anchor_to_messages(api_messages)
+                except Exception as e:
+                    logger.debug("Harness context layout injection failed: %s", e)
+
+            # === DeepAgent Harness: Flash/Pro model routing ===
+            if self._harness_enabled:
+                try:
+                    _mr = getattr(self, '_model_router', None)
+                    if _mr and hasattr(_mr, 'route'):
+                        _route_context = {
+                            "context_tokens": approx_tokens,
+                            "active_files": len(getattr(self, '_active_files', set())),
+                            "dependency_depth": getattr(self, '_dependency_depth', 0),
+                            "failures_so_far": retry_count,
+                            "tool_calls_so_far": api_call_count,
+                            "risk_level": "high" if (self._harness_strategy and
+                                self._harness_strategy.review_standard in ("deep", "max")) else "low",
+                            "requires_final_review": api_call_count == self.max_iterations - 1,
+                        }
+                        _route_decision = _mr.route(
+                            _route_context,
+                            instruction=str(api_messages[-1].get("content", ""))[:200] if api_messages else ""
+                        )
+                        _routed_model = _route_decision.model_name
+                        if _routed_model != self.model:
+                            logger.info(
+                                "Harness model route: %s -> %s | reason: %s",
+                                self.model, _routed_model, _route_decision.reason,
+                            )
+                except Exception as e:
+                    logger.debug("Harness model routing failed (non-fatal): %s", e)
+
             while retry_count < max_retries:
                 try:
                     self._reset_stream_delivery_tracking()
                     api_kwargs = self._build_api_kwargs(api_messages)
+                    # 应用模型路由决策
+                    if _routed_model and _routed_model != self.model:
+                        api_kwargs["model"] = _routed_model
                     if self._force_ascii_payload:
                         _sanitize_structure_non_ascii(api_kwargs)
                     if self.api_mode == "codex_responses":
@@ -10834,6 +11194,39 @@ class AIAgent:
             except Exception as e:
                 logger.debug("Cognitive evaluation failed (non-fatal): %s", e)
         # === End ===
+
+        # === DeepAgent Harness: Post-execution immune review ===
+        if self._harness_enabled and final_response and not interrupted:
+            try:
+                _ims = getattr(self, '_immune_system', None)
+                if _ims:
+                    immune_result = _ims.post_execution_review(
+                        hard_constraints=self._harness_constraints,
+                        task_output=final_response,
+                        conversation_messages=messages[-10:],  # 最近10条
+                    )
+                    if immune_result.violations:
+                        logger.warning(
+                            "Harness immune: %d violations (compliance: %.0f%%)",
+                            len(immune_result.violations),
+                            immune_result.compliance_rate * 100,
+                        )
+                        result["harness_immune_violations"] = len(immune_result.violations)
+                        result["harness_compliance_rate"] = immune_result.compliance_rate
+                # 记录 Harness 诊断信息
+                _pm = getattr(self, '_prefix_manager', None)
+                _mr = getattr(self, '_model_router', None)
+                _rm = getattr(self, '_reasoning_manager', None)
+                result["harness"] = {
+                    "prefix_fingerprint": _pm.fingerprint if _pm else None,
+                    "intent": self._harness_intent.value if self._harness_intent else None,
+                    "model_route_log": _mr.get_route_history() if _mr else [],
+                    "reasoning_stats": _rm.get_summary() if _rm else {},
+                    "immune_stats": _ims.get_stats() if _ims else {},
+                }
+            except Exception as e:
+                logger.debug("Harness post-execution review failed (non-fatal): %s", e)
+        # === End Harness post-execution ===
 
         # Background memory/skill review — runs AFTER the response is delivered
         # so it never competes with the user's task for model attention.
