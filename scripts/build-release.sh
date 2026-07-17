@@ -248,27 +248,29 @@ create_dist_dir() {
 }
 
 # ============================================================================
-# Step 7-8: 打包 tarball（含排除规则和包含路径清单）
+# Step 7-8: 打包 tarball（排除模式 — 打包整个项目根，靠 exclude 排除）
 # ============================================================================
 #
-# 打包策略：在 PROJECT_ROOT 内执行 tar，使用相对路径。
-# 这样 tarball 解压后的根目录就是项目根 — pyproject.toml 在顶层。
+# 打包策略：在 PROJECT_ROOT 内执行 tar .，使用相对路径。
+# tarball 解压后的根目录就是项目根 — pyproject.toml 在顶层。
 #
-# 排除规则:
-#   --exclude='__pycache__'  — Python 缓存
-#   --exclude='.git'         — Git 元数据
-#   --exclude='.venv'        — Python 虚拟环境（项目级）
-#   --exclude='venv'         — Python 虚拟环境（备选目录名）
-#   --exclude='node_modules' — Node.js 依赖
-#   --exclude='dist/releases'— 本脚本的输出（防止嵌套打包）
+# 采用「排除模式」：打包整个项目根目录（.），通过 --exclude 排除不需要的内容。
+# 这样比显式列举文件更不容易遗漏新增文件（如 deepagent_harness/、新测试等）。
 #
-# 包含路径（来自 spec Step 8）:
-#   pyproject.toml uv.lock requirements.txt constraints-termux.txt
-#   cli.py model_tools.py run_agent.py hermes_state.py hermes_constants.py
-#   hermes_logging.py hermes_time.py utils.py
-#   agent/ hermes_cli/ tools/ gateway/ cron/ acp_adapter/ plugins/
-#   skills/ embedded/ webui/dist/ webui/bin/ webui/electron/ webui/package.json
-#   VERSION
+# 排除规则分两类：
+#   A) 全局排除（base name 匹配，任意层级生效）：
+#      __pycache__、*.pyc、*.pyo、.git、.venv、venv、node_modules、
+#      .DS_Store、.coverage、htmlcov、.pytest_cache、*.egg-info、
+#      .hermes、.omc、.workbuddy、.codegraph、.omo、.opencode
+#
+#   B) 顶层目录排除（含 / 的模式按完整路径匹配，仅排除顶层）：
+#      ./dist/releases、./dist/website（排除构建产物，但保留 webui/dist）
+#      ./input、./logs、./tmp、./temp、./temp_vision_images、
+#      ./sessions、./memories、./form.html、./test_screenshots、
+#      ./.workspace-write-test.md、./.brand-replace-task.md、./.update_check
+#
+# 注意：不使用 --exclude='./dist'（会误排除 webui/dist），而是精确排除
+#       ./dist/releases 和 ./dist/website 两个子目录。
 # ============================================================================
 
 build_tarball() {
@@ -277,53 +279,54 @@ build_tarball() {
     log_info "构建 Release tarball..."
     log_info "  路径: ${tarball_path}"
     log_info "  版本: v${VERSION}"
+    log_info "  模式: 排除模式（打包整个项目根，排除 dev/构建产物）"
 
     # 切换到项目根目录，确保 tarball 内的路径是相对的
     cd "$PROJECT_ROOT"
 
-    # 用 tar 打包，项目根 = tarball 根
-    # 使用 --exclude 排除不需要的目录和文件
+    # 打包前清空 dist/releases/ 中的旧 tarball 和校验文件，避免嵌套打包
+    log_info "  清空 dist/releases/ 旧产物..."
+    rm -f "${DIST_DIR}"/*.tar.gz "${DIST_DIR}"/*.sha256 2>/dev/null || true
+
+    # 用 tar 打包整个项目根目录（.），通过 --exclude 排除不需要的内容
+    # 这样确保所有新增文件（如 deepagent_harness/、新测试、新脚本）自动包含
     tar czf "$tarball_path" \
+        \
         --exclude='__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.pyo' \
         --exclude='.git' \
         --exclude='.venv' \
         --exclude='venv' \
         --exclude='node_modules' \
-        --exclude='dist/releases' \
-        --exclude='*.pyc' \
-        --exclude='*.pyo' \
         --exclude='.DS_Store' \
         --exclude='.coverage' \
         --exclude='htmlcov' \
         --exclude='.pytest_cache' \
         --exclude='*.egg-info' \
+        --exclude='.hermes' \
+        --exclude='.omc' \
+        --exclude='.workbuddy' \
+        --exclude='.codegraph' \
+        --exclude='.omo' \
+        --exclude='.opencode' \
         \
-        pyproject.toml \
-        uv.lock \
-        requirements.txt \
-        constraints-termux.txt \
-        cli.py \
-        model_tools.py \
-        run_agent.py \
-        hermes_state.py \
-        hermes_constants.py \
-        hermes_logging.py \
-        hermes_time.py \
-        utils.py \
-        agent/ \
-        hermes_cli/ \
-        tools/ \
-        gateway/ \
-        cron/ \
-        acp_adapter/ \
-        plugins/ \
-        skills/ \
-        embedded/ \
-        webui/dist/ \
-        webui/bin/ \
-        webui/electron/ \
-        webui/package.json \
-        VERSION
+        --exclude='./dist/releases' \
+        --exclude='./dist/website' \
+        --exclude='./input' \
+        --exclude='./logs' \
+        --exclude='./tmp' \
+        --exclude='./temp' \
+        --exclude='./temp_vision_images' \
+        --exclude='./sessions' \
+        --exclude='./memories' \
+        --exclude='./form.html' \
+        --exclude='./test_screenshots' \
+        --exclude='./.workspace-write-test.md' \
+        --exclude='./.brand-replace-task.md' \
+        --exclude='./.update_check' \
+        \
+        .
 
     # 验证 tarball 是否成功创建
     if [ -f "$tarball_path" ]; then
