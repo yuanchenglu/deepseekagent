@@ -27,6 +27,28 @@
 
 ---
 
+## DeepAgent Harness 层（核心优化）
+
+DeepAgent 为 DeepSeek V4 模型量身定制了 **10 个 Harness 层模块**，最大化发挥模型物理特性：
+
+| 模块 | 功能 |
+|------|------|
+| **Byte-Stable Prefix** (`prefix_manager.py`) | System Prompt 冻结锁定，变更注入尾部，最大化 KV Cache 命中率 |
+| **硬约束注入** (`hard_constraint.py`) | 纯正则提取"必须/禁止"约束，物理隔离不参与压缩 |
+| **Flash/Pro 智能路由** (`model_router.py`) | Flash-first 策略，复杂任务自动升级 Pro，降低 70% 成本 |
+| **Reasoning 管理** (`reasoning_manager.py`) | 按 Provider 策略剥离无用 reasoning，tool 轮保留符合协议 |
+| **7+1 意图路由** (`intent_router.py`) | 8 种任务类型识别，自动绑定面谈/计划/审查策略 |
+| **Agent 免疫系统** (`immune_system.py`) | 执行后自动审查硬约束遵守情况，违反时固化 Skill |
+| **StarRoad 认知** (`starroad_cognition.py`) | 三层认知：L1荣辱观、L2方法论、L3三省吾身 |
+| **Context Layout** (`context_layout.py`) | sliding_window=128 近端锚点，关键信息不被挤出 |
+| **Tool Schema 稳定器** (`tool_schema_stabilizer.py`) | 工具描述字节稳定，确保 cache 命中 |
+| **双向 Agent 原语** (`bidirectional_primitives.py`) | 双向Agent原语，LLM⇄Harness四个元指令 |
+
+📚 详细架构见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**  
+🔧 维护指南见 **[docs/MAINTENANCE.md](docs/MAINTENANCE.md)**
+
+---
+
 ## 快速开始
 
 ```bash

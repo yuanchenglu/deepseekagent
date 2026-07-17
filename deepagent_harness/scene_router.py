@@ -142,3 +142,44 @@ def route_instruction(instruction: str) -> Dict[str, Any]:
     """快捷路由入口"""
     router = SceneRouter()
     return router.route(instruction)
+
+
+def route_enhanced(instruction: str) -> Dict[str, Any]:
+    """
+    增强路由：三路由层（语义路由→专家匹配→执行路由）
+
+    Layer 1: 语义路由（SceneRouter 关键词分类）
+    Layer 2: 专家匹配（IntentRouter 意图分类+策略绑定）
+    Layer 3: 执行路由（CODE→Code Mode，其他→direct）
+    """
+    # Layer 1: 语义路由
+    router = SceneRouter()
+    scene_type = router.classify(instruction)
+
+    # Layer 2: 专家匹配（意图路由）
+    from deepagent_harness.intent_router import IntentRouter
+    intent_router = IntentRouter()
+    intent, strategy = intent_router.classify_and_get_strategy(
+        instruction, scene_type.value
+    )
+    route_context = intent_router.get_route_context(intent, strategy)
+
+    # Layer 3: 执行路由
+    execution = router.route(instruction)
+
+    return {
+        "scene_type": scene_type.value,
+        "intent": intent.value,
+        "strategy": {
+            "interview_depth": strategy.interview_depth,
+            "plan_granularity": strategy.plan_granularity,
+            "review_standard": strategy.review_standard,
+            "execution_mode": strategy.execution_mode,
+            "model_tier_hint": strategy.model_tier_hint,
+        },
+        "route_context": route_context,
+        "execution": execution,
+        "starroad_l1": True,
+        "starroad_l2": True,
+        "starroad_l3": True,
+    }
