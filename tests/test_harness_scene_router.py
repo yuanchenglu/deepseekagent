@@ -2,12 +2,33 @@
 DeepAgent Harness 场景路由测试
 """
 import pytest
+from unittest.mock import patch
 from deepagent_harness import SceneRouter, SceneType
 
 
 @pytest.fixture
 def router():
     return SceneRouter()
+
+
+@pytest.fixture
+def mock_dispatch():
+    """模拟 CodeModeDispatcher.dispatch，避免实际调用子进程导致超时
+
+    这些测试验证路由逻辑，不需要实际执行研发任务。
+    子进程调用 embedded/run_task.sh 会触发 OpenCode 二进制执行，
+    在测试环境中会超时（30秒），因此用 mock 替代。
+    """
+    with patch("deepagent_code_mode.CodeModeDispatcher.dispatch") as mock:
+        mock.return_value = {
+            "status": "completed",
+            "task_id": "mock-0001",
+            "task": {"instruction": "", "task_type": "general_development"},
+            "pid": None,
+            "result": {"summary": "（测试模拟）任务已完成"},
+            "message": "任务 [mock-0001] 已派发给内置研发小组",
+        }
+        yield mock
 
 
 class TestSceneClassification:
@@ -48,7 +69,7 @@ class TestSceneClassification:
         assert router.classify("今天天气怎么样") == SceneType.OTHER
         assert router.classify("你叫什么名字") == SceneType.OTHER
 
-    def test_route_code_auto_dispatch(self, router):
+    def test_route_code_auto_dispatch(self, router, mock_dispatch):
         """研发类指令自动路由到 Code Mode"""
         result = router.route("实现一个文件上传功能")
         assert result["status"] == "completed"
@@ -66,7 +87,7 @@ class TestSceneClassification:
         assert router.is_code(SceneType.OTHER) is False
         assert router.is_code(SceneType.QUERY) is False
 
-    def test_route_instruction_shortcut(self):
+    def test_route_instruction_shortcut(self, mock_dispatch):
         """快捷函数"""
         from deepagent_harness import route_instruction
         result = route_instruction("修复登录bug")
@@ -137,7 +158,7 @@ class TestEdgeCases:
         result2 = router.classify("\t\n\r")
         assert result2 == SceneType.OTHER, f"空白字符应归类为 OTHER"
 
-    def test_html_or_markdown_mixed(self):
+    def test_html_or_markdown_mixed(self, mock_dispatch):
         """HTML/Markdown 混合指令"""
         from deepagent_harness import SceneRouter
         router = SceneRouter()

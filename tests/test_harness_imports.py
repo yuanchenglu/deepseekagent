@@ -7,12 +7,33 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+
+@pytest.fixture
+def mock_dispatch():
+    """模拟 CodeModeDispatcher.dispatch，避免实际调用子进程导致超时
+
+    端到端测试验证模块间的调用链不报错，不需要实际执行研发任务。
+    子进程调用 embedded/run_task.sh 会触发 OpenCode 二进制执行，
+    在测试环境中会超时（30秒），因此用 mock 替代。
+    """
+    with patch("deepagent_code_mode.CodeModeDispatcher.dispatch") as mock:
+        mock.return_value = {
+            "status": "completed",
+            "task_id": "mock-0001",
+            "task": {"instruction": "", "task_type": "general_development"},
+            "pid": None,
+            "result": {"summary": "（测试模拟）任务已完成"},
+            "message": "任务 [mock-0001] 已派发给内置研发小组",
+        }
+        yield mock
 
 
 # ============================================================
@@ -104,7 +125,7 @@ class TestCodeModeImports:
 class TestEndToEnd:
     """端到端集成测试"""
 
-    def test_route_instruction_to_code_mode(self):
+    def test_route_instruction_to_code_mode(self, mock_dispatch):
         """验证 route_instruction 可以路由研发类指令到 Code Mode 且不报错"""
         from deepagent_harness import route_instruction
         
@@ -129,7 +150,7 @@ class TestEndToEnd:
         if result["status"] not in ("passthrough", "other"):
             pytest.skip(f"非研发类状态为 {result['status']}（可能已实现自动路由）")
 
-    def test_handle_development_request_direct(self):
+    def test_handle_development_request_direct(self, mock_dispatch):
         """验证 handle_development_request 可直接调用不报错"""
         from deepagent_code_mode import handle_development_request
         
@@ -139,7 +160,7 @@ class TestEndToEnd:
         assert "status" in result
         assert "task_id" in result
 
-    def test_dispatcher_cycle(self):
+    def test_dispatcher_cycle(self, mock_dispatch):
         """验证 CodeModeDispatcher 完整生命周期：创建 → dispatch → list → status"""
         from deepagent_code_mode import CodeModeDispatcher
         
@@ -159,7 +180,7 @@ class TestEndToEnd:
         assert isinstance(status, dict)
         assert "status" in status
 
-    def test_route_instruction_via_harness_shortcut(self):
+    def test_route_instruction_via_harness_shortcut(self, mock_dispatch):
         """验证快捷函数 route_instruction 能从 harness 正确调用"""
         from deepagent_harness import route_instruction
         from deepagent_code_mode import handle_development_request
