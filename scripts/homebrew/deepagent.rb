@@ -20,7 +20,7 @@ class Deepagent < Formula
   homepage "https://deepseekagent.starseas.org"
   url "https://deepseekagent.starseas.org/releases/deepagent-0.9.0-alpha.1.tar.gz"
   mirror "https://github.com/yuanchenglu/deepseekagent/releases/download/v0.9.0-alpha.1/deepagent-0.9.0-alpha.1.tar.gz"
-  sha256 "PLACEHOLDER_SHA256_WILL_BE_FILLED_DURING_RELEASE"
+  sha256 "d8c29dccbe221bdac3d3dc28fb0af4d4ae418092381bde7e1572a00da0ed849b"
   license "MIT"
   version "0.9.0-alpha.1"
 

@@ -5,7 +5,6 @@
 # Deep Agent ☤
 
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-deepagent.starseas.org-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://github.com/yuanchenglu/deepseekagent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
@@ -124,7 +123,7 @@ deepagent
 
 ## 项目结构亮点（开发中）
 
-- `webui/` — 默认 Web 工作台（基于 Hermes Web UI）
+- `webui/` — 默认 Web 工作台（DeepAgent 定制版）
 - `embedded/` — 内置、隔离的研发小组（OpenCode 等）
 - `deepagent_code_mode/` — Code 模式核心（dispatcher + session）
 - `scripts/brand-replace.py` — 品牌清理工具
