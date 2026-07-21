@@ -1,0 +1,80 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+
+  // ==========================================================
+  // DeepAgent 预装配置 — oh-my-openagent（v4.19.0）
+  //
+  // 模型策略：
+  //   - DeepSeek V4 Flash（主力 7/11 Agent）：性价比优先，最强推理档位
+  //   - DeepSeek V4 Pro（兜底 4/11 Agent）：复杂推理任务自动升级
+  // ==========================================================
+
+  "agents": {
+    // --- Flash 组（性价比主力，日常任务） ---
+    "sisyphus": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max",
+      "temperature": 0.3
+    },
+    "explore": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max",
+      "temperature": 0.3
+    },
+    "librarian": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max"
+    },
+    "multimodal-looker": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max"
+    },
+    "atlas": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max",
+      "temperature": 0.3
+    },
+    "sisyphus-junior": {
+      "model": "deepseek/deepseek-v4-flash",
+      "reasoningEffort": "max",
+      "temperature": 0.3
+    },
+
+    // --- Pro 组（复杂推理，兜底升级） ---
+    "hephaestus": {
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "temperature": 0.2
+    },
+    "oracle": {
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "temperature": 0.2
+    },
+    "prometheus": {
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "temperature": 0.3
+    },
+    "metis": {
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "temperature": 0.2
+    },
+    "momus": {
+      "model": "deepseek/deepseek-v4-pro",
+      "reasoningEffort": "max",
+      "temperature": 0.2
+    }
+  },
+
+  // 类别 → 模型映射（Agent 按任务类别自动选模型）
+  "categories": {
+    "visual-engineering": { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "quick":             { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "deep":              { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" },
+    "ultrabrain":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" }
+  },
+
+  "telemetry": false
+}
