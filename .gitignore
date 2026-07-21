@@ -81,6 +81,21 @@ yuanchenglu/
 # Embedded OpenCode workspace runtime data
 embedded/workspace/
 
+# Agent runtime state / checkpoints
+.omc/
+
+# Agent local workspace metadata
+.workbuddy/
+
+# Agent planning artifacts
+.hermes/plans/
+
+# Test screenshots
+test_screenshots/
+
+# Workspace write test
+.workspace-write-test.md
+
 # macOS
 .DS_Store
 # Project-level oh-my-openagent config & tooling (user-specific)
