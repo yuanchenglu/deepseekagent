@@ -1,0 +1,50 @@
+# CodeWhale Configuration — ~/.deepseek/config.toml
+# DeepSeek-first coding agent with 1M context, thinking mode, model auto-routing
+
+provider = "deepseek"
+api_key = "sk-..."
+base_url = "https://api.deepseek.com/beta"
+default_text_model = "deepseek-v4-pro"
+reasoning_effort = "max"
+cost_currency = "cny"
+
+[providers.deepseek]
+api_key = "sk-..."
+base_url = "https://api.deepseek.com/beta"
+
+# Security
+allow_shell = true
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+max_subagents = 10
+
+# TUI
+[tui]
+locale = "zh-Hans"
+alternate_screen = "auto"
+mouse_capture = true
+osc8_links = true
+
+# Features
+[features]
+shell_tool = true
+subagents = true
+web_search = true
+apply_patch = true
+mcp = true
+exec_policy = true
+
+# Retry
+[retry]
+enabled = true
+max_retries = 3
+initial_delay = 1.0
+max_delay = 60.0
+exponential_base = 2.0
+
+# Context (Flash seams disabled by default — opt-in)
+[context]
+enabled = false
+verbatim_window_turns = 16
+cycle_threshold = 768000
+seam_model = "deepseek-v4-flash"

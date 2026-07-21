@@ -1,0 +1,83 @@
+<!--
+  Zone Map Template — 学习区三层同心圆
+  ============================================
+  运行时填充：
+    {{TOPIC}}            当前学习主题（一行短文本）
+    {{COMFORT_ITEMS}}    舒适区条目（每行一条 <tspan x="500" dy="1.4em">…</tspan>）
+    {{LEARNING_ITEMS}}   学习区条目（同上，建议 1–3 条，最重要的放第一行）
+    {{PANIC_ITEMS}}      恐慌区条目（同上）
+
+  视觉约定：
+    - 中环（学习区）必须最突出（已用更深的填充 + 黄色描边 + 「你在这里」标记）。
+    - 外环灰阶（先不碰）。
+    - 各环条目直接写在该环的扇形/弧线区域内，避免压线。
+
+  使用方式：把本文件作为字符串读入，做占位符替换，然后通过 show_widget 以 SVG 内联渲染。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" width="100%" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+  <!-- 背景 -->
+  <rect width="1000" height="720" fill="#fafaf9"/>
+
+  <!-- 标题 -->
+  <text x="500" y="48" text-anchor="middle" font-size="22" font-weight="600" fill="#1c1917">
+    学习区定位 · {{TOPIC}}
+  </text>
+  <text x="500" y="74" text-anchor="middle" font-size="13" fill="#78716c">
+    内层 = 已会的舒适区　·　中层 = 当前要待的学习区　·　外层 = 暂时不碰的恐慌区
+  </text>
+
+  <!-- 三层同心圆 -->
+  <g transform="translate(500 400)">
+    <!-- 恐慌区（外） -->
+    <circle r="290" fill="#f5f5f4" stroke="#d6d3d1" stroke-width="1.5"/>
+    <!-- 学习区（中） —— 视觉最突出 -->
+    <circle r="200" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/>
+    <!-- 舒适区（内） -->
+    <circle r="110" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+
+    <!-- 「你在这里」标记 -->
+    <g transform="translate(0 -155)">
+      <circle r="9" fill="#ef4444"/>
+      <circle r="9" fill="#ef4444" opacity="0.4">
+        <animate attributeName="r" values="9;18;9" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.4;0;0.4" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <text y="-16" text-anchor="middle" font-size="12" font-weight="600" fill="#ef4444">你在这里</text>
+    </g>
+  </g>
+
+  <!-- 标签：恐慌区 -->
+  <text x="500" y="135" text-anchor="middle" font-size="13" font-weight="600" fill="#a8a29e">恐慌区</text>
+  <text x="500" y="155" text-anchor="middle" font-size="12" fill="#78716c">
+    <tspan x="500" dy="0">{{PANIC_ITEMS}}</tspan>
+  </text>
+
+  <!-- 标签：学习区（中环） -->
+  <text x="500" y="240" text-anchor="middle" font-size="15" font-weight="700" fill="#b45309">学习区</text>
+  <text x="500" y="262" text-anchor="middle" font-size="13" font-weight="500" fill="#78350f">
+    <tspan x="500" dy="0">{{LEARNING_ITEMS}}</tspan>
+  </text>
+
+  <!-- 标签：舒适区（内环） -->
+  <text x="500" y="395" text-anchor="middle" font-size="13" font-weight="600" fill="#166534">舒适区</text>
+  <text x="500" y="415" text-anchor="middle" font-size="12" fill="#15803d">
+    <tspan x="500" dy="0">{{COMFORT_ITEMS}}</tspan>
+  </text>
+
+  <!-- 底部图例 -->
+  <g transform="translate(0 680)" font-size="12" fill="#57534e">
+    <g transform="translate(220 0)">
+      <circle cx="0" cy="-4" r="6" fill="#dcfce7" stroke="#86efac"/>
+      <text x="14" y="0">已会 · 自动化</text>
+    </g>
+    <g transform="translate(420 0)">
+      <circle cx="0" cy="-4" r="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+      <text x="14" y="0">够得着但要使点劲（成长发生在这）</text>
+    </g>
+    <g transform="translate(800 0)">
+      <circle cx="0" cy="-4" r="6" fill="#f5f5f4" stroke="#d6d3d1"/>
+      <text x="14" y="0">先不碰</text>
+    </g>
+  </g>
+</svg>
