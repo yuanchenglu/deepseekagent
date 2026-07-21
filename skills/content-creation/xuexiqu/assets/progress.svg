@@ -1,0 +1,66 @@
+<!--
+  Progress Template — 学习进度条
+  ============================================
+  运行时填充：
+    {{TOPIC}}    当前学习主题（一行短文本）
+    {{CELLS}}    一组 <g class="cell"> 节点，按以下三种状态之一插入：
+
+      已掌握（done）：
+        <g transform="translate(<x> 0)">
+          <rect class="cell" width="120" height="56" rx="10" fill="#bbf7d0" stroke="#16a34a"/>
+          <text x="60" y="26" text-anchor="middle" font-size="13" font-weight="600" fill="#14532d">{{LABEL}}</text>
+          <text x="60" y="44" text-anchor="middle" font-size="11" fill="#15803d">✓ 已掌握</text>
+        </g>
+
+      当前正在攻克（current）：
+        <g transform="translate(<x> 0)">
+          <rect class="cell" width="120" height="56" rx="10" fill="#fde68a" stroke="#f59e0b" stroke-width="2.5">
+            <animate attributeName="stroke-opacity" values="1;0.4;1" dur="1.6s" repeatCount="indefinite"/>
+          </rect>
+          <text x="60" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="#78350f">{{LABEL}}</text>
+          <text x="60" y="44" text-anchor="middle" font-size="11" fill="#b45309">⚡ 进行中</text>
+        </g>
+
+      未解锁（locked）：
+        <g transform="translate(<x> 0)" opacity="0.55">
+          <rect class="cell" width="120" height="56" rx="10" fill="#f5f5f4" stroke="#d6d3d1" stroke-dasharray="4 4"/>
+          <text x="60" y="26" text-anchor="middle" font-size="13" fill="#a8a29e">{{LABEL}}</text>
+          <text x="60" y="44" text-anchor="middle" font-size="11" fill="#a8a29e">🔒 未解锁</text>
+        </g>
+
+  布局：每格宽 120，间距 20，从 x=60 起；超过 7 格建议换行或缩进。
+  连接线：每格之间用一段水平线，已 done 段用绿，current 之后的连接线用虚线灰。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 220" width="100%" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+  <rect width="1080" height="220" fill="#fafaf9"/>
+
+  <!-- 标题 -->
+  <text x="540" y="40" text-anchor="middle" font-size="20" font-weight="600" fill="#1c1917">
+    学习进度 · {{TOPIC}}
+  </text>
+  <text x="540" y="62" text-anchor="middle" font-size="12" fill="#78716c">
+    每内化一个学习区 → 它沉降为舒适区 → 边界外推一格
+  </text>
+
+  <!-- 进度格容器（运行时把 {{CELLS}} 替换为多个 <g> 节点） -->
+  <g transform="translate(0 96)">
+    {{CELLS}}
+  </g>
+
+  <!-- 底部图例 -->
+  <g transform="translate(0 200)" font-size="11" fill="#57534e">
+    <g transform="translate(360 0)">
+      <rect x="-12" y="-9" width="14" height="10" rx="2" fill="#bbf7d0" stroke="#16a34a"/>
+      <text x="10" y="0">已掌握（舒适区）</text>
+    </g>
+    <g transform="translate(540 0)">
+      <rect x="-12" y="-9" width="14" height="10" rx="2" fill="#fde68a" stroke="#f59e0b"/>
+      <text x="10" y="0">进行中（学习区）</text>
+    </g>
+    <g transform="translate(720 0)">
+      <rect x="-12" y="-9" width="14" height="10" rx="2" fill="#f5f5f4" stroke="#d6d3d1" stroke-dasharray="2 2"/>
+      <text x="10" y="0">未解锁</text>
+    </g>
+  </g>
+</svg>
