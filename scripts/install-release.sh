@@ -993,11 +993,84 @@ sync_skills() {
 }
 
 # ============================================================================
-# Step 5: 配置保留
+# Step 5: 安装 oh-my-openagent 插件依赖
 # ============================================================================
-# .env、config.yaml 和 sessions.db 的保留策略：
-#   全新安装 → 从模板创建
-#   更新安装 → ✅ 保留已有文件
+# 在嵌入式 OpenCode 配置目录中安装 oh-my-opencode npm 包，
+# 以便 OpenCode 加载 oh-my-openagent 插件（含 DeepSeek V4 Flash/Pro 配置）。
+# npm/bun 均可用；均不可用时给出提示但不阻断安装。
+# ============================================================================
+
+setup_embedded_opencode_deps() {
+    # 尝试定位嵌入式 config 目录
+    local embed_config
+    if [ -d "${INSTALL_DIR}/deepagent/embedded/config" ]; then
+        embed_config="${INSTALL_DIR}/deepagent/embedded/config"
+    elif [ -d "${INSTALL_DIR}/embedded/config" ]; then
+        embed_config="${INSTALL_DIR}/embedded/config"
+    else
+        log_warn "未找到嵌入式配置目录，跳过 oh-my-openagent 插件安装"
+        return 0
+    fi
+
+    # 检查 opencode.json 是否存在（由 setup-embedded-opencode.sh 或源码提供）
+    if [ ! -f "$embed_config/opencode.json" ]; then
+        log_info "opencode.json 不存在，创建默认配置..."
+        cat > "$embed_config/opencode.json" << 'EOF'
+{
+  "plugin": ["oh-my-openagent"]
+}
+EOF
+    fi
+
+    # 检查 oh-my-openagent.jsonc 是否存在
+    if [ ! -f "$embed_config/oh-my-openagent.jsonc" ]; then
+        log_info "oh-my-openagent.jsonc 不存在，创建默认配置..."
+        cat > "$embed_config/oh-my-openagent.jsonc" << 'OPNEOF'
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+
+  "agents": {
+    "sisyphus":          { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
+    "explore":           { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
+    "librarian":         { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "multimodal-looker": { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "atlas":             { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
+    "sisyphus-junior":   { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
+    "hephaestus":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
+    "oracle":            { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
+    "prometheus":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.3 },
+    "metis":             { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
+    "momus":             { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 }
+  },
+  "categories": {
+    "visual-engineering": { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "quick":             { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
+    "deep":              { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" },
+    "ultrabrain":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" }
+  },
+  "telemetry": false
+}
+OPNEOF
+    fi
+
+    # 安装 npm 依赖
+    if command -v npm &>/dev/null; then
+        log_info "使用 npm 安装 oh-my-openagent..."
+        cd "$embed_config" && npm install --omit=dev --no-audit --no-fund 2>&1 | tail -3
+        log_success "oh-my-openagent 插件已安装"
+    elif command -v bun &>/dev/null; then
+        log_info "使用 bun 安装 oh-my-openagent..."
+        cd "$embed_config" && bun install --production --no-audit 2>&1 | tail -3
+        log_success "oh-my-openagent 插件已安装（bun）"
+    else
+        log_warn "未检测到 npm 或 bun，oh-my-openagent 插件将不可用。"
+        log_info "安装 Node.js 后执行以下命令即可补装："
+        log_info "  cd $embed_config && npm install"
+    fi
+}
+
+# ============================================================================
+# Step 6: 配置保留
 # ============================================================================
 
 setup_config() {
@@ -1437,29 +1510,34 @@ main() {
     echo -e "${BLUE}${BOLD}[Step 4/10] 技能同步${NC}"
     sync_skills
 
-    # ---- Step 5: 配置保留 ----
+    # ---- Step 5: 安装嵌入式研发小组依赖（oh-my-openagent 插件） ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 5/10] 配置保留${NC}"
+    echo -e "${BLUE}${BOLD}[Step 5/10] 安装 oh-my-openagent 插件${NC}"
+    setup_embedded_opencode_deps
+
+    # ---- Step 6: 配置保留 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 6/10] 配置保留${NC}"
     setup_config
 
-    # ---- Step 6: PATH 配置 ----
+    # ---- Step 7: PATH 配置 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 6/10] PATH 配置${NC}"
+    echo -e "${BLUE}${BOLD}[Step 7/10] PATH 配置${NC}"
     setup_path
 
-    # ---- Step 7: Desktop DMG ----
+    # ---- Step 8: Desktop DMG ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 7/10] 桌面版安装${NC}"
+    echo -e "${BLUE}${BOLD}[Step 8/10] 桌面版安装${NC}"
     maybe_download_dmg
 
-    # ---- Step 8: 自动启动 ----
+    # ---- Step 9: 自动启动 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 8/10] 启动 DeepAgent${NC}"
+    echo -e "${BLUE}${BOLD}[Step 9/10] 启动 DeepAgent${NC}"
     auto_start
 
-    # ---- Step 9: 开机自启设置 ----
+    # ---- Step 10: 开机自启设置 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 9/10] 开机自启设置${NC}"
+    echo -e "${BLUE}${BOLD}[Step 10/10] 开机自启设置${NC}"
     setup_autostart
 
     # ---- Step 10: 完成提示 ----
