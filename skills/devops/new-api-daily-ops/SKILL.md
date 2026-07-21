@@ -134,7 +134,7 @@ sudo sqlite3 /home/bluth/new-api/data/one-api.db \
 sudo docker restart new-api
 ```
 
-**给客户显示的 Key：** 把 48 位字符前面加 `sk-`（如 `sk-MuHY7SKJuAsiMrAAxc2e8mW3hq9Uo7eIGUiSQIFNjGYcxOrM`）
+**给客户显示的 Key：** 把 48 位字符前面加 `sk-`（如 `sk-<your-generated-48-char-key>`）
 
 ---
 
@@ -200,7 +200,7 @@ curl -s -X POST http://localhost:3000/api/user/login \
 sudo sqlite3 /home/bluth/new-api/data/one-api.db \
   "INSERT INTO channels (type, key, status, name, weight, created_time,
    base_url, models, \"group\", priority, auto_ban)
-   VALUES (1, 'sk-rDf1tdVPedjoNsNTeiZEBnilWXoMJJE5DpxmvNlgo6e3weAXKiPSweMJ1grWY6ht',
+   VALUES (1, 'sk-<your-opencode-go-channel-key>',
    1, 'OpenCode Go - OpenAI', 1, strftime('%s','now'),
    'https://opencode.ai/zen/go',
    'deepseek-v4-flash,deepseek-v4-pro,glm-5.1,glm-5,kimi-k2.6,kimi-k2.5',
@@ -210,7 +210,7 @@ sudo sqlite3 /home/bluth/new-api/data/one-api.db \
 sudo sqlite3 /home/bluth/new-api/data/one-api.db \
   "INSERT INTO channels (type, key, status, name, weight, created_time,
    base_url, models, \"group\", priority, auto_ban)
-   VALUES (14, 'sk-rDf1tdVPedjoNsNTeiZEBnilWXoMJJE5DpxmvNlgo6e3weAXKiPSweMJ1grWY6ht',
+   VALUES (14, 'sk-<your-opencode-go-channel-key>',
    1, 'OpenCode Go - Anthropic', 1, strftime('%s','now'),
    'https://opencode.ai/zen/go',
    'qwen3.7-max,qwen3.7-plus,qwen3.6-plus,minimax-m3,minimax-m2.7,minimax-m2.5',
@@ -348,7 +348,7 @@ sudo docker restart new-api
 **验证（客户端不传 reasoning_effort，看是否自动生效）：**
 ```bash
 curl -s -X POST http://localhost:3000/v1/chat/completions \
-  -H "Authorization: Bearer sk-SzgIhKM0KS2e1UH6iwBrrR8jfXKEHqukeIBwsCFsu3eP0z8a" \
+  -H "Authorization: Bearer sk-<your-local-test-key>" \
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"1+1=?"}],"max_tokens":60}'
 ```
