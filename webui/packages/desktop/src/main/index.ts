@@ -14,6 +14,8 @@ import {
   type RuntimeDownloadSource,
   type RuntimeProgress,
 } from './runtime-manager'
+// 双模式切换管理器（Stage 9 新增）
+import { ModeManager, type AppMode, type SharedConfig, type StartCodeModeResult } from './mode-manager'
 
 const PORT = Number(process.env.HERMES_DESKTOP_PORT) || 8748
 const START_HIDDEN = process.argv.includes('--hidden')
@@ -28,6 +30,8 @@ type DesktopWindowBounds = { x: number; y: number; width: number; height: number
 
 let mainWindow: BrowserWindow | null = null
 let petWindow: BrowserWindow | null = null
+// 双模式管理器（Stage 9）：由 app.whenReady 时实例化
+let modeManager: ModeManager | null = null
 let petWindowLoadPromise: Promise<void> | null = null
 let serverUrl: string | null = null
 let tray: Tray | null = null
@@ -683,6 +687,27 @@ ipcMain.handle('hermes-desktop:retry-bootstrap', async (_event, source?: Runtime
   await bootstrap(selectedSource)
 })
 
+// ─── 双模式 IPC（Stage 9） ───────────────────────────────────────────
+/** 向所有 BrowserWindow 广播模式变更事件 */
+function broadcastMode(mode: AppMode): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('hermes-desktop:mode-changed', mode)
+  }
+}
+ipcMain.handle('hermes-desktop:get-mode', () => modeManager?.getMode() ?? 'assistant')
+ipcMain.handle('hermes-desktop:set-mode', async (_event, mode?: unknown) => {
+  if (!modeManager) return
+  if (mode !== 'assistant' && mode !== 'code') return
+  await modeManager.setMode(mode)
+})
+ipcMain.handle('hermes-desktop:start-code-mode', async (_event, config?: unknown): Promise<StartCodeModeResult> => {
+  if (!modeManager) return { ok: false, error: 'not-ready' }
+  return modeManager.startCodeMode((config as SharedConfig) ?? { apiKey: '', model: '', provider: '' })
+})
+ipcMain.handle('hermes-desktop:stop-code-mode', async () => {
+  await modeManager?.stopCodeMode()
+})
+
 function runDesktopApp() {
   const gotLock = app.requestSingleInstanceLock(QUIT_EXISTING ? { quit: true } : undefined)
   if (!gotLock) {
@@ -735,6 +760,11 @@ function runDesktopApp() {
     }
     createTray()
     createWindow()
+    // 双模式管理器：注册 IPC，其 broadcast 推送到所有窗口
+    modeManager = new ModeManager({
+      userDataPath: app.getPath('userData'),
+      broadcast: broadcastMode,
+    })
     bootstrap()
     initAutoUpdater({
       beforeQuitAndInstall: () => {
