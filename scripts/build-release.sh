@@ -248,141 +248,207 @@ create_dist_dir() {
 }
 
 # ============================================================================
-# Step 7-8: 打包 tarball（排除模式 — 打包整个项目根，靠 exclude 排除）
+# Step 7-8: 打包多个 Release tarball
 # ============================================================================
 #
-# 打包策略：在 PROJECT_ROOT 内执行 tar .，使用相对路径。
-# tarball 解压后的根目录就是项目根 — pyproject.toml 在顶层。
+# 不再打包单个臃肿的 tar.gz，而是按安装顺序拆分为多个包：
 #
-# 采用「排除模式」：打包整个项目根目录（.），通过 --exclude 排除不需要的内容。
-# 这样比显式列举文件更不容易遗漏新增文件（如 deepagent_harness/、新测试等）。
+#   1. deepagent-core-{VERSION}.tar.gz
+#      源码 + CLI + tools + gateway + skills（约 5 MB）
+#      不含 webui/dist/ 和 embedded/
 #
-# 排除规则分两类：
-#   A) 全局排除（base name 匹配，任意层级生效）：
-#      __pycache__、*.pyc、*.pyo、.git、.venv、venv、node_modules、
-#      .DS_Store、.coverage、htmlcov、.pytest_cache、*.egg-info、
-#      .hermes、.omc、.workbuddy、.codegraph、.omo、.opencode
+#   2. deepagent-embedded-{VERSION}.tar.gz
+#      所有平台的 OpenCode 二进制（约 254 MB raw）
+#      安装脚本按架构只下载对应文件
 #
-#   B) 顶层目录排除（含 / 的模式按完整路径匹配，仅排除顶层）：
-#      ./dist/releases、./dist/website（排除构建产物，但保留 webui/dist）
-#      ./input、./logs、./tmp、./temp、./temp_vision_images、
-#      ./sessions、./memories、./form.html、./test_screenshots、
-#      ./.workspace-write-test.md、./.brand-replace-task.md、./.update_check
+#   3. deepagent-webui-server-{VERSION}.tar.gz
+#      Web 服务端 + 前端（约 60 MB，不含 Electron）
+#      `deepagent webui install` 时下载
 #
-# 注意：不使用 --exclude='./dist'（会误排除 webui/dist），而是精确排除
-#       ./dist/releases 和 ./dist/website 两个子目录。
+#   4. Electron DMG（由 electron-builder 产出，独立分发）
+#      webui/dist/electron-output/Deep.*.{arch}.dmg
 # ============================================================================
 
-build_tarball() {
-    local tarball_path="${DIST_DIR}/${TARBALL_NAME}.tar.gz"
+# 共用排除规则
+TAR_EXCLUDES=(
+    '--exclude=__pycache__'
+    '--exclude=.git'
+    '--exclude=.venv'
+    '--exclude=venv'
+    '--exclude=node_modules'
+    '--exclude=dist/releases'
+    '--exclude=*.pyc'
+    '--exclude=*.pyo'
+    '--exclude=.DS_Store'
+    '--exclude=.coverage'
+    '--exclude=htmlcov'
+    '--exclude=.pytest_cache'
+    '--exclude=*.egg-info'
+)
 
-    log_info "构建 Release tarball..."
+build_core_tarball() {
+    local tarball_name="${TARBALL_NAME}"
+    local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
+
+    log_info "构建 Core tarball..."
     log_info "  路径: ${tarball_path}"
-    log_info "  版本: v${VERSION}"
-    log_info "  模式: 排除模式（打包整个项目根，排除 dev/构建产物）"
 
-    # 切换到项目根目录，确保 tarball 内的路径是相对的
     cd "$PROJECT_ROOT"
 
-    # 打包前清空 dist/releases/ 中的旧 tarball 和校验文件，避免嵌套打包
-    log_info "  清空 dist/releases/ 旧产物..."
-    rm -f "${DIST_DIR}"/*.tar.gz "${DIST_DIR}"/*.sha256 2>/dev/null || true
-
-    # 用 tar 打包整个项目根目录（.），通过 --exclude 排除不需要的内容
-    # 这样确保所有新增文件（如 deepagent_harness/、新测试、新脚本）自动包含
     tar czf "$tarball_path" \
+        "${TAR_EXCLUDES[@]}" \
+        --exclude='embedded' \
+        --exclude='webui' \
         \
-        --exclude='__pycache__' \
-        --exclude='*.pyc' \
-        --exclude='*.pyo' \
-        --exclude='.git' \
-        --exclude='.venv' \
-        --exclude='venv' \
-        --exclude='node_modules' \
-        --exclude='.DS_Store' \
-        --exclude='.coverage' \
-        --exclude='htmlcov' \
-        --exclude='.pytest_cache' \
-        --exclude='*.egg-info' \
-        --exclude='.hermes' \
-        --exclude='.omc' \
-        --exclude='.workbuddy' \
-        --exclude='.codegraph' \
-        --exclude='.omo' \
-        --exclude='.opencode' \
-        \
-        --exclude='./dist/releases' \
-        --exclude='./dist/website' \
-        --exclude='./input' \
-        --exclude='./logs' \
-        --exclude='./tmp' \
-        --exclude='./temp' \
-        --exclude='./temp_vision_images' \
-        --exclude='./sessions' \
-        --exclude='./memories' \
-        --exclude='./form.html' \
-        --exclude='./test_screenshots' \
-        --exclude='./.workspace-write-test.md' \
-        --exclude='./.brand-replace-task.md' \
-        --exclude='./.update_check' \
-        \
-        .
+        pyproject.toml \
+        uv.lock \
+        requirements.txt \
+        constraints-termux.txt \
+        cli.py \
+        model_tools.py \
+        run_agent.py \
+        hermes_state.py \
+        hermes_constants.py \
+        hermes_logging.py \
+        hermes_time.py \
+        utils.py \
+        toolsets.py \
+        agent/ \
+        hermes_cli/ \
+        tools/ \
+        gateway/ \
+        cron/ \
+        acp_adapter/ \
+        plugins/ \
+        skills/ \
+        VERSION
 
-    # 验证 tarball 是否成功创建
     if [ -f "$tarball_path" ]; then
         local tarball_size
         tarball_size=$(du -h "$tarball_path" | cut -f1)
-        log_success "Tarball 已创建: ${tarball_path} (${tarball_size})"
+        log_success "Core tarball 已创建: ${tarball_path} (${tarball_size})"
     else
-        log_error "Tarball 创建失败！"
+        log_error "Core tarball 创建失败！"
         exit 1
     fi
 }
 
-# ============================================================================
-# Step 9: 生成 SHA256 校验和
-# ============================================================================
+build_embedded_tarball() {
+    local tarball_name="${TARBALL_NAME/deepagent-/deepagent-embedded-}"
+    local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
 
-generate_checksum() {
-    local tarball_path="${DIST_DIR}/${TARBALL_NAME}.tar.gz"
-    local sha_file="${DIST_DIR}/${TARBALL_NAME}.sha256"
+    log_info "构建 Embedded tarball..."
+    log_info "  路径: ${tarball_path}"
 
-    log_info "生成 SHA256 校验和..."
+    cd "$PROJECT_ROOT"
 
-    # 检测可用的 SHA256 工具
-    local sha_cmd=""
-    if command -v sha256sum &>/dev/null; then
-        sha_cmd="sha256sum"
-    elif command -v shasum &>/dev/null; then
-        sha_cmd="shasum -a 256"
-    elif command -v openssl &>/dev/null; then
-        sha_cmd="openssl dgst -sha256"
+    tar czf "$tarball_path" \
+        "${TAR_EXCLUDES[@]}" \
+        embedded/
+
+    if [ -f "$tarball_path" ]; then
+        local tarball_size
+        tarball_size=$(du -h "$tarball_path" | cut -f1)
+        log_success "Embedded tarball 已创建: ${tarball_path} (${tarball_size})"
     else
-        log_error "无可用 SHA256 计算工具（需 sha256sum、shasum 或 openssl）"
+        log_error "Embedded tarball 创建失败！"
         exit 1
     fi
+}
 
-    # 计算校验和并写入文件（标准格式: "<hash>  <filename>"）
-    # 这样 sha256sum -c 或 shasum -a 256 -c 可直接验证
-    cd "$DIST_DIR"
-    if [ "$sha_cmd" = "sha256sum" ]; then
-        sha256sum "${TARBALL_NAME}.tar.gz" > "$sha_file"
-    elif [ "$sha_cmd" = "shasum -a 256" ]; then
-        shasum -a 256 "${TARBALL_NAME}.tar.gz" > "$sha_file"
+build_webui_server_tarball() {
+    local tarball_name="${TARBALL_NAME/deepagent-/deepagent-webui-server-}"
+    local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
+
+    log_info "构建 WebUI Server tarball（不含 Electron）..."
+    log_info "  路径: ${tarball_path}"
+
+    cd "$PROJECT_ROOT"
+
+    tar czf "$tarball_path" \
+        "${TAR_EXCLUDES[@]}" \
+        webui/dist/client/ \
+        webui/dist/server/ \
+        webui/dist/data/ \
+        webui/bin/ \
+        webui/package.json
+
+    if [ -f "$tarball_path" ]; then
+        local tarball_size
+        tarball_size=$(du -h "$tarball_path" | cut -f1)
+        log_success "WebUI Server tarball 已创建: ${tarball_path} (${tarball_size})"
     else
-        # openssl: 输出格式与 sha256sum 不同，需要转换
+        log_error "WebUI Server tarball 创建失败！"
+        exit 1
+    fi
+}
+
+# 汇总所有 tarball 路径
+collect_tarballs() {
+    TARBALL_CORE="${DIST_DIR}/${TARBALL_NAME}.tar.gz"
+    TARBALL_EMBEDDED="${DIST_DIR}/deepagent-embedded-${VERSION}.tar.gz"
+    TARBALL_WEBUI_SERVER="${DIST_DIR}/deepagent-webui-server-${VERSION}.tar.gz"
+}
+
+# ============================================================================
+# Step 9: 生成 SHA256 校验和（每个 tarball 独立）
+# ============================================================================
+
+detect_sha_cmd() {
+    if command -v sha256sum &>/dev/null; then
+        SHACMD="sha256sum"
+        SHACMD_CHECK="-c"
+    elif command -v shasum &>/dev/null; then
+        SHACMD="shasum -a 256"
+        SHACMD_CHECK="-c"
+    elif command -v openssl &>/dev/null; then
+        SHACMD="openssl dgst -sha256"
+        SHACMD_CHECK=""
+    else
+        log_error "无可用 SHA256 计算工具"
+        exit 1
+    fi
+}
+
+generate_one_checksum() {
+    local file="$1"
+    local sha_file="${file}.sha256"
+    local basename_file
+    basename_file=$(basename "$file")
+
+    cd "$DIST_DIR"
+    if [ "$SHACMD" = "sha256sum" ]; then
+        sha256sum "$basename_file" > "$sha_file"
+    elif [ "$SHACMD" = "shasum -a 256" ]; then
+        shasum -a 256 "$basename_file" > "$sha_file"
+    else
         local hash
-        hash=$($sha_cmd "${DIST_DIR}/${TARBALL_NAME}.tar.gz" 2>/dev/null | awk '{print $NF}')
-        echo "${hash}  ${TARBALL_NAME}.tar.gz" > "$sha_file"
+        hash=$(openssl dgst -sha256 "$file" 2>/dev/null | awk '{print $NF}')
+        echo "${hash}  ${basename_file}" > "$sha_file"
     fi
 
     if [ -f "$sha_file" ]; then
-        log_success "SHA256 校验和已生成: ${sha_file}"
-        log_info "  校验和: $(awk '{print $1}' "$sha_file")"
+        local filesize
+        filesize=$(du -h "$file" | cut -f1)
+        local filehash
+        filehash=$(awk '{print $1}' "$sha_file")
+        log_success "  ${basename_file} (${filesize}) → ${filehash}"
     else
-        log_error "校验和文件生成失败！"
+        log_error "校验和生成失败: ${sha_file}"
         exit 1
     fi
+}
+
+generate_checksums() {
+    log_info "生成 SHA256 校验和..."
+    detect_sha_cmd
+    generate_one_checksum "$TARBALL_CORE"
+    generate_one_checksum "$TARBALL_EMBEDDED"
+    generate_one_checksum "$TARBALL_WEBUI_SERVER"
+    # Electron DMG 校验和（如果存在）
+    for dmg in "${DIST_DIR}"/DeepAgent-*.dmg; do
+        [ -f "$dmg" ] && generate_one_checksum "$dmg"
+    done
 }
 
 # ============================================================================
@@ -390,13 +456,20 @@ generate_checksum() {
 # ============================================================================
 
 print_success() {
-    local tarball_path="${DIST_DIR}/${TARBALL_NAME}.tar.gz"
-    local sha_file="${DIST_DIR}/${TARBALL_NAME}.sha256"
-    local tarball_size
-    local tarball_sha
+    local core_size
+    local core_sha
+    core_size=$(du -h "$TARBALL_CORE" 2>/dev/null | cut -f1)
+    core_sha=$(awk '{print $1}' "${TARBALL_CORE}.sha256" 2>/dev/null)
 
-    tarball_size=$(du -h "$tarball_path" | cut -f1)
-    tarball_sha=$(awk '{print $1}' "$sha_file")
+    local emb_size
+    local emb_sha
+    emb_size=$(du -h "$TARBALL_EMBEDDED" 2>/dev/null | cut -f1)
+    emb_sha=$(awk '{print $1}' "${TARBALL_EMBEDDED}.sha256" 2>/dev/null)
+
+    local ws_size
+    local ws_sha
+    ws_size=$(du -h "$TARBALL_WEBUI_SERVER" 2>/dev/null | cut -f1)
+    ws_sha=$(awk '{print $1}' "${TARBALL_WEBUI_SERVER}.sha256" 2>/dev/null)
 
     echo ""
     echo -e "${GREEN}${BOLD}"
@@ -406,26 +479,27 @@ print_success() {
     echo -e "${NC}"
     echo ""
 
-    echo -e "${CYAN}${BOLD}📦 Release 包概览${NC}"
+    echo -e "${CYAN}${BOLD}📦 Release 产物概览 (v${VERSION})${NC}"
     echo ""
-    echo -e "   ${YELLOW}版本:${NC}        v${VERSION}"
-    echo -e "   ${YELLOW}Tarball:${NC}     ${tarball_path}"
-    echo -e "   ${YELLOW}大小:${NC}         ${tarball_size}"
-    echo -e "   ${YELLOW}SHA256:${NC}      ${tarball_sha}"
-    echo -e "   ${YELLOW}校验文件:${NC}     ${sha_file}"
+    printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "core"          "${core_size}" "${core_sha}"
+    printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "embedded"      "${emb_size}" "${emb_sha}"
+    printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "webui-server"  "${ws_size}" "${ws_sha}"
     echo ""
 
     echo -e "${CYAN}${BOLD}🚀 后续操作${NC}"
     echo ""
     echo -e "   1. 上传到 Cloudflare R2:"
-    echo -e "      ${GREEN}aws s3 cp ${tarball_path} s3://deepseekagent/releases/${TARBALL_NAME}.tar.gz${NC}"
-    echo -e "      ${GREEN}aws s3 cp ${sha_file} s3://deepseekagent/releases/${TARBALL_NAME}.sha256${NC}"
+    echo -e "      ${GREEN}aws s3 cp ${TARBALL_CORE} s3://deepagent-releases/deepagent-core-${VERSION}.tar.gz${NC}"
+    echo -e "      ${GREEN}aws s3 cp ${TARBALL_EMBEDDED} s3://deepagent-releases/deepagent-embedded-${VERSION}.tar.gz${NC}"
+    echo -e "      ${GREEN}aws s3 cp ${TARBALL_WEBUI_SERVER} s3://deepagent-releases/deepagent-webui-server-${VERSION}.tar.gz${NC}"
     echo ""
-    echo -e "   2. 上传到 GitHub Releases:"
-    echo -e "      ${GREEN}gh release create v${VERSION} ${tarball_path} ${sha_file} --title \"v${VERSION}\"${NC}"
+    echo -e "   2. 上传 Electron DMG 到 R2:"
+    for dmg in "${DIST_DIR}"/DeepAgent-*.dmg; do
+        [ -f "$dmg" ] && echo -e "      ${GREEN}aws s3 cp $dmg s3://deepagent-releases/$(basename "$dmg")${NC}"
+    done
     echo ""
-    echo -e "   3. 本地验证 tarball 内容:"
-    echo -e "      ${GREEN}tar tzf ${tarball_path} | head -30${NC}"
+    echo -e "   3. (可选) 上传到 GitHub Releases:"
+    echo -e "      ${GREEN}gh release create v${VERSION} ${TARBALL_CORE} ${TARBALL_EMBEDDED} ${TARBALL_WEBUI_SERVER} --title \"v${VERSION}\"${NC}"
     echo ""
 
     echo -e "${CYAN}─────────────────────────────────────────────────────────${NC}"
@@ -530,17 +604,26 @@ main() {
 
     # ---- Step 7-8: 打包 tarball ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 7-8/10] 打包 Release tarball${NC}"
-    build_tarball
+    echo -e "${BLUE}${BOLD}[Step 7/10] 打包 Core tarball${NC}"
+    build_core_tarball
 
-    # ---- Step 9: 生成 SHA256 校验和 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 9/10] 生成 SHA256 校验和${NC}"
-    generate_checksum
+    echo -e "${BLUE}${BOLD}[Step 8/10] 打包 Embedded tarball${NC}"
+    build_embedded_tarball
 
-    # ---- Step 10: 打印成功信息 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 10/10] 构建完成${NC}"
+    echo -e "${BLUE}${BOLD}[Step 9/10] 打包 WebUI Server tarball${NC}"
+    build_webui_server_tarball
+
+    # ---- 收集路径 ----
+    collect_tarballs
+
+    # ---- Step 10: 生成 SHA256 校验和 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 10/10] 生成 SHA256 校验和${NC}"
+    generate_checksums
+
+    # ---- 打印成功信息 ----
     print_success
 }
 
