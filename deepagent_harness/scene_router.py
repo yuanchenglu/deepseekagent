@@ -50,8 +50,12 @@ _SCENE_KEYWORDS: Dict[SceneType, list] = {
         "优缺点", "优劣", "区别", "差异",
     ],
     SceneType.PLANNING: [
-        "方案", "设计", "架构", "规划", "计划",
-        "文档", "PRD", "设计文档", "技术方案",
+        # 注意：不要用"架构"这种宽泛词，会把"什么是微服务架构？"误判为 PLANNING。
+        # 用更长/更具体的组合词来指代"做架构设计"这个动作。
+        "方案", "写方案", "出方案", "设计方案", "设计文档",
+        "架构设计", "系统架构", "架构规划", "技术架构",
+        "规划", "计划", "做计划",
+        "文档", "PRD", "技术方案",
         "路线图", "roadmap", "里程碑",
     ],
     SceneType.OPERATION: [
@@ -74,12 +78,16 @@ class SceneRouter:
 
     def __init__(self):
         self._keyword_map = _SCENE_KEYWORDS
+        # 迭代顺序即优先级——先匹配到哪个就返回哪个。
+        # 修复历史问题：docstring 声明 "CODE > RESEARCH > PLANNING > OPERATION > QUERY"
+        # 但旧实现把 QUERY 放在第一位，导致 "如何实现 X" 被误判为 QUERY。
+        # 现与 docstring 对齐：CODE 最优先（核心业务——研发任务要进 Code Mode）。
         self._scene_order = [
-            SceneType.QUERY,
-            SceneType.RESEARCH,
             SceneType.CODE,
+            SceneType.RESEARCH,
             SceneType.PLANNING,
             SceneType.OPERATION,
+            SceneType.QUERY,
         ]
 
     def classify(self, instruction: str) -> SceneType:
