@@ -61,6 +61,38 @@ class TestToolSchemaStabilizer:
         fp2 = get_tools_fingerprint([])
         assert fp2 == "no-tools"
 
+    def test_description_none_becomes_empty_string(self):
+        """测试 None description 不会被序列化为 'None' 字面量"""
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "test",
+                "description": None,
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        }]
+        result = stabilize_tool_schemas(tools)
+        assert result[0]["function"]["description"] == ""
+
+    def test_description_non_string_cast(self):
+        """测试非字符串 description 仍被 str() 转换"""
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "test",
+                "description": 42,
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        }]
+        result = stabilize_tool_schemas(tools)
+        assert result[0]["function"]["description"] == "42"
+
     def test_required_params_sorted(self):
         """测试required参数列表排序"""
         tools = [{
