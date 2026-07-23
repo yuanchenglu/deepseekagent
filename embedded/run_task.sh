@@ -50,9 +50,38 @@ if [ -z "$TASK_ID" ]; then
 fi
 
 # --- 调用隔离的 OpenCode 执行任务 ---
-echo "[DeepAgent Embedded] Invoking isolated OpenCode for task ${TASK_ID}..."
+# B3 修复：根据当前 OS + 架构选择正确的 binary 路径，避免硬编码 macos-arm64
+# 支持：macos-arm64 / macos-x64 / linux-x64 / linux-arm64 / windows
+OS_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+case "$OS_NAME" in
+    darwin) OS_DIR="macos" ;;
+    linux)  OS_DIR="linux" ;;
+    mingw*|msys*|cygwin*) OS_DIR="windows" ;;
+    *)      OS_DIR="linux" ;;
+esac
+case "$ARCH" in
+    arm64|aarch64) ARCH_DIR="arm64" ;;
+    x86_64|amd64)  ARCH_DIR="x64" ;;
+    *)             ARCH_DIR="$ARCH" ;;
+esac
+OPENCODE_BIN="$SCRIPT_DIR/opencode/${OS_DIR}-${ARCH_DIR}/opencode"
+# Windows 下补 .exe 后缀
+[ "$OS_DIR" = "windows" ] && OPENCODE_BIN="${OPENCODE_BIN}.exe"
+
+if [ ! -x "$OPENCODE_BIN" ]; then
+    echo "[DeepAgent Embedded] Warning: OpenCode binary not found at $OPENCODE_BIN"
+    echo "[DeepAgent Embedded] Falling back to simulated result (platform not bundled)."
+    # 输出 JSON 模拟结果，让 dispatcher.collect_result 可以解析
+    cat <<EOF
+{"task_id":"${TASK_ID}","status":"simulated","result":{"summary":"OpenCode binary not available for ${OS_DIR}-${ARCH_DIR}; task recorded but not executed."}}
+EOF
+    exit 0
+fi
+
+echo "[DeepAgent Embedded] Invoking isolated OpenCode ($OPENCODE_BIN) for task ${TASK_ID}..."
 OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
-    "$SCRIPT_DIR/opencode/macos-arm64/opencode" \
+    "$OPENCODE_BIN" \
     run "$INSTRUCTION_RAW" 2>&1
 
 # 记录运行日志
