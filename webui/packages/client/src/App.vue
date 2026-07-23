@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { onUnmounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { darkTheme, NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { getThemeOverrides } from '@/styles/theme'
 import { useTheme } from '@/composables/useTheme'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import DesktopTitleBar from '@/components/layout/DesktopTitleBar.vue'
+// 双模式切换栏（Stage 9 新增）
+import ModeSwitcher from '@/components/layout/ModeSwitcher.vue'
+// Code 模式容器（Stage 9 新增）
+import CodeModeView from '@/views/hermes/CodeModeView.vue'
+import { useAppMode } from '@/composables/useAppMode'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useAppStore } from '@/stores/hermes/app'
 import SessionSearchModal from '@/components/hermes/chat/SessionSearchModal.vue'
@@ -19,6 +24,9 @@ const { isDark, isComic } = useTheme()
 const { t } = useI18n()
 const appStore = useAppStore()
 const route = useRoute()
+const router = useRouter()
+// 双模式状态：assistant（助理模式）| code（Code 模式）
+const { mode: appMode, setMode } = useAppMode()
 
 const themeOverrides = computed(() => getThemeOverrides(isDark.value, isComic.value))
 const naiveTheme = computed(() => isDark.value ? darkTheme : null)
@@ -43,6 +51,11 @@ const hasDesktopTitleBar = computed(() => {
   const platform = desktopBridge()?.platform
   return isDesktopShell.value && (platform === 'darwin' || platform === 'win32')
 })
+// 双模式：是否显示模式切换栏 + 当前是否 Code 模式
+const showModeSwitcher = computed(() => !isLoginPage.value && !isDesktopPetRoute.value)
+const isCodeMode = computed(() => appMode.value === 'code')
+// Code 模式下不显示助理侧边栏
+const showSidebarInCurrentMode = computed(() => showAppSidebar.value && !isCodeMode.value)
 
 function handleMobileMenuClick() {
   if (usesPageSidebar.value) {
@@ -67,6 +80,16 @@ onUnmounted(() => {
   appStore.stopHealthPolling()
 })
 
+// 双模式路由联动：进入 Code 模式时切到 /hermes/code，切回助理模式则不强行跳转
+// （切回助理模式保留用户离开前的 hermes 路由）
+watch(appMode, (next) => {
+  if (next === 'code' && route.name !== 'hermes.code') {
+    router.push({ name: 'hermes.code' }).catch(() => { /* navigation duplicated */ })
+  } else if (next === 'assistant' && route.name === 'hermes.code') {
+    router.push({ name: 'hermes.chat' }).catch(() => {})
+  }
+}, { immediate: false })
+
 useKeyboard()
 </script>
 
@@ -79,17 +102,27 @@ useKeyboard()
           <router-view v-if="isDesktopPetRoute" />
           <div v-else class="app-shell" :class="{ desktop: isDesktopShell, 'desktop-titlebar-host': hasDesktopTitleBar }">
             <DesktopTitleBar v-if="isDesktopShell" />
+            <!-- 双模式切换栏：login 页与宠物窗口不显示 -->
+            <ModeSwitcher v-if="showModeSwitcher" />
             <div v-if="nodeVersionLow" class="node-warning-bar">
               {{ t('sidebar.nodeVersionWarning', { version: appStore.nodeVersion }) }}
             </div>
-            <div class="app-layout" :class="{ 'no-sidebar': isLoginPage || !showAppSidebar }">
-              <button v-if="showMobileMenuButton" class="hamburger-btn" @click="handleMobileMenuClick">
+            <div class="app-layout" :class="{ 'no-sidebar': isLoginPage || !showSidebarInCurrentMode, 'code-mode': isCodeMode }">
+              <button v-if="!isCodeMode && showMobileMenuButton" class="hamburger-btn" @click="handleMobileMenuClick">
                 <img src="/logo.png" alt="Menu" style="width: 24px; height: 24px;" />
               </button>
-              <div v-if="!isLoginPage && showAppSidebar && appStore.sidebarOpen" class="mobile-backdrop" @click="appStore.closeSidebar" />
-              <AppSidebar v-if="!isLoginPage && showAppSidebar" />
+              <div v-if="!isLoginPage && !isCodeMode && showAppSidebar && appStore.sidebarOpen" class="mobile-backdrop" @click="appStore.closeSidebar" />
+              <!-- 助理模式侧边栏（Code 模式下隐藏） -->
+              <AppSidebar v-if="!isLoginPage && showSidebarInCurrentMode" />
               <main class="app-main">
-                <router-view />
+                <!-- 助理模式：路由视图（keep-alive 保留状态） -->
+                <router-view v-if="!isCodeMode" v-slot="{ Component }">
+                  <keep-alive>
+                    <component :is="Component" />
+                  </keep-alive>
+                </router-view>
+                <!-- Code 模式：OpenCode 容器 -->
+                <CodeModeView v-else />
               </main>
             </div>
           </div>

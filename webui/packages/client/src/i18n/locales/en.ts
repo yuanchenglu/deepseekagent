@@ -2132,9 +2132,25 @@ export default {
     qqQrScanHint: 'Scan the QR code with QQ, or open the link on your phone to complete binding',
   },
 
+  // Mode
+  mode: {
+    switcherLabel: 'Mode',
+    assistant: 'Assistant',
+    code: 'Code',
+    codeDesktopOnly: 'Desktop only',
+    starting: 'Starting',
+    startingHint: 'Starting Code mode…',
+    running: 'Running',
+    failed: 'Failed',
+    unsupported: 'Unsupported',
+    unsupportedHint: 'Code mode is not supported on this platform.',
+    restart: 'Restart',
+    retry: 'Retry',
+    modelLabel: 'Model',
+  },
+
   // Language
   language: {
-    label: 'Language',
     zh: '中文',
     en: 'English',
   },
