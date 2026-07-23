@@ -2878,6 +2878,83 @@ def cmd_version(args):
             pass
 
 
+def _webui_install(args):
+    """Download and install Web UI (server + optional Electron desktop)."""
+    import tarfile, urllib.request, tempfile
+    from pathlib import Path
+    from hermes_constants import get_hermes_home
+
+    hermes_home = get_hermes_home()
+    version_file = hermes_home / "VERSION"
+    if not version_file.exists():
+        print("Error: DeepAgent is not installed. Run the installer first.")
+        sys.exit(1)
+
+    version = args.version or version_file.read_text().strip()
+    version = version.lstrip("v")
+    r2_base = "https://deepseekagent.starseas.org/releases"
+    webui_dest = hermes_home / "webui"
+
+    server_name = f"deepagent-webui-server-{version}.tar.gz"
+    server_url = f"{r2_base}/{server_name}"
+    print(f"Downloading Web UI server ({server_name})...")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfile = Path(tmpdir) / server_name
+        try:
+            resp = urllib.request.urlopen(urllib.request.Request(server_url))
+            tmpfile.write_bytes(resp.read())
+        except Exception as e:
+            print(f"Error downloading Web UI: {e}")
+            sys.exit(1)
+
+        webui_dest.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(tmpfile, "r:gz") as tf:
+            for member in tf.getmembers():
+                if member.name.startswith("webui/"):
+                    member.name = member.name[len("webui/"):]
+                    tf.extract(member, webui_dest)
+        print("Web UI server installed.")
+
+    if args.electron:
+        import platform
+        machine = platform.machine()
+        arch = "arm64" if machine == "arm64" else "x64"
+        dmg_name = f"DeepAgent-{version}-{arch}.dmg"
+        dmg_path = Path.home() / "Downloads" / dmg_name
+
+        print(f"Downloading Electron desktop app ({dmg_name})...")
+        try:
+            resp = urllib.request.urlopen(urllib.request.Request(f"{r2_base}/{dmg_name}"))
+            dmg_path.write_bytes(resp.read())
+            print(f"Downloaded: {dmg_path}")
+
+            import subprocess
+            subprocess.run(
+                ["hdiutil", "attach", str(dmg_path), "-mountpoint", "/Volumes/DeepAgent"],
+                capture_output=True
+            )
+            subprocess.run(["open", "/Volumes/DeepAgent"])
+            print("DMG mounted. Drag DeepAgent.app to Applications to install.")
+        except Exception as e:
+            print(f"Electron download failed: {e}")
+            print("You can still use the Web UI via browser at http://localhost:8648")
+
+    print("\nWeb UI installed! Run 'deepagent webui start' to launch.")
+
+
+def cmd_webui(args):
+    """Manage Web UI installation and lifecycle."""
+    command = getattr(args, "webui_command", None)
+    if command == "install":
+        _webui_install(args)
+    else:
+        print("Usage: deepagent webui install [--electron]")
+        print("       deepagent webui start")
+        print("       deepagent webui stop")
+        print("       deepagent webui status")
+
+
 def cmd_uninstall(args):
     """Uninstall DeepSeek Agent."""
     _require_tty("uninstall")
@@ -5908,6 +5985,34 @@ Examples:
         help="Skip confirmation prompts"
     )
     uninstall_parser.set_defaults(func=cmd_uninstall)
+
+    # =========================================================================
+    # webui command
+    # =========================================================================
+    webui_parser = subparsers.add_parser(
+        "webui",
+        help="Web UI management (install, start, stop)",
+        description="Manage the DeepAgent Web UI. The web server can be installed separately after CLI setup."
+    )
+    webui_subparsers = webui_parser.add_subparsers(dest="webui_command")
+
+    # webui install
+    webui_install = webui_subparsers.add_parser(
+        "install",
+        help="Download and install Web UI (server + optional Electron desktop)",
+        description="Downloads the pre-built Web UI package (~60 MB) "
+                    "and optionally the Electron desktop app (~270 MB)."
+    )
+    webui_install.add_argument(
+        "--electron", action="store_true", default=False,
+        help="Also download the Electron desktop app"
+    )
+    webui_install.add_argument(
+        "--version", default=None,
+        help="Specific version to download (default: current installed version)"
+    )
+    webui_install.set_defaults(func=cmd_webui)
+    # =========================================================================
 
     # =========================================================================
     # acp command
