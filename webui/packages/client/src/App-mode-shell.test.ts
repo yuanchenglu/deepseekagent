@@ -5,6 +5,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { _resetAppModeForTests } from '@/composables/useAppMode'
 
 // ─── mocks ──────────────────────────────────────────────────────────────
 vi.mock('@/composables/useTheme', () => ({ useTheme: () => ({ isDark: { value: false }, isComic: { value: false } }) }))
@@ -51,7 +52,7 @@ beforeEach(() => {
     key: vi.fn(),
   })
 })
-afterEach(() => { vi.unstubAllGlobals(); delete (window as any).hermesDesktop })
+afterEach(() => { _resetAppModeForTests(); vi.unstubAllGlobals(); delete (window as any).hermesDesktop })
 
 function i18n() {
   return createI18n({ legacy: false, locale: 'zh', messages: { zh: { sidebar: { nodeVersionWarning: '' } }, en: {} } })
@@ -64,6 +65,7 @@ function makeRouter() {
       { path: '/', name: 'login', component: { template: '<div class="login-page">Login</div>' }, meta: { public: true } },
       { path: '/hermes/chat', name: 'hermes.chat', component: { template: '<div class="chat-page">Chat</div>' } },
       { path: '/hermes/code', name: 'hermes.code', component: { template: '<div class="code-route">CodeRoute</div>' } },
+      { path: '/hermes/settings', name: 'hermes.settings', component: { template: '<div class="settings-page">Settings</div>' } },
     ],
   })
 }
@@ -73,7 +75,7 @@ import App from './App.vue'
 describe('App.vue mode shell', () => {
   it('renders ModeSwitcher when not on login page', async () => {
     const router = makeRouter()
-    router.push({ name: 'hermes.chat' })
+    router.push({ name: 'hermes.settings' })
     await router.isReady()
     const wrapper = mount(App, {
       global: { plugins: [i18n(), createPinia(), router] },
@@ -84,6 +86,7 @@ describe('App.vue mode shell', () => {
 
   it('hides ModeSwitcher on login page', async () => {
     const router = makeRouter()
+    router.push('/')
     await router.isReady()
     const wrapper = mount(App, {
       global: { plugins: [i18n(), createPinia(), router] },
@@ -94,7 +97,7 @@ describe('App.vue mode shell', () => {
 
   it('renders AppSidebar in assistant mode', async () => {
     const router = makeRouter()
-    router.push({ name: 'hermes.chat' })
+    router.push({ name: 'hermes.settings' })
     await router.isReady()
     const wrapper = mount(App, { global: { plugins: [i18n(), createPinia(), router] } })
     await flushPromises()

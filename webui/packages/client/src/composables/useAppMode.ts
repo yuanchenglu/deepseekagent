@@ -13,6 +13,7 @@ const modeRef = ref<AppMode>('assistant')
 
 /** 是否已完成初始化（从主进程拉取过一次） */
 let initialized = false
+let userTouched = false
 
 /** 订阅者集合 */
 const listeners = new Set<(mode: AppMode) => void>()
@@ -29,6 +30,7 @@ function init(): void {
   const bridge = desktopBridge()
   if (bridge?.isDesktop && typeof bridge.getMode === 'function') {
     bridge.getMode().then(m => {
+      if (userTouched) return
       if (m === 'assistant' || m === 'code') {
         modeRef.value = m
         writeStoredMode(m)
@@ -53,6 +55,7 @@ function init(): void {
 async function setMode(mode: AppMode): Promise<void> {
   if (mode !== 'assistant' && mode !== 'code') return
   if (modeRef.value === mode) return
+  userTouched = true
   modeRef.value = mode
   writeStoredMode(mode)
   notify(mode)
@@ -87,6 +90,7 @@ export function useAppMode(_bridge?: HermesDesktopBridge) {
 export function _resetAppModeForTests(): void {
   modeRef.value = 'assistant'
   initialized = false
+  userTouched = false
   listeners.clear()
   try { localStorage.removeItem(APP_MODE_STORAGE_KEY) } catch { /* */ }
 }
