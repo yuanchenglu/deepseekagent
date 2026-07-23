@@ -194,7 +194,14 @@ class ImmuneSystem:
                         rf"✅.*{re.escape(keyword)}",
                     ]
                     for pattern in action_patterns:
-                        if re.search(pattern, text_lower):
+                        m = re.search(pattern, text_lower)
+                        if m:
+                            # B9 修复：如果"已...<keyword>"之间夹有否定词（不/不会/没有/未/请勿），
+                            # 则是"已经确认不会删除"这类否定陈述，而非违反
+                            window = text_lower[m.start():m.end()]
+                            negation_words = ("不会", "不能", "没有", "未", "请勿", "不要", "没", "不再")
+                            if any(neg in window for neg in negation_words):
+                                continue
                             return Violation(
                                 constraint_text=constraint.text,
                                 constraint_type="prohibition",
