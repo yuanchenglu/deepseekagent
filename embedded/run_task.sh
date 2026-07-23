@@ -91,34 +91,25 @@ fi
 
 echo "[DeepAgent Embedded] Invoking isolated OpenCode ($OPENCODE_BIN) for task ${TASK_ID}..."
 
+# 非阻塞模式：后台启动 opencode，立即写入 dispatched 状态
 OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
     "$OPENCODE_BIN" \
-    run "$INSTRUCTION_RAW" > "$OUTPUT_DIR/.output_${TASK_ID}.txt" 2>&1
-OPENCODE_EXIT=$?
+    run "$INSTRUCTION_RAW" > "$OUTPUT_DIR/.output_${TASK_ID}.txt" 2>&1 &
+OPENCODE_PID=$!
 
-# Write structured result file for collect_result() to read
 python3 << PYEOF
 import json
 instr = open("$INSTRUCTION_FILE").read() if __import__('os').path.exists("$INSTRUCTION_FILE") else ""
-try:
-    output = open("$OUTPUT_DIR/.output_${TASK_ID}.txt").read()[:500]
-except:
-    output = ""
-
 data = {
     "task_id": "$TASK_ID",
-    "status": "completed" if $OPENCODE_EXIT == 0 else "failed",
+    "status": "dispatched",
     "instruction": instr,
-    "exit_code": $OPENCODE_EXIT,
-    "result": {"summary": "Task completed with exit code $OPENCODE_EXIT"},
-    "output": output,
+    "pid": $OPENCODE_PID,
+    "result": {"summary": "Task dispatched to OpenCode (pid=$OPENCODE_PID), non-blocking mode"}
 }
 with open("$RESULT_FILE", "w") as f:
     json.dump(data, f, ensure_ascii=False)
 PYEOF
-
-# Cleanup temp files
-rm -f "$INSTRUCTION_FILE" "$OUTPUT_DIR/.output_${TASK_ID}.txt"
 
 # 记录运行日志
 {
