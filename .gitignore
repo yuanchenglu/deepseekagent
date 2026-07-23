@@ -113,3 +113,12 @@ embedded/oh-my-openagent/.git/
 embedded/opencode/src/.git/
 openspec/node_modules/
 openspec/.git/
+embedded/oh-my-openagent/.agents/
+embedded/oh-my-openagent/.claude/
+embedded/oh-my-openagent/.codex/
+embedded/oh-my-openagent/.cursor/
+embedded/oh-my-openagent/.devcontainer/
+embedded/oh-my-openagent/.github/
+embedded/oh-my-openagent/AGENTS.md
+embedded/oh-my-openagent/CLA.md
+embedded/oh-my-openagent/CLAUDE.md
