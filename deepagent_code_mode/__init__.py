@@ -7,7 +7,17 @@ DeepAgent Code Mode - CEO指挥内置研发小组的核心模块
 
 from .dispatcher import CodeModeDispatcher
 from .session import CodeModeSessionManager
-from .handler import handle_development_request, check_task, get_task_result, list_recent_tasks
+from .handler import (
+    handle_development_request,
+    check_task,
+    get_task_result,
+    list_recent_tasks,
+    TaskType,
+    handle_feature,
+    handle_bugfix,
+    handle_refactor,
+    handle_research,
+)
 
 __all__ = [
     "CodeModeDispatcher",
@@ -16,4 +26,9 @@ __all__ = [
     "check_task",
     "get_task_result",
     "list_recent_tasks",
+    "TaskType",
+    "handle_feature",
+    "handle_bugfix",
+    "handle_refactor",
+    "handle_research",
 ]
