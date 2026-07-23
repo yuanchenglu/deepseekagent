@@ -8,7 +8,7 @@
 #   1. 接收一个描述任务的 JSON 文件路径（含有 task_id、instruction）
 #   2. 提取 task_id 和 instruction
 #   3. 用隔离的 OpenCode 二进制执行 instruction
-#   4. 记录运行日志到 workspace/last_run.log
+#   4. 写入结构化结果到 workspace/task_{task_id}.json
 #
 # 隔离原则:
 #   - 不读取 ~/.config/opencode 或任何用户本地配置
@@ -24,7 +24,6 @@ mkdir -p "$OUTPUT_DIR"
 
 # --- 从输入文件读取 task_id 和 instruction ---
 if [ -f "$TASK_FILE" ]; then
-    # 尝试用 Python 解析 JSON 以获取 task_id
     TASK_ID=$(python3 -c "
 import json
 with open('$TASK_FILE') as f:
@@ -32,13 +31,16 @@ with open('$TASK_FILE') as f:
 print(data.get('task_id', ''))
 " 2>/dev/null || echo "")
 
-    # 读取原始指令内容（保留原始文本）
-    INSTRUCTION_RAW=$(python3 -c "
+    # Write raw instruction to a temp file to avoid quoting issues
+    INSTRUCTION_FILE="$OUTPUT_DIR/.instr_${TASK_ID}.txt"
+    python3 -c "
 import json
 with open('$TASK_FILE') as f:
     data = json.load(f)
-print(data.get('instruction', '(no instruction)'))
-" 2>/dev/null || head -c 1000 "$TASK_FILE")
+with open('$INSTRUCTION_FILE', 'w') as f:
+    f.write(data.get('instruction', '(no instruction)'))
+" 2>/dev/null || echo "(no instruction)" > "$INSTRUCTION_FILE"
+    INSTRUCTION_RAW=$(cat "$INSTRUCTION_FILE")
 else
     TASK_ID=""
     INSTRUCTION_RAW="(no task file provided)"
@@ -49,11 +51,65 @@ if [ -z "$TASK_ID" ]; then
     TASK_ID="$(date +%s)-$$"
 fi
 
+RESULT_FILE="$OUTPUT_DIR/task_${TASK_ID}.json"
+
 # --- 调用隔离的 OpenCode 执行任务 ---
-echo "[DeepAgent Embedded] Invoking isolated OpenCode for task ${TASK_ID}..."
+# B3 修复：根据当前 OS + 架构选择正确的 binary 路径，避免硬编码 macos-arm64
+OS_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+case "$OS_NAME" in
+    darwin) OS_DIR="macos" ;;
+    linux)  OS_DIR="linux" ;;
+    mingw*|msys*|cygwin*) OS_DIR="windows" ;;
+    *)      OS_DIR="linux" ;;
+esac
+case "$ARCH" in
+    arm64|aarch64) ARCH_DIR="arm64" ;;
+    x86_64|amd64)  ARCH_DIR="x64" ;;
+    *)             ARCH_DIR="$ARCH" ;;
+esac
+OPENCODE_BIN="$SCRIPT_DIR/opencode/${OS_DIR}-${ARCH_DIR}/opencode"
+[ "$OS_DIR" = "windows" ] && OPENCODE_BIN="${OPENCODE_BIN}.exe"
+
+if [ ! -x "$OPENCODE_BIN" ]; then
+    echo "[DeepAgent Embedded] Warning: OpenCode binary not found at $OPENCODE_BIN"
+    echo "[DeepAgent Embedded] Falling back to simulated result."
+    python3 << PYEOF
+import json
+data = {
+    "task_id": "$TASK_ID",
+    "status": "simulated",
+    "instruction": open("$INSTRUCTION_FILE").read() if __import__('os').path.exists("$INSTRUCTION_FILE") else "",
+    "result": {"summary": "OpenCode binary not available; task recorded but not executed."}
+}
+with open("$RESULT_FILE", "w") as f:
+    json.dump(data, f, ensure_ascii=False)
+PYEOF
+    rm -f "$INSTRUCTION_FILE"
+    exit 0
+fi
+
+echo "[DeepAgent Embedded] Invoking isolated OpenCode ($OPENCODE_BIN) for task ${TASK_ID}..."
+
+# 非阻塞模式：后台启动 opencode，立即写入 dispatched 状态
 OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
-    "$SCRIPT_DIR/opencode/macos-arm64/opencode" \
-    run "$INSTRUCTION_RAW" 2>&1
+    "$OPENCODE_BIN" \
+    run "$INSTRUCTION_RAW" > "$OUTPUT_DIR/.output_${TASK_ID}.txt" 2>&1 &
+OPENCODE_PID=$!
+
+python3 << PYEOF
+import json
+instr = open("$INSTRUCTION_FILE").read() if __import__('os').path.exists("$INSTRUCTION_FILE") else ""
+data = {
+    "task_id": "$TASK_ID",
+    "status": "dispatched",
+    "instruction": instr,
+    "pid": $OPENCODE_PID,
+    "result": {"summary": "Task dispatched to OpenCode (pid=$OPENCODE_PID), non-blocking mode"}
+}
+with open("$RESULT_FILE", "w") as f:
+    json.dump(data, f, ensure_ascii=False)
+PYEOF
 
 # 记录运行日志
 {
@@ -61,5 +117,6 @@ OPENCODE_CONFIG_DIR="$SCRIPT_DIR/config" \
     echo "Task ID: ${TASK_ID}"
     echo "Time: $(date)"
     echo "Instruction: ${INSTRUCTION_RAW}"
+    echo "Exit Code: ${OPENCODE_EXIT}"
     echo "=== End of run ==="
 } > "$OUTPUT_DIR/last_run.log"

@@ -2134,9 +2134,25 @@ export default {
     stopFailed: '停止失败',
   },
 
+  // 模式
+  mode: {
+    switcherLabel: '模式',
+    assistant: '助手模式',
+    code: 'Code 模式',
+    codeDesktopOnly: '仅桌面端',
+    starting: '启动中',
+    startingHint: 'Code 模式启动中…',
+    running: '运行中',
+    failed: '启动失败',
+    unsupported: '不支持',
+    unsupportedHint: '当前平台不支持 Code 模式。',
+    restart: '重启',
+    retry: '重试',
+    modelLabel: '模型',
+  },
+
   // 语言
   language: {
-    label: '语言',
     zh: '中文',
     en: 'English',
   },

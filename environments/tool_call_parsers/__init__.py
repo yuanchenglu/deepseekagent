@@ -70,9 +70,19 @@ def register_parser(name: str):
         @register_parser("hermes")
         class HermesToolCallParser(ToolCallParser):
             ...
+
+    Raises:
+        ValueError: If name is empty or not a string
     """
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(
+            f"Parser name must be a non-empty string, got {name!r}"
+        )
+    name = name.strip()
 
     def decorator(cls: Type[ToolCallParser]) -> Type[ToolCallParser]:
+        if name in PARSER_REGISTRY:
+            logger.warning("Overwriting existing parser '%s'", name)
         PARSER_REGISTRY[name] = cls
         return cls
 

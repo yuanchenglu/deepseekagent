@@ -78,8 +78,12 @@ def stabilize_tool_schemas(tools: Optional[List[Dict[str, Any]]]) -> Optional[Li
             _normalize_schema(params)
 
         # 确保 description 是字符串且不含动态内容
-        desc = fn.get("description", "")
-        if not isinstance(desc, str):
+        # B6 修复：None description 不应被序列化为字面量 "None"（会污染模型上下文），
+        # 改为空字符串（OpenAI function-calling 规范允许空 description）
+        desc = fn.get("description")
+        if desc is None:
+            fn["description"] = ""
+        elif not isinstance(desc, str):
             fn["description"] = str(desc)
 
     return stabilized

@@ -14,22 +14,24 @@ class TestGetDefaultHermesRoot:
     """Tests for get_default_hermes_root() — Docker/custom deployment awareness."""
 
     def test_no_hermes_home_returns_native(self, tmp_path, monkeypatch):
-        """When HERMES_HOME is not set, returns ~/.hermes."""
+        """When HERMES_HOME is not set, returns ~/.deepagent (post-rebrand)."""
         monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("DEEPAGENT_HOME", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        assert get_default_hermes_root() == tmp_path / ".hermes"
+        # Hermes → DeepAgent 品牌迁移后默认路径为 ~/.deepagent
+        assert get_default_hermes_root() == tmp_path / ".deepagent"
 
     def test_hermes_home_is_native(self, tmp_path, monkeypatch):
-        """When HERMES_HOME = ~/.hermes, returns ~/.hermes."""
-        native = tmp_path / ".hermes"
+        """When HERMES_HOME = ~/.deepagent, returns ~/.deepagent."""
+        native = tmp_path / ".deepagent"
         native.mkdir()
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("HERMES_HOME", str(native))
         assert get_default_hermes_root() == native
 
     def test_hermes_home_is_profile(self, tmp_path, monkeypatch):
-        """When HERMES_HOME is a profile under ~/.hermes, returns ~/.hermes."""
-        native = tmp_path / ".hermes"
+        """When HERMES_HOME is a profile under ~/.deepagent, returns ~/.deepagent."""
+        native = tmp_path / ".deepagent"
         profile = native / "profiles" / "coder"
         profile.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -37,7 +39,7 @@ class TestGetDefaultHermesRoot:
         assert get_default_hermes_root() == native
 
     def test_hermes_home_is_docker(self, tmp_path, monkeypatch):
-        """When HERMES_HOME points outside ~/.hermes (Docker), returns HERMES_HOME."""
+        """When HERMES_HOME points outside ~/.deepagent (Docker), returns HERMES_HOME."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -45,8 +47,8 @@ class TestGetDefaultHermesRoot:
         assert get_default_hermes_root() == docker_home
 
     def test_hermes_home_is_custom_path(self, tmp_path, monkeypatch):
-        """Any HERMES_HOME outside ~/.hermes is treated as the root."""
-        custom = tmp_path / "my-hermes-data"
+        """Any HERMES_HOME outside ~/.deepagent is treated as the root."""
+        custom = tmp_path / "my-deepagent-data"
         custom.mkdir()
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.setenv("HERMES_HOME", str(custom))

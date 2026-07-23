@@ -119,6 +119,12 @@ const router = createRouter({
       component: () => import('@/views/hermes/SettingsView.vue'),
     },
     {
+      // Code 模式容器路由：双模式统一后，进入此路由即激活 Code 模式
+      path: '/hermes/code',
+      name: 'hermes.code',
+      component: () => import('@/views/hermes/CodeModeView.vue'),
+    },
+    {
       path: '/hermes/channels',
       name: 'hermes.channels',
       component: () => import('@/views/hermes/ChannelsView.vue'),

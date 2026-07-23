@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'packages/client/src/**/*.test.ts'],
     setupFiles: ['tests/setup.ts'],
   },
 })
