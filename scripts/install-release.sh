@@ -408,37 +408,77 @@ check_node() {
 }
 
 # ============================================================================
-# Step 2: 下载 Release 包
+# Step 2: 顺序下载组件 + 安装
 # ============================================================================
-# 从主源（R2）下载，失败则切备用源（GitHub Releases）。
-# 校验和从 GitHub 获取（不同信任域），下载的 tarball 来自 R2。
+# 不再下载单个 900 MB tar.gz，而是按顺序下载多个小包：
+#   1. core（~5 MB）→ 解压 → uv sync（终端滚屏）
+#   2. embedded（~97 MB）→ 按平台提取
+#   3. webui-server（~60 MB，可选）→ `deepagent webui install`
+#
+# 每一批下载时终端都有进度反馈，用户不会焦虑。
 # ============================================================================
 
-# 获取最新版本号（当 VERSION=latest 时调用）
-# 纯 bash 实现（不依赖 python3），通过 sed/awk 从 GitHub API JSON 响应中提取 tag_name
-fetch_latest_version() {
-    log_info "正在获取最新版本号..."
-    local api_url="https://api.github.com/repos/${GH_REPO}/releases/latest"
-    local latest
-
-    # curl 获取 JSON → grep 找到 "tag_name" 行 → sed 提取引号内的值
-    latest=$(curl -fsSL "$api_url" 2>/dev/null \
-        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        | sed 's/"tag_name"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/')
-
-    if [ -n "$latest" ]; then
-        # tag 名通常为 v0.9.0 格式，去掉前缀 v
-        VERSION="${latest#v}"
-        log_success "最新版本: v${VERSION}"
+# 检测可用的 SHA256 校验工具
+detect_sha256_cmd() {
+    if command -v sha256sum &>/dev/null; then
+        SHA256_CMD="sha256sum"
+        SHA256_CHECK_FLAG="-c"
+    elif command -v shasum &>/dev/null; then
+        SHA256_CMD="shasum"
+        SHA256_CHECK_FLAG="-a 256 -c"
+    elif command -v openssl &>/dev/null; then
+        SHA256_CMD="openssl dgst -sha256"
+        SHA256_CHECK_FLAG=""
     else
-        log_warn "无法获取最新版本，使用默认版本 'latest'"
-        VERSION="latest"
+        SHA256_CMD=""
+        SHA256_CHECK_FLAG=""
     fi
 }
 
-# 用 curl 下载文件，失败时重试一次
+# 校验文件 SHA256
+verify_sha256() {
+    local file="$1"
+    local sha_file="$2"
+
+    if [ -z "${SHA256_CMD:-}" ]; then
+        log_warn "无可用 SHA256 工具，跳过校验"
+        return 0
+    fi
+    if [ ! -f "$sha_file" ]; then
+        log_warn "校验和文件不存在，跳过"
+        return 0
+    fi
+
+    log_info "验证 SHA256 校验和..."
+    local check_dir
+    check_dir=$(dirname "$file")
+
+    if [ -n "$SHA256_CHECK_FLAG" ]; then
+        if (cd "$check_dir" && $SHA256_CMD $SHA256_CHECK_FLAG "$(basename "$sha_file")" 2>/dev/null); then
+            log_success "校验和验证通过 ✓"
+            return 0
+        fi
+    else
+        local expected_hash
+        local actual_hash
+        expected_hash=$(awk '{print $1}' "$sha_file" 2>/dev/null)
+        actual_hash=$($SHA256_CMD "$file" 2>/dev/null | awk '{print $NF}')
+        if [ "$expected_hash" = "$actual_hash" ]; then
+            log_success "校验和验证通过 ✓"
+            return 0
+        fi
+    fi
+
+    log_error "校验和验证失败！文件可能已损坏。"
+    log_info "文件: $file"
+    log_info "预期: $(cat "$sha_file" 2>/dev/null)"
+    return 1
+}
+
+# 下载单个文件（带进度条），失败时重试一次
 # 参数：$1=URL, $2=输出路径, $3=描述（用于日志）
-curl_with_retry() {
+# 小文件用静默下载，大文件用进度条
+curl_download() {
     local url="$1"
     local output="$2"
     local desc="$3"
@@ -446,8 +486,9 @@ curl_with_retry() {
     local attempt=1
 
     while [ "$attempt" -le "$max_attempts" ]; do
-            log_info "${desc} (attempt ${attempt}/${max_attempts})"
-        if curl -fsSL --connect-timeout 15 --max-time 180 "$url" -o "$output" 2>/dev/null; then
+        log_info "${desc} (attempt ${attempt}/${max_attempts})"
+        # 用 --progress-bar 让用户看到下载进度
+        if curl -fL --progress-bar --connect-timeout 15 --max-time 900 "$url" -o "$output" 2>&1; then
             return 0
         fi
         if [ "$attempt" -lt "$max_attempts" ]; then
@@ -459,138 +500,134 @@ curl_with_retry() {
     return 1
 }
 
-# 检测可用的 SHA256 校验工具，设置 SHA256_CMD 和 SHA256_CHECK_FLAG
-detect_sha256_cmd() {
-    if command -v sha256sum &>/dev/null; then
-        SHA256_CMD="sha256sum"
-        SHA256_CHECK_FLAG="-c"
-    elif command -v shasum &>/dev/null; then
-        SHA256_CMD="shasum"
-        SHA256_CHECK_FLAG="-a 256 -c"
-    elif command -v openssl &>/dev/null; then
-        # openssl dgst 不支持 -c 模式，需要手动比较
-        SHA256_CMD="openssl dgst -sha256"
-        SHA256_CHECK_FLAG=""
-    else
-        SHA256_CMD=""
-        SHA256_CHECK_FLAG=""
-    fi
-}
-
-# 验证文件的 SHA256 校验和
-# 参数：$1=文件路径, $2=校验和文件路径（格式：hash  filename）
-# 返回：0=验证通过, 1=验证失败
-verify_sha256() {
-    local file="$1"
-    local sha_file="$2"
-
-    if [ -z "${SHA256_CMD:-}" ]; then
-        log_warn "无可用 SHA256 工具，跳过校验和验证"
-        return 0
-    fi
-
-    if [ ! -f "$sha_file" ]; then
-        log_warn "校验和文件不存在: $sha_file，跳过验证"
-        return 0
-    fi
-
-    log_info "验证 SHA256 校验和..."
-
-    local check_dir
-    check_dir=$(dirname "$file")
-
-    if [ -n "$SHA256_CHECK_FLAG" ]; then
-        # sha256sum / shasum 支持 -c 模式：读取校验和文件并逐行校验
-        if (cd "$check_dir" && $SHA256_CMD $SHA256_CHECK_FLAG "$(basename "$sha_file")" 2>/dev/null); then
-            log_success "校验和验证通过 ✓"
-            return 0
-        fi
-    else
-        # openssl 降级：手动计算并比较
-        local expected_hash
-        local actual_hash
-        # 校验和文件格式：第一列为哈希值
-        expected_hash=$(awk '{print $1}' "$sha_file" 2>/dev/null)
-        actual_hash=$($SHA256_CMD "$file" 2>/dev/null | awk '{print $NF}')
-        if [ "$expected_hash" = "$actual_hash" ]; then
-            log_success "校验和验证通过 ✓"
-            return 0
-        fi
-    fi
-
-    # 验证失败：显示详细信息
-    log_error "校验和验证失败！文件可能已损坏或被篡改。"
-    log_info "文件: $file"
-    log_info "预期校验和: $(cat "$sha_file" 2>/dev/null)"
-    log_info "实际 SHA256: $(sha256sum "$file" 2>/dev/null || shasum -a 256 "$file" 2>/dev/null || openssl dgst -sha256 "$file" 2>/dev/null)"
-    return 1
-}
-
-# 获取校验和文件并验证
-# 参数：$1=tarball 路径, $2=版本号
-# 从 GitHub Releases 获取校验和（与主源 R2 构成不同信任域）
-download_and_verify() {
+# 获取校验和文件并从 R2 下载校验验证
+download_verify_file() {
     local tarball="$1"
-    local ver="$2"
-    local sha_url="${GH_BASE_URL}/v${ver}/deepagent-${ver}.sha256"
+    local name="$2"
+    local sha_url="${R2_BASE_URL}/${name}.sha256"
     local sha_file
-    sha_file="$(dirname "$tarball")/deepagent-${ver}.sha256"
+    sha_file="$(dirname "$tarball")/${name}.sha256"
 
     if curl -fsSL --connect-timeout 10 --max-time 30 "$sha_url" -o "$sha_file" 2>/dev/null; then
         verify_sha256 "$tarball" "$sha_file"
     else
-        log_warn "Cannot fetch checksum file, skipping verification: $sha_url"
+        log_warn "无法获取校验和文件，跳过验证"
         return 0
     fi
 }
 
-# 下载 Release tarball
-download_release() {
-    local version_display="${VERSION}"
-    local tarball_name="deepagent-${VERSION}.tar.gz"
-    local r2_url="${R2_BASE_URL}/${tarball_name}"
-    local gh_url="${GH_BASE_URL}/v${VERSION}/${tarball_name}"
+# ---- 2a: 下载核心代码（~5 MB，瞬间完成） ----
+download_core() {
+    local name="deepagent-core-${VERSION}"
+    local url="${R2_BASE_URL}/${name}.tar.gz"
 
-    # 创建临时目录
+    log_info "下载核心代码..."
+    log_info "  大小: ~6 MB"
+
     TMP_DIR=$(mktemp -d)
-    TARBALL_PATH="${TMP_DIR}/${tarball_name}"
+    local tarball="${TMP_DIR}/${name}.tar.gz"
 
-    log_info "下载版本: v${version_display}"
+    if curl_download "$url" "$tarball" "(R2)"; then
+        download_verify_file "$tarball" "$name" || true
+        log_success "核心代码下载完成"
+    else
+        log_error "核心代码下载失败！"
+        log_info "请检查网络连接后重试。"
+        log_info "URL: $url"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
 
-    # 先检测可用的 SHA256 工具
-    detect_sha256_cmd
+    # 解压到安装目录
+    log_info "解压核心代码..."
+    mkdir -p "${INSTALL_DIR}/deepagent"
+    tar xzf "$tarball" -C "${INSTALL_DIR}/deepagent"
+    log_success "核心代码解压完成"
 
-    # 策略 A: 尝试从主源（R2）下载 → 从 GitHub 获取校验和（不同信任域）
-    if curl_with_retry "$r2_url" "$TARBALL_PATH" "(primary R2)"; then
-        log_success "从主源下载成功"
-        download_and_verify "$TARBALL_PATH" "$VERSION" || {
-            rm -rf "$TMP_DIR"
-            exit 1
+    CORE_TARBALL="$tarball"
+}
+
+# ---- 2b: uv sync 安装 Python 依赖（终端滚屏，用户等得起） ----
+do_uv_sync() {
+    local pkg_dir="${INSTALL_DIR}/deepagent"
+
+    if [ ! -f "$pkg_dir/pyproject.toml" ]; then
+        log_error "未找到 pyproject.toml，无法安装依赖"
+        log_info "目录内容: $(ls "$pkg_dir" 2>/dev/null | head -10)"
+        exit 1
+    fi
+
+    if [ -n "${UV_CMD:-}" ] && [ "$DISTRO" != "termux" ]; then
+        log_info "安装 Python 依赖（uv sync）..."
+        log_info "  终端将持续输出进度，请耐心等待"
+        if (cd "$pkg_dir" && $UV_CMD sync 2>&1); then
+            log_success "Python 依赖安装完成"
+        else
+            log_warn "uv sync 失败，尝试 pip 降级..."
+            if [ ! -d "${INSTALL_DIR}/.venv" ]; then
+                $UV_CMD venv "${INSTALL_DIR}/.venv" --python "$PYTHON_VERSION"
+            fi
+            $UV_CMD pip install --python "${INSTALL_DIR}/.venv/bin/python" -e "$pkg_dir" 2>/dev/null || {
+                log_warn "pip 安装不完整，继续..."
+                "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
+            }
+        fi
+    else
+        log_info "使用 pip 安装 Python 依赖..."
+        if [ ! -d "${INSTALL_DIR}/.venv" ]; then
+            "$PYTHON_PATH" -m venv "${INSTALL_DIR}/.venv"
+        fi
+        "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
+        "${INSTALL_DIR}/.venv/bin/python" -m pip install -e "$pkg_dir" 2>/dev/null || {
+            log_warn "pip 安装不完整，继续..."
+            "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
         }
+        log_success "Python 依赖安装完成"
+    fi
+}
+
+# ---- 2c: 下载 Embedded OpenCode（~97 MB，进度条可见） ----
+download_embedded() {
+    local name="deepagent-embedded-${VERSION}"
+    local url="${R2_BASE_URL}/${name}.tar.gz"
+    local tarball="${TMP_DIR}/${name}.tar.gz"
+
+    log_info "下载嵌入式 OpenCode（${ARCH}）..."
+    log_info "  大小: ~97 MB（含全部平台，安装脚本只提取当前架构）"
+
+    if curl_download "$url" "$tarball" "(R2)"; then
+        download_verify_file "$tarball" "$name" || true
+        log_success "Embedded 包下载完成"
+    else
+        log_warn "Embedded 包下载失败（非致命，CLI 可用）"
+        log_info "OpenCode 研发小组功能将不可用"
         return 0
     fi
 
-    # 策略 B: 主源失败，尝试备用源（GitHub Releases）
-    log_warn "主源下载失败，尝试备用源..."
-    log_info "备用源 URL: ${gh_url}"
+    # 只提取当前平台的 OpenCode 二进制
+    log_info "提取嵌入式组件..."
+    local embed_dst="${INSTALL_DIR}/deepagent/embedded"
+    mkdir -p "$embed_dst"
 
-    if curl_with_retry "$gh_url" "$TARBALL_PATH" "(fallback GitHub)"; then
-        log_success "从备用源（GitHub Releases）下载成功"
-        # 备用源也尝试校验（同一信任域，但聊胜于无）
-        download_and_verify "$TARBALL_PATH" "$VERSION" || {
-            rm -rf "$TMP_DIR"
-            exit 1
-        }
-        return 0
+    # 检测二进制路径（macOS 用 macos-{arch}, Linux 用 linux-{arch}）
+    local os_dir=""
+    case "$OS" in
+        macos) os_dir="macos" ;;
+        linux) os_dir="linux" ;;
+        *)     os_dir="linux" ;;
+    esac
+
+    local opencode_path="embedded/opencode/${os_dir}-${ARCH_SHORT}/opencode"
+
+    if tar tzf "$tarball" "$opencode_path" >/dev/null 2>&1; then
+        tar xzf "$tarball" -C "$embed_dst" "$opencode_path" 2>/dev/null || true
+        chmod +x "${embed_dst}/${opencode_path}" 2>/dev/null || true
+        log_success "OpenCode 已提取: ${opencode_path}"
+    else
+        log_warn "未找到 ${opencode_path}，跳过"
     fi
 
-    # 两个源都失败
-    log_error "下载失败！主源和备用源均不可用。"
-    log_info "请检查网络连接后重试。"
-    log_info "主源: $r2_url"
-    log_info "备用: $gh_url"
-    rm -rf "$TMP_DIR"
-    exit 1
+    EMBEDDED_TARBALL="$tarball"
 }
 
 # ============================================================================
@@ -620,47 +657,15 @@ copy_with_fallback() {
 }
 
 # ============================================================================
-# Step 3: 安装
+# Step 3: 安装收尾
 # ============================================================================
-# 判断全新安装 vs 更新安装，复制文件、uv sync 安装 Python 依赖。
-# 注意：不执行 electron-builder（耗时且无 GUI 环境会失败）。
-# 注意：不执行 npm build（WebUI 已预构建包含在包中）。
+# core 已解压、uv sync 已完成、embedded 已提取。
+# 这里只处理：skills 同步、版本写入、验证。
+# WebUI 不在此安装，用户可通过 `deepagent webui install` 后装。
 # ============================================================================
 
 install_release() {
-    local extract_dir="${TMP_DIR}/deepagent-${VERSION}"
-    local src_root="$TMP_DIR"
-
-    log_info "解压 Release 包..."
-    tar xzf "$TARBALL_PATH" -C "$TMP_DIR"
-
-    # 检测 tarball 内部结构：
-    #   结构 A: tarball 有 deepagent-{VERSION}/ 外层目录（旧格式）
-    #   结构 B: 扁平 tarball，pyproject.toml 直接在根目录（build-release.sh 格式）
-    #   结构 C: 唯一的子目录（fallback）
-    if [ -d "$extract_dir" ]; then
-        src_root="$extract_dir"
-        log_success "Release 包解压成功（结构 A: deepagent-${VERSION}/）"
-    elif [ -f "$TMP_DIR/pyproject.toml" ]; then
-        src_root="$TMP_DIR"
-        log_success "Release 包解压成功（结构 B: 扁平 tarball）"
-    else
-        # Fallback: 尝试唯一的子目录
-        local first_subdir
-        first_subdir=$(ls -d "$TMP_DIR"/*/ 2>/dev/null | head -1)
-        if [ -n "$first_subdir" ] && [ -d "$first_subdir" ]; then
-            src_root="$first_subdir"
-            log_success "Release 包解压成功（结构 C: fallback 子目录）"
-        else
-            log_error "解压失败：无法识别 Release 包结构"
-            log_info "TMP_DIR 内容: $(ls -la "$TMP_DIR" 2>/dev/null | head -20)"
-            rm -rf "$TMP_DIR"
-            exit 1
-        fi
-    fi
-
-    # 保存提取目录为全局变量，供后续步骤（sync_skills 等）使用
-    TMP_EXTRACT_DIR="$src_root"
+    local src_root="${INSTALL_DIR}/deepagent"
 
     # 判断是全新安装还是更新安装
     if [ -f "$INSTALL_DIR/VERSION" ]; then
@@ -678,149 +683,46 @@ install_release() {
         local backup_dir="${INSTALL_DIR}/.backup/$(date -u +%Y%m%d-%H%M%S)"
         log_info "备份旧版本到 ${backup_dir}..."
         mkdir -p "$backup_dir"
-
-        # 备份核心目录和文件（不备份 .env、config.yaml、用户 skills）
         for item in "deepagent" "webui" "VERSION" "skills/.bundled_manifest"; do
             if [ -e "${INSTALL_DIR}/${item}" ]; then
                 local target_dir="$backup_dir/$(dirname "$item")"
                 mkdir -p "$target_dir"
-                copy_with_fallback "${INSTALL_DIR}/${item}" "$target_dir/"
+                cp -r "${INSTALL_DIR}/${item}" "$target_dir/" 2>/dev/null || true
             fi
         done
-
-        # 如果 sessions.db 存在也备份（非必需，但有助于回滚）
-        if [ -f "${INSTALL_DIR}/sessions.db" ]; then
-            cp "${INSTALL_DIR}/sessions.db" "$backup_dir/" 2>/dev/null || true
-        fi
-
-        log_success "备份完成（可回滚: $backup_dir）"
+        [ -f "${INSTALL_DIR}/sessions.db" ] && cp "${INSTALL_DIR}/sessions.db" "$backup_dir/" 2>/dev/null || true
+        log_success "备份完成"
     fi
 
-    # ---- 复制文件 ----
-    log_info "安装文件到 ${INSTALL_DIR}..."
+    # ---- 创建辅助目录 ----
+    mkdir -p "${INSTALL_DIR}"/{skills,logs}
 
-    # 创建安装目录
-    mkdir -p "$INSTALL_DIR"/{deepagent,webui,skills,logs}
-
-    # ---- 复制 deepagent Python 包 ----
-    # 支持两种 tarball 结构：
-    #   A/C: deepagent/ 子目录包含所有 Python 源文件
-    #   B:   扁平结构，pyproject.toml 等文件在 src_root 根目录，需排除 skills/webui/VERSION
-    log_info "复制 deepagent 核心模块..."
-    local deepagent_copied=false
-
-    if [ -d "$src_root/deepagent" ]; then
-        # 结构 A/C: deepagent/ 子目录
-        copy_with_fallback "$src_root/deepagent/" "${INSTALL_DIR}/deepagent/" \
-            --exclude="__pycache__" \
-            --exclude="*.pyc" \
-            --exclude=".pyo" \
-            --exclude="venv/" \
-            --exclude=".venv/" \
-            --exclude="*.egg-info/"
-        deepagent_copied=true
-        log_success "deepagent 核心模块已复制（deepagent/ 子目录）"
-    elif [ -f "$src_root/pyproject.toml" ]; then
-        # 结构 B: 扁平 tarball — 复制 pyproject.toml 和核心模块目录
-        # 需排除 skills/ webui/ VERSION（它们单独处理）
-        local da_dst="${INSTALL_DIR}/deepagent"
-        for _item in pyproject.toml uv.lock requirements.txt constraints-termux.txt \
-                      cli.py model_tools.py run_agent.py hermes_state.py \
-                      hermes_constants.py hermes_logging.py hermes_time.py utils.py \
-                      agent hermes_cli tools gateway cron acp_adapter plugins embedded; do
-            if [ -e "$src_root/$_item" ]; then
-                mkdir -p "$da_dst"
-                cp -r "$src_root/$_item" "$da_dst/"
-            fi
-        done
-        # 验证至少有核心文件被复制
-        if [ -f "$da_dst/pyproject.toml" ] && [ -d "$da_dst/hermes_cli" ]; then
-            deepagent_copied=true
-            log_success "deepagent 核心模块已复制（扁平结构）"
-        fi
-    fi
-
-    if [ "$deepagent_copied" = false ]; then
-        log_error "安装失败：未找到 deepagent Python 模块源文件"
-        log_info "src_root 内容: $(ls "$src_root" 2>/dev/null | head -20)"
-        log_info "Release 包可能已损坏或结构不兼容"
-        rm -rf "$TMP_DIR"
-        exit 1
-    fi
-
-    # ---- 复制预构建 WebUI ----
-    if [ -d "$src_root/webui" ]; then
-        log_info "复制 WebUI（预构建）..."
-        copy_with_fallback "$src_root/webui/" "${INSTALL_DIR}/webui/" \
-            --exclude="node_modules"
-        log_success "WebUI 已复制"
-    else
-        log_warn "未找到 WebUI 目录，跳过（CLI 版本不受影响）"
-    fi
-
-    # ---- 复制系统 skills ----
+    # ---- 复制系统 skills（从 core 目录到 skills/） ----
     if [ -d "$src_root/skills" ]; then
         log_info "复制系统 skills..."
         mkdir -p "${INSTALL_DIR}/skills"
-        copy_with_fallback "$src_root/skills/" "${INSTALL_DIR}/skills/"
+        cp -r "$src_root/skills/"* "${INSTALL_DIR}/skills/" 2>/dev/null || true
         log_success "系统 skills 已复制"
     fi
 
     # ---- 写版本文件 ----
     if [ -f "$src_root/VERSION" ]; then
-        cp "$src_root/VERSION" "${INSTALL_DIR}/VERSION"
+        cp "$src_root/VERSION" "${INSTALL_DIR}/VERSION" 2>/dev/null || true
     else
         echo "$VERSION" > "${INSTALL_DIR}/VERSION"
     fi
-    log_success "版本文件已更新: $VERSION"
+    log_success "版本: ${VERSION}"
 
     # ---- 安装后验证 ----
     local py_file_count
-    py_file_count=$(find "${INSTALL_DIR}/deepagent" -type f -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
+    py_file_count=$(find "$src_root" -type f -name "*.py" 2>/dev/null | wc -l | tr -d ' ')
     if [ "$py_file_count" -lt 10 ]; then
-        log_error "安装失败：deepagent 目录 Python 文件过少（仅 $py_file_count 个 .py 文件）"
-        log_info "Release 包可能已损坏或不完整"
+        log_error "安装失败：Python 文件过少（仅 $py_file_count 个）"
+        log_info "目录内容: $(ls "$src_root" 2>/dev/null | head -20)"
         rm -rf "$TMP_DIR"
         exit 1
     fi
-    log_success "安装内容验证通过（$py_file_count 个 Python 文件）"
-
-    # ---- uv sync 安装 Python 依赖 ----
-    local pkg_dir="${INSTALL_DIR}/deepagent"
-    if [ -f "$pkg_dir/pyproject.toml" ] || [ -f "$pkg_dir/setup.py" ] || [ -f "$pkg_dir/setup.cfg" ]; then
-        if [ -n "${UV_CMD:-}" ] && [ "$DISTRO" != "termux" ]; then
-            log_info "使用 uv sync 安装 Python 依赖（读取 $pkg_dir/pyproject.toml）..."
-            # uv sync 在 deepagent/ 目录内执行，自动创建 .venv 并安装所有依赖
-            if (cd "$pkg_dir" && $UV_CMD sync 2>/dev/null); then
-                log_success "Python 依赖安装完成 (uv sync)"
-            else
-                log_warn "uv sync 失败，尝试 uv pip install 降级方案..."
-                # 降级方案：手动创建 venv + pip install
-                if [ ! -d "${INSTALL_DIR}/.venv" ]; then
-                    $UV_CMD venv "${INSTALL_DIR}/.venv" --python "$PYTHON_VERSION"
-                fi
-                $UV_CMD pip install --python "${INSTALL_DIR}/.venv/bin/python" -e "$pkg_dir" 2>/dev/null || {
-                    log_warn "uv pip install 也失败，尝试 pip 最小安装..."
-                    "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
-                }
-            fi
-        else
-            # 无 uv 时使用标准 pip（Termux 等场景）
-            log_info "使用 pip 安装 Python 依赖..."
-            if [ ! -d "${INSTALL_DIR}/.venv" ]; then
-                "$PYTHON_PATH" -m venv "${INSTALL_DIR}/.venv"
-            fi
-            "${INSTALL_DIR}/.venv/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1 || true
-            "${INSTALL_DIR}/.venv/bin/python" -m pip install -e "$pkg_dir" 2>/dev/null || {
-                log_warn "pip 安装不完整，尝试最小安装..."
-                "${INSTALL_DIR}/.venv/bin/python" -m pip install --no-deps -e "$pkg_dir" 2>/dev/null || true
-            }
-            log_success "Python 依赖安装完成 (pip)"
-        fi
-    else
-        log_warn "未找到 pyproject.toml 或 setup.py，跳过 Python 依赖安装"
-        log_info "请稍后手动运行: cd $pkg_dir && pip install -e ."
-    fi
+    log_success "安装验证通过（$py_file_count 个 Python 文件）"
 }
 
 # ---- 创建 deepagent 符号链接（单独函数，便于测试/维护） ----
@@ -883,17 +785,12 @@ WRAPPER_EOF
 sync_skills() {
     log_info "同步系统 skills 到用户目录..."
 
-    # Release 包中 skills 的源目录（tarball 中解压出来的）
-    local bundled_skills_dir="${TMP_EXTRACT_DIR}/skills"
+    # Release 包中 skills 的源目录（核心代码已解压到 INSTALL_DIR/deepagent/）
+    local bundled_skills_dir="${INSTALL_DIR}/deepagent/skills"
     # 用户 skills 目标目录
     local user_skills_dir="${INSTALL_DIR}/skills"
     # manifest 文件：记录每个 skill 的原始哈希，用于检测用户修改
     local manifest_file="${user_skills_dir}/.bundled_manifest"
-
-    # 如果临时提取目录中有 skills，优先用（刚解压的原始 bundle）
-    if [ ! -d "$bundled_skills_dir" ] && [ -d "${INSTALL_DIR}/deepagent/skills" ]; then
-        bundled_skills_dir="${INSTALL_DIR}/deepagent/skills"
-    fi
 
     # 创建用户 skills 目录
     mkdir -p "$user_skills_dir"
@@ -993,84 +890,11 @@ sync_skills() {
 }
 
 # ============================================================================
-# Step 5: 安装 oh-my-openagent 插件依赖
+# Step 5: 配置保留
 # ============================================================================
-# 在嵌入式 OpenCode 配置目录中安装 oh-my-opencode npm 包，
-# 以便 OpenCode 加载 oh-my-openagent 插件（含 DeepSeek V4 Flash/Pro 配置）。
-# npm/bun 均可用；均不可用时给出提示但不阻断安装。
-# ============================================================================
-
-setup_embedded_opencode_deps() {
-    # 尝试定位嵌入式 config 目录
-    local embed_config
-    if [ -d "${INSTALL_DIR}/deepagent/embedded/config" ]; then
-        embed_config="${INSTALL_DIR}/deepagent/embedded/config"
-    elif [ -d "${INSTALL_DIR}/embedded/config" ]; then
-        embed_config="${INSTALL_DIR}/embedded/config"
-    else
-        log_warn "未找到嵌入式配置目录，跳过 oh-my-openagent 插件安装"
-        return 0
-    fi
-
-    # 检查 opencode.json 是否存在（由 setup-embedded-opencode.sh 或源码提供）
-    if [ ! -f "$embed_config/opencode.json" ]; then
-        log_info "opencode.json 不存在，创建默认配置..."
-        cat > "$embed_config/opencode.json" << 'EOF'
-{
-  "plugin": ["oh-my-openagent"]
-}
-EOF
-    fi
-
-    # 检查 oh-my-openagent.jsonc 是否存在
-    if [ ! -f "$embed_config/oh-my-openagent.jsonc" ]; then
-        log_info "oh-my-openagent.jsonc 不存在，创建默认配置..."
-        cat > "$embed_config/oh-my-openagent.jsonc" << 'OPNEOF'
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
-
-  "agents": {
-    "sisyphus":          { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
-    "explore":           { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
-    "librarian":         { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
-    "multimodal-looker": { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
-    "atlas":             { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
-    "sisyphus-junior":   { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max", "temperature": 0.3 },
-    "hephaestus":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
-    "oracle":            { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
-    "prometheus":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.3 },
-    "metis":             { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 },
-    "momus":             { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max", "temperature": 0.2 }
-  },
-  "categories": {
-    "visual-engineering": { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
-    "quick":             { "model": "deepseek/deepseek-v4-flash", "reasoningEffort": "max" },
-    "deep":              { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" },
-    "ultrabrain":        { "model": "deepseek/deepseek-v4-pro",   "reasoningEffort": "max" }
-  },
-  "telemetry": false
-}
-OPNEOF
-    fi
-
-    # 安装 npm 依赖
-    if command -v npm &>/dev/null; then
-        log_info "使用 npm 安装 oh-my-openagent..."
-        cd "$embed_config" && npm install --omit=dev --no-audit --no-fund 2>&1 | tail -3
-        log_success "oh-my-openagent 插件已安装"
-    elif command -v bun &>/dev/null; then
-        log_info "使用 bun 安装 oh-my-openagent..."
-        cd "$embed_config" && bun install --production --no-audit 2>&1 | tail -3
-        log_success "oh-my-openagent 插件已安装（bun）"
-    else
-        log_warn "未检测到 npm 或 bun，oh-my-openagent 插件将不可用。"
-        log_info "安装 Node.js 后执行以下命令即可补装："
-        log_info "  cd $embed_config && npm install"
-    fi
-}
-
-# ============================================================================
-# Step 6: 配置保留
+# .env、config.yaml 和 sessions.db 的保留策略：
+#   全新安装 → 从模板创建
+#   更新安装 → ✅ 保留已有文件
 # ============================================================================
 
 setup_config() {
@@ -1251,8 +1075,8 @@ maybe_download_dmg() {
         local dmg_url="${R2_BASE_URL}/${dmg_name}"
         dmg_path="${HOME}/Downloads/${dmg_name}"
 
-        log_info "Trying: ${dmg_name}"
-        if curl -fsSL --connect-timeout 10 --max-time 180 "$dmg_url" -o "$dmg_path" 2>/dev/null; then
+            log_info "Trying: ${dmg_name}"
+            if curl -fsSL --connect-timeout 10 --max-time 600 "$dmg_url" -o "$dmg_path" 2>/dev/null; then
             log_success "DMG downloaded: ${dmg_path}"
             dmg_downloaded=true
             break
@@ -1446,7 +1270,7 @@ print_success() {
     echo ""
     echo -e "   直接输入 ${GREEN}deepagent${NC} 启动 CLI 模式"
     echo -e "   运行 ${GREEN}deepagent setup${NC} 完成交互式向导"
-    echo -e "   运行 ${GREEN}deepagent update --check${NC} 查看更新"
+    echo -e "   运行 ${GREEN}deepagent webui install${NC} 安装 Web 管理界面"
     echo ""
 
     if [ "$OS" = "macos" ]; then
@@ -1481,7 +1305,7 @@ main() {
 
     # ---- Step 1: 系统检测 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 1/10] 系统环境检测${NC}"
+    echo -e "${BLUE}${BOLD}[Step 1/6] 系统环境检测${NC}"
     detect_os
     detect_arch
     init_log_file
@@ -1491,58 +1315,38 @@ main() {
     check_python
     check_node
 
-    # ---- Step 2: 下载 Release 包 ----
+    # ---- Step 2a: 下载核心代码 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 2/10] 下载 Release 包${NC}"
-    if [ "$VERSION" = "latest" ]; then
-        fetch_latest_version
-    fi
-    download_release
+    echo -e "${BLUE}${BOLD}[Step 2/6] 下载核心代码${NC}"
+    detect_sha256_cmd
+    download_core
 
-    # ---- Step 3: 安装 ----
+    # ---- Step 2b: 安装 Python 依赖 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 3/10] 安装 DeepAgent${NC}"
+    echo -e "${BLUE}${BOLD}[Step 3/6] 安装 Python 依赖${NC}"
+    do_uv_sync
+
+    # ---- Step 2c: 下载嵌入式组件 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 4/6] 下载嵌入式组件${NC}"
+    download_embedded
+
+    # ---- Step 3: 安装收尾 ----
+    echo ""
+    echo -e "${BLUE}${BOLD}[Step 5/6] 安装收尾${NC}"
     install_release
     create_symlink
-
-    # ---- Step 4: Skill 同步 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 4/10] 技能同步${NC}"
     sync_skills
 
-    # ---- Step 5: 安装嵌入式研发小组依赖（oh-my-openagent 插件） ----
+    # ---- Step 4: 配置 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 5/10] 安装 oh-my-openagent 插件${NC}"
-    setup_embedded_opencode_deps
-
-    # ---- Step 6: 配置保留 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 6/10] 配置保留${NC}"
+    echo -e "${BLUE}${BOLD}[Step 6/6] 配置${NC}"
     setup_config
-
-    # ---- Step 7: PATH 配置 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 7/10] PATH 配置${NC}"
     setup_path
-
-    # ---- Step 8: Desktop DMG ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 8/10] 桌面版安装${NC}"
     maybe_download_dmg
 
-    # ---- Step 9: 自动启动 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 9/10] 启动 DeepAgent${NC}"
-    auto_start
-
-    # ---- Step 10: 开机自启设置 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 10/10] 开机自启设置${NC}"
-    setup_autostart
-
-    # ---- Step 10: 完成提示 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 10/10] 安装完成${NC}"
+    echo -e "${BLUE}${BOLD}── 安装完成 ──${NC}"
     print_success
 
     # 结束日志
