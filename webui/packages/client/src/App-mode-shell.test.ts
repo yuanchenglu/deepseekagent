@@ -114,4 +114,16 @@ describe('App.vue mode shell', () => {
     // CodeModeView (mocked) should render instead of sidebar
     expect(wrapper.find('.mock-sidebar').exists()).toBe(false)
   })
+
+  it('renders login page even when app mode is code', async () => {
+    LS['hermes_app_mode'] = 'code'
+    const router = makeRouter()
+    router.push('/')
+    await router.isReady()
+    const wrapper = mount(App, { global: { plugins: [i18n(), createPinia(), router] } })
+    await flushPromises()
+    // Login page should still render via router-view, not CodeModeView
+    expect(wrapper.find('.login-page').exists()).toBe(true)
+    expect(wrapper.find('.mock-code-view').exists()).toBe(false)
+  })
 })

@@ -82,7 +82,9 @@ onUnmounted(() => {
 
 // 双模式路由联动：进入 Code 模式时切到 /hermes/code，切回助理模式则不强行跳转
 // （切回助理模式保留用户离开前的 hermes 路由）
+// 登录页不受双模式影响，忽略模式切换以防路由循环
 watch(appMode, (next) => {
+  if (route.name === 'login') return
   if (next === 'code' && route.name !== 'hermes.code') {
     router.push({ name: 'hermes.code' }).catch(() => { /* navigation duplicated */ })
   } else if (next === 'assistant' && route.name === 'hermes.code') {
@@ -115,14 +117,18 @@ useKeyboard()
               <!-- 助理模式侧边栏（Code 模式下隐藏） -->
               <AppSidebar v-if="!isLoginPage && showSidebarInCurrentMode" />
               <main class="app-main">
-                <!-- 助理模式：路由视图（keep-alive 保留状态） -->
-                <router-view v-if="!isCodeMode" v-slot="{ Component }">
-                  <keep-alive>
-                    <component :is="Component" />
-                  </keep-alive>
-                </router-view>
-                <!-- Code 模式：OpenCode 容器 -->
-                <CodeModeView v-else />
+                <!-- 登录页不受双模式影响，始终显示路由视图 -->
+                <router-view v-if="isLoginPage" />
+                <template v-else>
+                  <!-- 助理模式：路由视图（keep-alive 保留状态） -->
+                  <router-view v-if="!isCodeMode" v-slot="{ Component }">
+                    <keep-alive>
+                      <component :is="Component" />
+                    </keep-alive>
+                  </router-view>
+                  <!-- Code 模式：OpenCode 容器 -->
+                  <CodeModeView v-else />
+                </template>
               </main>
             </div>
           </div>
