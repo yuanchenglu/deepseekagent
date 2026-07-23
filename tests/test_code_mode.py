@@ -30,6 +30,11 @@ from deepagent_code_mode import (
     check_task,
     get_task_result,
     list_recent_tasks,
+    TaskType,
+    handle_feature,
+    handle_bugfix,
+    handle_refactor,
+    handle_research,
 )
 
 
@@ -126,7 +131,65 @@ def test_handler_shortcut():
 
 
 # ============================================================
-# 测试 6: list_tasks 列举已完成任务
+# 测试 6: 类型化快捷接口 — handle_feature
+# ============================================================
+def test_handler_feature_shortcut():
+    """handle_feature() 可正常调用"""
+    result = handle_feature("用户注册模块")
+    assert isinstance(result, dict)
+    assert "status" in result
+    print(f"  ✓ handle_feature() 返回 status={result['status']}")
+
+
+# ============================================================
+# 测试 7: 类型化快捷接口 — handle_bugfix
+# ============================================================
+def test_handler_bugfix_shortcut():
+    """handle_bugfix() 可正常调用"""
+    result = handle_bugfix("登录页面白屏")
+    assert isinstance(result, dict)
+    assert "status" in result
+    print(f"  ✓ handle_bugfix() 返回 status={result['status']}")
+
+
+# ============================================================
+# 测试 8: 类型化快捷接口 — handle_refactor
+# ============================================================
+def test_handler_refactor_shortcut():
+    """handle_refactor() 可正常调用"""
+    result = handle_refactor("数据库连接模块")
+    assert isinstance(result, dict)
+    assert "status" in result
+    print(f"  ✓ handle_refactor() 返回 status={result['status']}")
+
+
+# ============================================================
+# 测试 9: 类型化快捷接口 — handle_research
+# ============================================================
+def test_handler_research_shortcut():
+    """handle_research() 可正常调用"""
+    result = handle_research("WebSocket 连接池方案对比")
+    assert isinstance(result, dict)
+    assert "status" in result
+    print(f"  ✓ handle_research() 返回 status={result['status']}")
+
+
+# ============================================================
+# 测试 10: TaskType 枚举结构验证
+# ============================================================
+def test_task_type_enum():
+    """TaskType 枚举包含预期值"""
+    assert TaskType.FEATURE.value == "feature"
+    assert TaskType.BUGFIX.value == "bugfix"
+    assert TaskType.REFACTOR.value == "refactor"
+    assert TaskType.RESEARCH.value == "research"
+    assert TaskType.GENERAL.value == "general"
+    assert len(TaskType) == 5
+    print(f"  ✓ TaskType 枚举包含 5 个值: {[t.value for t in TaskType]}")
+
+
+# ============================================================
+# 测试 11: list_tasks 列举已完成任务
 # ============================================================
 def test_list_tasks():
     """list_tasks() 返回任务列表"""
@@ -253,6 +316,11 @@ if __name__ == "__main__":
         ("collect_result 查询任务结果", test_collect_result_after_dispatch),
         ("check_status 快速状态检查", test_check_status),
         ("handler 快捷接口", test_handler_shortcut),
+        ("handle_feature 类型化接口", test_handler_feature_shortcut),
+        ("handle_bugfix 类型化接口", test_handler_bugfix_shortcut),
+        ("handle_refactor 类型化接口", test_handler_refactor_shortcut),
+        ("handle_research 类型化接口", test_handler_research_shortcut),
+        ("TaskType 枚举结构", test_task_type_enum),
         ("list_tasks 列举任务", test_list_tasks),
         ("run_task.sh 直接执行", test_run_task_script_direct),
     ]

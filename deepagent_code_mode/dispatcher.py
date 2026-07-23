@@ -69,68 +69,25 @@ class CodeModeDispatcher:
 
         print(f"[CodeMode] Dispatching task [{task_id}]: {user_instruction[:80]}...")
 
-        # 调用嵌入式任务执行脚本
+        # 调用嵌入式任务执行脚本（非阻塞 — fire-and-forget）
         pid = None
         if self._task_script.exists():
             proc = subprocess.Popen(
                 [str(self._task_script), str(task_file)],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             pid = proc.pid
-            try:
-                stdout_data, stderr_data = proc.communicate(timeout=30)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                stdout_data, stderr_data = proc.communicate()
-            result_text = stdout_data
-
-            # 尝试解析脚本返回的 JSON
-            stdout_trimmed = result_text.strip()
-            task_result = None
-            if stdout_trimmed:
-                # 尝试直接解析整个输出
-                try:
-                    task_result = json.loads(stdout_trimmed)
-                except json.JSONDecodeError:
-                    # 回退：逐行查找 JSON 块
-                    json_lines = []
-                    in_json = False
-                    for line in stdout_trimmed.split('\n'):
-                        if line.strip().startswith('{'):
-                            in_json = True
-                        if in_json:
-                            json_lines.append(line)
-                        if line.strip().endswith('}'):
-                            break
-                    if json_lines:
-                        try:
-                            task_result = json.loads('\n'.join(json_lines))
-                        except json.JSONDecodeError:
-                            task_result = {"raw_output": stdout_trimmed[:500]}
-                    else:
-                        task_result = {"raw_output": stdout_trimmed[:500]}
+            print(f"[CodeMode] Task [{task_id}] dispatched to subprocess (pid={pid})")
         else:
-            # fallback：脚本不存在时直接模拟
             print(f"[CodeMode] Warning: {self._task_script} not found, using fallback")
-            task_result = {
-                "task_id": task_id,
-                "status": "simulated",
-                "instruction": user_instruction,
-                "result": {"summary": "（回退模式）未找到 run_task.sh，使用模拟结果"}
-            }
-            pid = None
-
-        # 清理临时任务文件
-        if task_file.exists():
-            task_file.unlink()
 
         return {
-            "status": task_result.get("status", "dispatched") if task_result else "dispatched",
+            "status": "dispatched",
             "task_id": task_id,
             "task": task,
             "pid": pid,
-            "result": task_result.get("result", {}) if task_result else {},
-            "message": f"任务 [{task_id}] 已派发给内置研发小组"
+            "result": {},
+            "message": f"任务 [{task_id}] 已派发给内置研发小组（非阻塞模式）"
         }
 
     def collect_result(self, task_id: str) -> Dict[str, Any]:
@@ -142,8 +99,8 @@ class CodeModeDispatcher:
         """
         task_file = self.workspace / f"task_{task_id}.json"
         if not task_file.exists():
-            # 尝试查找其他 task_id 文件（可能存在不同前缀）
-            for f in self.workspace.glob(f"*{task_id}*.json"):
+            # 尝试查找其他 task_id 文件放宽前缀匹配
+            for f in self.workspace.glob(f"task_*{task_id}*.json"):
                 task_file = f
                 break
             else:
