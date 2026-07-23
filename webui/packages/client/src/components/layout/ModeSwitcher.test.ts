@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ModeSwitcher from './ModeSwitcher.vue'
+import { _resetAppModeForTests } from '@/composables/useAppMode'
 
 const LS: Record<string, string> = {}
 
@@ -20,6 +21,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  _resetAppModeForTests()
   vi.unstubAllGlobals()
 })
 
@@ -54,6 +56,7 @@ function mountComp(desktop = false) {
 
 describe('ModeSwitcher', () => {
   afterEach(() => {
+    _resetAppModeForTests()
     delete (window as any).hermesDesktop
   })
 
