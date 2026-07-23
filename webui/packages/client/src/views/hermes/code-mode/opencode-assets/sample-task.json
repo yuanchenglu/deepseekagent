@@ -1,0 +1,10 @@
+{
+  "task_id": "02de1ce6",
+  "instruction": "帮我实现一个登录功能",
+  "task_type": "general_development",
+  "priority": "normal",
+  "context": {
+    "mode": "code",
+    "isolated": true
+  }
+}
