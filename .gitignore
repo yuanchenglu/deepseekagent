@@ -122,3 +122,18 @@ embedded/oh-my-openagent/.github/
 embedded/oh-my-openagent/AGENTS.md
 embedded/oh-my-openagent/CLA.md
 embedded/oh-my-openagent/CLAUDE.md
+
+# Embedded toolchains (whole directories)
+embedded/oh-my-openagent/
+embedded/opencode/src/
+embedded/run_task.sh.bak
+
+# Workspace test & temp files
+*.workspace-test*
+workspace-test*
+workspace_write_test*
+workspace_test*
+_write_test*
+_TEST_WRITE.md
+hello.py
+db_connection.py
