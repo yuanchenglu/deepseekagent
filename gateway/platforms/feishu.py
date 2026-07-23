@@ -2080,7 +2080,7 @@ class FeishuAdapter(BasePlatformAdapter):
             message_id = event.message_id
             await self.handle_message(event)
 
-async def _process_inbound_message(
+    async def _process_inbound_message(
         self,
         *,
         data: Any,
