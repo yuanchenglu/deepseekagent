@@ -195,18 +195,13 @@ class ModelRouter:
             RouteDecision 对象，包含选择的模型、原因、是否升级等
 
         决策顺序:
-            1. 如果路由器禁用 → 返回 FLASH_THINK
-            2. 不可逆操作 → PRO_MAX（最高优先级）
+            1. 不可逆操作 → PRO_MAX（最高优先级，即使路由器禁用也不降级）
+            2. 如果路由器禁用 → 返回 FLASH_THINK
             3. 检查升级条件 → PRO_THINK（任一条件触发）
             4. 简单任务判断 → FLASH_NON_THINK
             5. 默认 → FLASH_THINK
         """
-        if not self.enabled:
-            return self._make_decision(
-                ModelTier.FLASH_THINK, "路由器未启用，使用默认 Flash Think", False, context
-            )
-
-        # 1. 不可逆操作 → PRO_MAX（最高优先级，不可降级）
+        # 1. 不可逆操作 → PRO_MAX（最高优先级，不可降级，即使路由器禁用也走 Pro Max）
         if self.UPGRADE_CONDITIONS["irreversible"][1](context):
             decision = self._make_decision(
                 ModelTier.PRO_MAX,
@@ -215,6 +210,11 @@ class ModelRouter:
             )
             self._log(decision)
             return decision
+
+        if not self.enabled:
+            return self._make_decision(
+                ModelTier.FLASH_THINK, "路由器未启用，使用默认 Flash Think", False, context
+            )
 
         # 2. 检查升级条件（优先级高于简单任务判断）
         upgrade_reasons = []
