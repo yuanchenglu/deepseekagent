@@ -467,4 +467,30 @@ python -m pytest tests/gateway/ -q               # Gateway tests
 python -m pytest tests/tools/ -q                 # Tool-level tests
 ```
 
+
+
+### Environment Isolation for Local Development
+
+When developing DeepAgent on a machine that ALSO has Hermes installed, always set
+`DEEPAGENT_HOME` to an isolated test directory before running the gateway or CLI:
+
+```bash
+export DEEPAGENT_HOME=~/.deepagent-test
+deepagent  # or: python -m hermes_cli.main gateway run
+```
+
+**Why:** Without `DEEPAGENT_HOME`, DeepAgent defaults to `HERMES_HOME` (often
+`~/.hermes/`) which belongs to the Hermes installation. Running DeepAgent without
+isolation will corrupt Hermes sessions, memories, and gateway state. The same
+applies if `HERMES_HOME` is unset — DeepAgent falls back to `~/.deepagent/`,
+which may conflict with a separate DeepAgent product installation.
+
+**Permanent setup for active development:**
+
+```bash
+echo 'export DEEPAGENT_HOME=$HOME/.deepagent-test' >> ~/.zshrc
+source ~/.zshrc
+```
+
+
 Always run the full suite before pushing changes.
