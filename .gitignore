@@ -107,3 +107,9 @@ dist/releases/
 
 # OpenCode embedded binaries (download via setup-embedded-opencode.sh)
 embedded/opencode/macos-*/opencode
+embedded/oh-my-openagent/node_modules/
+embedded/opencode/src/node_modules/
+embedded/oh-my-openagent/.git/
+embedded/opencode/src/.git/
+openspec/node_modules/
+openspec/.git/
