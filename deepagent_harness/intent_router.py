@@ -142,10 +142,12 @@ _SIMPLE_KEYWORDS = [
 ]
 
 # Spec-Driven 指示器
+# B5 修复：原列表只有"根据spec"(无空格)，但用户常写"根据 spec"（有空格），
+# 统一 normalize：匹配前去除指令中的空白再比对
 _SPEC_INDICATORS = [
     "根据spec", "按照规范", "按文档", "spec-driven", "按prd",
     "根据需求文档", "按设计文档", "按照spec", "根据spec文档",
-    "按spec", "spec文档",
+    "按spec", "spec文档", "按prd文档", "followthespec",
 ]
 
 
@@ -180,10 +182,12 @@ class IntentRouter:
             IntentType 枚举值
         """
         instruction_lower = instruction.lower().strip()
+        # B5 修复：normalize 空白再做 spec 检测，让 "根据 spec" (有空格) 也能命中
+        instruction_normalized = re.sub(r"\s+", "", instruction_lower)
 
         # 1. Spec-Driven 检测（优先级最高）
         for indicator in _SPEC_INDICATORS:
-            if indicator in instruction_lower:
+            if indicator in instruction_normalized:
                 return IntentType.SPEC_DRIVEN
 
         # 2. 简单任务检测
