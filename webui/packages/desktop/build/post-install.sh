@@ -7,7 +7,7 @@ TARGET_APP="/Applications/${PRODUCT_NAME}.app"
 USER_BIN="${HOME}/.local/bin"
 DESKTOP_SHIM="${USER_BIN}/deepagent-desktop"
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SOURCE_APP=""
 
 # The helper is shipped in two locations:
@@ -55,7 +55,7 @@ if [[ "${SOURCE_APP}" != "${TARGET_APP}" ]]; then
       y|Y|yes|YES) ;;
       *) echo "Installation cancelled."; exit 0 ;;
     esac
-    run_with_required_privilege /bin/rm -rf -- "${TARGET_APP}"
+    run_with_required_privilege /bin/rm -rf "${TARGET_APP}"
   fi
   # Preserve macOS quarantine metadata. The user must explicitly approve the
   # first launch of this unsigned Preview through Finder's Open action.
@@ -66,7 +66,7 @@ fi
 /bin/chmod 0755 "${USER_BIN}"
 TMP_SHIM="$(/usr/bin/mktemp "${USER_BIN}/.deepagent-desktop.XXXXXX")"
 cleanup() {
-  /bin/rm -f -- "${TMP_SHIM}" 2>/dev/null || true
+  /bin/rm -f "${TMP_SHIM}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -75,7 +75,7 @@ cat > "${TMP_SHIM}" <<'SHIM'
 exec /usr/bin/open -a "DeepAgent" --args "$@"
 SHIM
 /bin/chmod 0755 "${TMP_SHIM}"
-/bin/mv -f -- "${TMP_SHIM}" "${DESKTOP_SHIM}"
+/bin/mv -f "${TMP_SHIM}" "${DESKTOP_SHIM}"
 trap - EXIT
 
 cat <<EOF
