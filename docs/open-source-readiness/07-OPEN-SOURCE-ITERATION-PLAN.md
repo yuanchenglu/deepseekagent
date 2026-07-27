@@ -1,5 +1,7 @@
 # DeepSeekAgent 最终开源执行计划
 
+> **已归档：本文件自三阶段计划生效后不再作为执行依据。** 许可证、安全、发布契约和 CLI 首发工作迁移到 [07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md](./07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md)；WebUI、Code Mode 与 Runtime 工作迁移到 [08-PHASE-2-WEBUI-STABLE-BETA.md](./08-PHASE-2-WEBUI-STABLE-BETA.md)；新 Electron 工作迁移到 [09-PHASE-3-DUAL-MODE-ELECTRON.md](./09-PHASE-3-DUAL-MODE-ELECTRON.md)。以下内容仅保留为历史审计记录。
+
 > 工作分支：`develop`
 > 文档状态：Final Plan，待产品确认后执行
 > 唯一目标：不扩张非核心功能，以最小改造把项目收敛为普通用户可用、默认安全、可验证发布的开源 Agent 产品。

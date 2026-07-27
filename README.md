@@ -2,11 +2,11 @@
   <img src="assets/banner.png" alt="Deep Agent" width="100%">
 </p>
 
-# Deep Agent ☤
+# DeepAgent ☤
 
 <p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-deepagent.starseas.org-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://github.com/yuanchenglu/deepseekagent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://deepseekagent.starseas.org/"><img src="https://img.shields.io/badge/Docs-deepseekagent.starseas.org-FFD700?style=for-the-badge" alt="Documentation"></a>
+  <a href="#许可证边界"><img src="https://img.shields.io/badge/License-MIT%20%2B%20BSL--1.1-blue?style=for-the-badge" alt="License: MIT and BSL-1.1"></a>
 </p>
 
 **Deep Agent 是基于 Hermes 深度改造的数字分身（CEO）产品**，核心目标是通过 **Harness 层** 让 DeepSeek 模型在真实场景下达到顶级水平。
@@ -29,61 +29,34 @@
 
 ## 快速开始
 
+CLI Alpha 首轮只承诺 **macOS Apple Silicon**。从官网安装：
+
 ```bash
+curl -fsSL https://deepseekagent.starseas.org/install.sh | bash
+deepagent setup
+deepagent doctor
 deepagent
 ```
 
-更多命令：
-- `deepagent model`
-- `deepagent gateway`
-- `deepagent setup`
-- `deepagent webui start`   — 启动 WebUI 工作台 (http://localhost:8648)
-- `deepagent webui status`  — 查看 WebUI 状态
-- `deepagent webui stop`    — 停止 WebUI
+第一阶段公开命令为 `--version`、`setup`、`doctor`、交互 CLI、`update` 和 `uninstall`。WebUI、旧 Electron 和 DeepCode 不包含在 CLI Alpha 安装包中。
 
-> 💡 **WebUI** 是 DeepAgent 的默认 Web 工作台，提供聊天、模型管理、设置等功能。
-> 安装时会自动构建。默认账号: `admin` / `123456`。
->
-> ### 🖥️ 桌面应用（Electron）
->
-> DeepAgent WebUI 可打包为独立的桌面应用（基于 Electron），无需通过浏览器访问。
->
-> #### 启动（开发模式）
->
-> ```bash
-> cd webui
-> npx electron electron/main.js
-> ```
->
-> #### 打包为安装包
->
-> ```bash
-> # 安装依赖后一键打包（当前平台）
-> ./scripts/package-electron.sh
->
-> # 或指定平台
-> ./scripts/package-electron.sh --mac     # macOS DMG
-> ./scripts/package-electron.sh --linux   # Linux AppImage/Deb
->
-> # 也可通过 npm 脚本
-> cd webui
-> npm run electron:build          # 当前平台
-> npm run electron:build:mac      # macOS 专用
-> npm run electron:build:linux    # Linux 专用
-> ```
->
-> 打包产物输出至 `webui/dist/electron-output/`。
->
-> #### 相关文件
->
-> | 文件 | 说明 |
-> |------|------|
-> | `webui/electron/main.js` | Electron 主进程，创建窗口并加载 `dist/client/index.html` |
-> | `webui/electron/preload.js` | 预加载脚本，通过 contextBridge 暴露桌面 API |
-> | `webui/electron/electron-builder.config.js` | electron-builder 打包配置 |
-> | `scripts/package-electron.sh` | 打包入口脚本 |
->
-> > **注意**：此 Electron 打包方案是**轻量版**。如需要完整功能（内嵌 Python 运行时、自动更新、托盘图标等），请参考 `packages/desktop/`（通过 `npm run build:desktop` 构建）。
+```bash
+deepagent update --check
+deepagent update
+deepagent uninstall --keep-data
+```
+
+安装默认使用 `~/.deepagent/`，唯一全局命令是 `~/.local/bin/deepagent`。安装、更新和卸载不读写 Hermes 或 OpenCode 的用户目录。
+
+## 发布路线
+
+| 阶段 | 产物 | 当前承诺 |
+|---|---|---|
+| 1 | 公开 CLI Alpha | macOS Apple Silicon，官网安装 |
+| 2 | 浏览器 WebUI Beta | 路线图，尚未列入 Alpha 承诺 |
+| 3 | DeepAgent / DeepCode 双模式 Electron | 路线图 |
+
+详细执行文档见 `docs/open-source-readiness/`。
 
 ---
 
@@ -112,7 +85,7 @@ deepagent
 
 ---
 
-**当前目标**：尽快把 MVP 四个方向的可执行骨架跑通，让 Deep Agent 真正具备“CEO 指挥内置研发小组”的能力。
+**当前目标**：先完成可公开、可安装、与 Hermes/OpenCode 隔离的 CLI Alpha，再按阶段开放 WebUI 与双模式桌面客户端。
 
 ---
 
@@ -129,7 +102,7 @@ export DEEPAGENT_HOME=~/.deepagent-test
 deepagent  # 或: python -m hermes_cli.main gateway run
 ```
 
-**原因：** 不设置 `DEEPAGENT_HOME` 时，DeepAgent 会读取 `HERMES_HOME` 环境变量（通常是 `~/.hermes/`），这属于 Hermes 的数据目录。直接运行会污染 Hermes 的会话、记忆和网关状态。如果 `HERMES_HOME` 也未设置，则回退到 `~/.deepagent/`，可能和已安装的 DeepAgent 产品冲突。
+**原因：** 产品运行时已不再把用户环境中的 `HERMES_HOME` 当作 DeepAgent 根目录；但开发与正式产品仍应使用不同的 `DEEPAGENT_HOME`，避免测试数据污染正式 DeepAgent 会话和配置。
 
 **持久化设置（开发期间）：**
 
@@ -138,3 +111,15 @@ echo 'export DEEPAGENT_HOME=$HOME/.deepagent-test' >> ~/.zshrc
 source ~/.zshrc
 ```
 
+## 许可证边界
+
+本仓库是同仓混合许可，**不是整仓 MIT**：
+
+| 范围 | 许可证 | 对外口径 |
+|---|---|---|
+| DeepAgent Core（除下列目录外的根项目代码） | [MIT](LICENSE) | 开源软件 |
+| `webui/`（包含现有 WebUI 和 Desktop） | [BSL-1.1](webui/LICENSE) | 源码可见软件，不得称为 MIT 开源 |
+| `embedded/opencode/` 及其内嵌组件 | 各自目录中的许可文件 | 第一阶段发布包不包含 |
+| 第三方依赖 | 各自上游许可证 | 见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
+
+贡献某个文件表示你同意按该文件所属目录的许可条款提供贡献。
