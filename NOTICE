@@ -1,0 +1,14 @@
+DeepAgent
+Copyright (c) 2025 Nous Research and DeepAgent contributors
+
+DeepAgent Core is derived in part from Hermes Agent and is distributed under the MIT License
+found in the repository root.
+
+The software under webui/ is separately licensed under the Business Source License 1.1. It is
+source-available software and is not part of the MIT-licensed DeepAgent Core.
+
+Third-party components retain their own copyright and license notices. See
+THIRD_PARTY_NOTICES.md and license files located within component directories.
+
+The names DeepAgent, Hermes, OpenCode, and other third-party names may be trademarks of their
+respective owners. License grants do not grant trademark rights.
