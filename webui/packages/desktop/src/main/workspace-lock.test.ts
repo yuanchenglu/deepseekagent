@@ -16,6 +16,37 @@ describe('WorkspaceLockManager', () => {
     expect(locks.status('/tmp/project')).toEqual({ writer: null, readers: ['read-1', 'read-2'] })
   })
 
+  it('blocks readers while another task holds the write lock', () => {
+    const locks = new WorkspaceLockManager()
+    expect(locks.acquire('/tmp/project', 'write-1', 'write')).toBe(true)
+    expect(locks.acquire('/tmp/project', 'read-1', 'read')).toBe(false)
+    expect(locks.status('/tmp/project')).toEqual({ writer: 'write-1', readers: [] })
+  })
+
+  it('blocks a writer while readers hold the workspace', () => {
+    const locks = new WorkspaceLockManager()
+    expect(locks.acquire('/tmp/project', 'read-1', 'read')).toBe(true)
+    expect(locks.acquire('/tmp/project', 'read-2', 'read')).toBe(true)
+    expect(locks.acquire('/tmp/project', 'write-1', 'write')).toBe(false)
+    expect(locks.status('/tmp/project')).toEqual({ writer: null, readers: ['read-1', 'read-2'] })
+  })
+
+  it('allows access after conflicting locks are released', () => {
+    const locks = new WorkspaceLockManager()
+    expect(locks.acquire('/tmp/project', 'write-1', 'write')).toBe(true)
+    locks.release('/tmp/project', 'write-1')
+    expect(locks.acquire('/tmp/project', 'read-1', 'read')).toBe(true)
+    locks.release('/tmp/project', 'read-1')
+    expect(locks.acquire('/tmp/project', 'write-2', 'write')).toBe(true)
+  })
+
+  it('allows a task to upgrade its sole read lock to a write lock', () => {
+    const locks = new WorkspaceLockManager()
+    expect(locks.acquire('/tmp/project', 'task-1', 'read')).toBe(true)
+    expect(locks.acquire('/tmp/project', 'task-1', 'write')).toBe(true)
+    expect(locks.status('/tmp/project')).toEqual({ writer: 'task-1', readers: [] })
+  })
+
   it('releases all workspaces owned by a completed task', () => {
     const locks = new WorkspaceLockManager()
     locks.acquire('/tmp/project-a', 'task-1', 'write')
