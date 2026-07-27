@@ -1,6 +1,6 @@
 import { startRunViaSocket, resumeSession, registerSessionHandlers, unregisterSessionHandlers, getChatRunSocket, respondToolApproval, onPeerUserMessage, onSessionCommand, onSessionTitleUpdated, respondClarify, type ChatRunTransport, type RunEvent, type ResumeSessionPayload, type StartRunRequest, type ContentBlock as ContentBlockImport } from '@/api/hermes/chat'
 import { archiveSession as archiveSessionApi, deleteSession as deleteSessionApi, fetchSessionMessagesPage, fetchSessions, setSessionModel, type HermesMessage, type SessionSummary } from '@/api/hermes/sessions'
-import { getActiveProfileName } from '@/api/client'
+import { getActiveProfileName, getApiKey } from '@/api/client'
 import { inferCodingAgentApiMode, normalizeCodingAgentApiMode } from '@/api/coding-agents'
 import { getDownloadUrl } from '@/api/hermes/download'
 import type { ProviderApiMode } from '@/api/hermes/system'
@@ -185,7 +185,7 @@ async function uploadFiles(attachments: Attachment[]): Promise<{ name: string; p
   for (const att of attachments) {
     if (att.file) formData.append('file', att.file, att.name)
   }
-  const token = localStorage.getItem('hermes_api_key') || ''
+  const token = getApiKey()
   const profileName = getActiveProfileName()
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`

@@ -61,7 +61,7 @@ export const useAppStore = defineStore('app', () => {
       }
       return res.success
     } catch (err) {
-      console.error('Failed to update Hermes Web UI:', err)
+      console.error('Failed to update DeepAgent WebUI:', err)
       return false
     } finally {
       updating.value = false

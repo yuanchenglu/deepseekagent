@@ -1,4 +1,14 @@
 import { vi } from 'vitest'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// Product paths are process-global constants in the server. Keep every test
+// worker inside an allowed disposable directory instead of a developer's home.
+process.env.DEEPAGENT_HOME = join(tmpdir(), `deepagent-webui-vitest-${process.pid}`)
+process.env.HERMES_HOME = process.env.DEEPAGENT_HOME
+delete process.env.HERMES_WEB_UI_HOME
+delete process.env.HERMES_WEBUI_STATE_DIR
+delete process.env.DEEPAGENT_WEBUI_RUNTIME_DIR
 
 // Vite injects this at build time; unit tests need a stable fallback.
 ;(globalThis as any).__APP_VERSION__ = 'test'

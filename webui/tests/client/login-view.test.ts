@@ -4,14 +4,17 @@ import { mount } from '@vue/test-utils'
 
 const mockReplace = vi.hoisted(() => vi.fn())
 const mockFetchAuthStatus = vi.hoisted(() => vi.fn())
+const mockFetchCurrentUser = vi.hoisted(() => vi.fn())
 const mockLoginWithPassword = vi.hoisted(() => vi.fn())
-const mockSetApiKey = vi.hoisted(() => vi.fn())
+const mockLoginWithTicket = vi.hoisted(() => vi.fn())
+const mockMarkCookieSession = vi.hoisted(() => vi.fn())
 const mockHasApiKey = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
   }),
+  useRoute: () => ({ query: {} }),
 }))
 
 vi.mock('vue-i18n', () => ({
@@ -21,13 +24,15 @@ vi.mock('vue-i18n', () => ({
 }))
 
 vi.mock('@/api/client', () => ({
-  setApiKey: mockSetApiKey,
+  markCookieSession: mockMarkCookieSession,
   hasApiKey: mockHasApiKey,
 }))
 
 vi.mock('@/api/auth', () => ({
   fetchAuthStatus: mockFetchAuthStatus,
+  fetchCurrentUser: mockFetchCurrentUser,
   loginWithPassword: mockLoginWithPassword,
+  loginWithTicket: mockLoginWithTicket,
 }))
 
 import LoginView from '@/views/LoginView.vue'
@@ -38,10 +43,13 @@ describe('LoginView password login', () => {
     vi.clearAllMocks()
     mockHasApiKey.mockReturnValue(false)
     mockFetchAuthStatus.mockResolvedValue({ hasPasswordLogin: true, username: 'admin' })
+    mockFetchCurrentUser.mockRejectedValue(new Error('Unauthorized'))
   })
 
   it('logs in with username and password', async () => {
-    mockLoginWithPassword.mockResolvedValue('jwt-token')
+    mockLoginWithPassword.mockResolvedValue({
+      user: { id: 1, username: 'admin', role: 'super_admin' },
+    })
     const wrapper = mount(LoginView)
 
     const inputs = wrapper.findAll('input.login-input')
@@ -50,14 +58,14 @@ describe('LoginView password login', () => {
     await wrapper.find('form.login-form').trigger('submit')
 
     expect(mockLoginWithPassword).toHaveBeenCalledWith('admin', '123456')
-    expect(mockSetApiKey).toHaveBeenCalledWith('jwt-token')
+    expect(mockMarkCookieSession).toHaveBeenCalledWith({ id: 1, username: 'admin', role: 'super_admin' })
     expect(mockReplace).toHaveBeenCalledWith('/hermes/chat')
   })
 
-  it('shows the default login hint', () => {
+  it('does not advertise fixed default credentials', () => {
     const wrapper = mount(LoginView)
 
-    expect(wrapper.text()).toContain('login.defaultCredentialsHint')
+    expect(wrapper.text()).not.toContain('login.defaultCredentialsHint')
   })
 
   it('shows an error when password login fails', async () => {
@@ -70,7 +78,7 @@ describe('LoginView password login', () => {
     await wrapper.find('form.login-form').trigger('submit')
 
     expect(wrapper.find('.login-error').text()).toBe('Invalid username or password')
-    expect(mockSetApiKey).not.toHaveBeenCalled()
+    expect(mockMarkCookieSession).not.toHaveBeenCalled()
     expect(mockReplace).not.toHaveBeenCalled()
   })
 
@@ -87,11 +95,9 @@ describe('LoginView password login', () => {
 
     expect(wrapper.find('.login-error').text()).toBe('login.tooManyAttempts')
     expect(wrapper.find('.login-lock-hint').text()).toContain('login.lockResetHint')
-    expect(wrapper.find('.login-lock-hint').text()).toContain('login.defaultLoginResetHint')
     const commands = wrapper.findAll('.login-lock-hint code').map(command => command.text())
     expect(commands).toEqual([
-      'hermes-web-ui clear-login-locks --restart',
-      'hermes-web-ui reset-default-login',
+      'deepagent webui stop && deepagent webui start',
     ])
   })
 })

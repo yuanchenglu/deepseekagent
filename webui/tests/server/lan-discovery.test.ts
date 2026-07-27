@@ -1,11 +1,12 @@
 import { readFileSync } from 'fs'
 import { createHash, generateKeyPairSync } from 'crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   HERMES_DISCOVERY_PORT,
   discoveryPortForHttpPort,
   getDiscoveryHttpPorts,
   getLanEndpointKind,
+  isLanDiscoveryEnabled,
   isPrivateOrLoopbackIPv4,
   resetLanDiscoveryState,
   scanLanDevices,
@@ -35,11 +36,23 @@ const fakeInfo: PublicSystemInfo = {
 
 describe('LAN discovery', () => {
   const originalPorts = process.env.HERMES_LAN_DISCOVERY_HTTP_PORTS
+  const originalEnabled = process.env.HERMES_LAN_DISCOVERY_ENABLED
+
+  beforeEach(() => {
+    process.env.HERMES_LAN_DISCOVERY_ENABLED = 'true'
+  })
 
   afterEach(() => {
     resetLanDiscoveryState()
     if (originalPorts === undefined) delete process.env.HERMES_LAN_DISCOVERY_HTTP_PORTS
     else process.env.HERMES_LAN_DISCOVERY_HTTP_PORTS = originalPorts
+    if (originalEnabled === undefined) delete process.env.HERMES_LAN_DISCOVERY_ENABLED
+    else process.env.HERMES_LAN_DISCOVERY_ENABLED = originalEnabled
+  })
+
+  it('keeps LAN discovery disabled unless the user explicitly enables it', () => {
+    expect(isLanDiscoveryEnabled({})).toBe(false)
+    expect(isLanDiscoveryEnabled({ HERMES_LAN_DISCOVERY_ENABLED: 'true' })).toBe(true)
   })
 
   it('maps HTTP ports to UDP discovery ports', () => {
