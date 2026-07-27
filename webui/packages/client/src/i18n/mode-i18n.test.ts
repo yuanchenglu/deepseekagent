@@ -17,7 +17,7 @@ const REQUIRED_KEYS = [
   'restart',
   'retry',
   'modelLabel',
-]
+] as const
 
 describe('i18n mode block', () => {
   for (const locale of [['en', en], ['zh', zh]] as const) {
