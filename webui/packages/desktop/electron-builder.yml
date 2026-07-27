@@ -30,6 +30,7 @@ extraResources:
     filter:
       - "icon.png"
       - "trayTemplate.png"
+      - "post-install.sh"
 
 asarUnpack:
   - "**/*.node"
@@ -48,9 +49,15 @@ mac:
 dmg:
   title: "DeepAgent ${version}"
   contents:
-    - x: 140
+    - x: 100
       y: 200
-    - x: 420
+      type: file
+    - x: 270
+      y: 200
+      type: file
+      path: "build/post-install.sh"
+      name: "Install DeepAgent.command"
+    - x: 440
       y: 200
       type: link
       path: /Applications
