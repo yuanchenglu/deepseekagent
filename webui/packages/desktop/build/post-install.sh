@@ -18,7 +18,8 @@ if [[ -d "${SCRIPT_DIR}/${PRODUCT_NAME}.app" ]]; then
 elif [[ -d "${SCRIPT_DIR}/../${PRODUCT_NAME}.app" ]]; then
   SOURCE_APP="$(cd "${SCRIPT_DIR}/../${PRODUCT_NAME}.app" && pwd -P)"
 elif [[ "${SCRIPT_DIR}" == *"/${PRODUCT_NAME}.app/Contents/Resources/build" ]]; then
-  SOURCE_APP="$(cd "${SCRIPT_DIR}/../../.." && pwd -P)"i
+  SOURCE_APP="$(cd "${SCRIPT_DIR}/../../.." && pwd -P)"
+fi
 
 if [[ -z "${SOURCE_APP}" || ! -d "${SOURCE_APP}/Contents" ]]; then
   echo "Unable to locate ${PRODUCT_NAME}.app next to this installer." >&2
@@ -56,7 +57,9 @@ if [[ "${SOURCE_APP}" != "${TARGET_APP}" ]]; then
     esac
     run_with_required_privilege /bin/rm -rf -- "${TARGET_APP}"
   fi
-  run_with_required_privilege /usr/bin/ditto --noqtn "${SOURCE_APP}" "${TARGET_APP}"
+  # Preserve macOS quarantine metadata. The user must explicitly approve the
+  # first launch of this unsigned Preview through Finder's Open action.
+  run_with_required_privilege /usr/bin/ditto "${SOURCE_APP}" "${TARGET_APP}"
 fi
 
 /bin/mkdir -p "${USER_BIN}"
