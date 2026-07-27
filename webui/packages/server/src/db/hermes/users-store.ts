@@ -37,8 +37,6 @@ export interface UserSummary {
   last_login_at: number | null
 }
 
-export const DEFAULT_USERNAME = 'admin'
-export const DEFAULT_PASSWORD = '123456'
 export const DEFAULT_PROFILE_NAME = 'default'
 
 const SCRYPT_KEY_LEN = 64
@@ -86,6 +84,17 @@ export function findFirstUser(): UserRecord | null {
   const db = getDb()
   if (!db) return null
   const row = db.prepare(`SELECT * FROM ${USERS_TABLE} ORDER BY id ASC LIMIT 1`).get() as UserRecord | undefined
+  return row || null
+}
+
+export function findFirstActiveSuperAdmin(): UserRecord | null {
+  const db = getDb()
+  if (!db) return null
+  const row = db.prepare(
+    `SELECT * FROM ${USERS_TABLE}
+     WHERE role = 'super_admin' AND status = 'active'
+     ORDER BY id ASC LIMIT 1`
+  ).get() as UserRecord | undefined
   return row || null
 }
 
@@ -300,21 +309,35 @@ export function replaceUserProfiles(userId: UserId, profiles: string[], defaultP
   }
 }
 
-export function createDefaultSuperAdmin(): UserRecord | null {
+export function ensureLocalSuperAdmin(): UserRecord | null {
   const db = getDb()
   if (!db) return null
 
+  const existing = findFirstActiveSuperAdmin()
+  if (existing) return existing
+  if (countUsers() > 0) return null
+
   const now = Date.now()
+  const username = 'deepagent-local'
+  const unusablePassword = randomBytes(48).toString('base64url')
   db.prepare(
     `INSERT INTO ${USERS_TABLE} (username, password_hash, role, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(DEFAULT_USERNAME, hashPassword(DEFAULT_PASSWORD), 'super_admin', 'active', now, now)
+  ).run(username, hashPassword(unusablePassword), 'super_admin', 'active', now, now)
 
-  return findUserByUsername(DEFAULT_USERNAME)
+  return findUserByUsername(username)
 }
 
+/**
+ * @deprecated Test and data-migration helper. Public login routes must never
+ * bootstrap an account from credentials supplied by an unauthenticated caller.
+ */
 export function bootstrapDefaultSuperAdmin(username: string, password: string): UserRecord | null {
-  if (countUsers() > 0) return null
-  if (username !== DEFAULT_USERNAME || password !== DEFAULT_PASSWORD) return null
-  return createDefaultSuperAdmin()
+  if (countUsers() > 0 || username.trim().length < 2 || password.length < 6) return null
+  return createUser({
+    username: username.trim(),
+    password,
+    role: 'super_admin',
+    status: 'active',
+  })
 }

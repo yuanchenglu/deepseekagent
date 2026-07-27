@@ -1,8 +1,8 @@
 # DeepSeekAgent 开源准备文档集
 
 > 分支：`develop`
-> 状态：产品与工程基线
-> 目标：以“能够安全、可验证、可维护地开源”为唯一发布标准。
+> 状态：三阶段执行基线
+> 目标：先交付 CLI Alpha，再交付 WebUI Beta，最终交付双模式 Electron。
 
 ## 文档目录
 
@@ -12,7 +12,11 @@
 4. [04-PRD.md](./04-PRD.md) — 完整产品需求文档与开源版本验收标准。
 5. [05-TEST-PLAN-AND-CASES.md](./05-TEST-PLAN-AND-CASES.md) — 测试策略、测试矩阵、完整核心测试用例。
 6. [06-FUNCTIONAL-TEST-REPORT.md](./06-FUNCTIONAL-TEST-REPORT.md) — 当前功能验证报告、已验证结论和未执行项。
-7. [07-OPEN-SOURCE-ITERATION-PLAN.md](./07-OPEN-SOURCE-ITERATION-PLAN.md) — 以最少新增功能完成开源的迭代路线。
+7. [07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md](./07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md) — 第一阶段：公开、可安装、可用的 CLI Alpha。
+8. [08-PHASE-2-WEBUI-STABLE-BETA.md](./08-PHASE-2-WEBUI-STABLE-BETA.md) — 第二阶段：浏览器 WebUI Beta 与完整本地共存。
+9. [09-PHASE-3-DUAL-MODE-ELECTRON.md](./09-PHASE-3-DUAL-MODE-ELECTRON.md) — 第三阶段：DeepAgent / DeepCode 双模式 Electron。
+
+原 [07-OPEN-SOURCE-ITERATION-PLAN.md](./07-OPEN-SOURCE-ITERATION-PLAN.md) 仅作历史审计记录，不再是执行依据。
 
 ## 决策原则
 
@@ -27,10 +31,10 @@
 
 首个可开源版本不是“功能最多”的版本，而是满足以下条件的最小完整版本：
 
-- CLI 与桌面端至少有一种稳定主入口。
-- Agent 基础循环、工具调用、会话持久化和 Code Mode 核心闭环可用。
-- 默认仅本地访问，认证、凭据和终端功能安全。
+- CLI 是第一阶段唯一正式入口；WebUI 与 Desktop 不阻塞仓库公开。
+- Agent 基础循环、工具调用和会话持久化可用。
+- 安装、运行和卸载不读写 Hermes 或用户 OpenCode 的数据目录。
 - 安装、升级、卸载和回滚可验证。
-- 所有 Release 产物具备校验、签名、SBOM 和来源证明。
+- 第一阶段 Release 产物具备 SHA-256、版本 Manifest 和可追溯 Commit；签名、公证属于第三阶段 DMG 门禁。
 - 文档与代码一致，第三方许可证清晰。
 - CI 对失败严格阻断。

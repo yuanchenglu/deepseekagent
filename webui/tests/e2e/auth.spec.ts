@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockHermesApi, TEST_ACCESS_KEY } from './fixtures'
+import { mockHermesApi } from './fixtures'
 
 test('redirects protected routes to the login screen without a token', async ({ page }) => {
   const api = await mockHermesApi(page)
@@ -7,7 +7,7 @@ test('redirects protected routes to the login screen without a token', async ({ 
   await page.goto('/#/hermes/jobs')
 
   await expect(page).toHaveURL(/#\/$/)
-  await expect(page.getByRole('heading', { name: 'Hermes Web UI' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'DeepAgent Web UI' })).toBeVisible()
   await expect(page.getByPlaceholder('Username')).toBeVisible()
   await expect(page.getByPlaceholder('Password')).toBeVisible()
   expect(api.unexpectedRequests).toEqual([])
@@ -36,11 +36,26 @@ test('logs in with password through the BFF before entering the app', async ({ p
   await page.getByRole('button', { name: 'Login' }).click()
 
   await expect(page).toHaveURL(/#\/hermes\/chat$/)
-  await expect(page.evaluate(() => window.localStorage.getItem('hermes_api_key'))).resolves.toBe(TEST_ACCESS_KEY)
+  await expect(page.evaluate(() => window.localStorage.getItem('hermes_api_key'))).resolves.toBeNull()
+  await expect(page.evaluate(() => window.sessionStorage.getItem('deepagent_cookie_session'))).resolves.not.toBeNull()
   await expect.poll(() => api.requests.some((request) => request.pathname === '/health')).toBe(true)
 
   const loginRequest = api.requests.find((request) => request.pathname === '/api/auth/login')
   expect(loginRequest?.method).toBe('POST')
   expect(loginRequest?.postData).toBe(JSON.stringify({ username: 'playwright', password: 'correct-password' }))
+  expect(api.unexpectedRequests).toEqual([])
+})
+
+test('exchanges a one-time ticket without persisting the ticket or JWT', async ({ page }) => {
+  const api = await mockHermesApi(page)
+  const ticket = 'T'.repeat(43)
+
+  await page.goto(`/#/?ticket=${ticket}`)
+
+  await expect(page).toHaveURL(/#\/hermes\/chat$/)
+  await expect(page.evaluate(() => window.localStorage.getItem('hermes_api_key'))).resolves.toBeNull()
+  await expect(page.evaluate(() => window.location.href)).resolves.not.toContain(ticket)
+  const request = api.requests.find((item) => item.pathname === '/api/auth/ticket')
+  expect(request?.postData).toBe(JSON.stringify({ ticket }))
   expect(api.unexpectedRequests).toEqual([])
 })

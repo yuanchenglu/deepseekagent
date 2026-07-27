@@ -7,6 +7,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from hermes_constants import get_deepagent_home
+
 
 # Env var name suffixes that indicate credential values.  These are the
 # only env vars whose values we sanitize on load — we must not silently
@@ -104,9 +106,16 @@ def load_hermes_dotenv(
     """
     loaded: list[Path] = []
 
-    home_path = Path(hermes_home or os.getenv("HERMES_HOME", Path.home() / ".hermes"))
+    # Product callers must never fall through to a user's existing Hermes
+    # installation. Legacy-compatible callers can still pass hermes_home
+    # explicitly when that behavior is intentional.
+    home_path = Path(hermes_home) if hermes_home is not None else get_deepagent_home()
     user_env = home_path / ".env"
     project_env_path = Path(project_env) if project_env else None
+    if project_env_path and os.getenv("DEEPAGENT_TEST_ISOLATION") == "1":
+        repository_env = Path(__file__).resolve().parents[1] / ".env"
+        if project_env_path.resolve() == repository_env.resolve():
+            project_env_path = None
 
     # Fix corrupted .env files before python-dotenv parses them (#8908).
     if user_env.exists():

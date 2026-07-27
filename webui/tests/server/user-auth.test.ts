@@ -295,15 +295,14 @@ describe('user auth tables and middleware', () => {
     expect(next).toHaveBeenCalledOnce()
   })
 
-  it('does not create the default super admin until first valid bootstrap login', async () => {
+  it('creates a local super admin with an unrecoverable random password', async () => {
     const { schemas, users } = await initUsers()
 
     expect(users.countUsers()).toBe(0)
-    expect(users.bootstrapDefaultSuperAdmin('admin', 'bad-password')).toBeNull()
-    expect(users.countUsers()).toBe(0)
-
-    const created = users.bootstrapDefaultSuperAdmin('admin', '123456')
+    const created = users.ensureLocalSuperAdmin()
     expect(created?.role).toBe('super_admin')
+    expect(created?.username).toBe('deepagent-local')
+    expect(users.verifyPassword('123456', created!.password_hash)).toBe(false)
     expect(users.countUsers()).toBe(1)
 
     const userCount = db.prepare(`SELECT COUNT(*) as count FROM ${schemas.USERS_TABLE}`).get() as any
@@ -344,14 +343,15 @@ describe('user auth tables and middleware', () => {
     expect(auth.verifyUserJwt(token, 'secret', 1000 + 60 * 60 * 1000)).toBeNull()
   })
 
-  it('authenticates JWTs passed as query tokens for download and websocket URLs', async () => {
+  it('authenticates JWTs from the HttpOnly session cookie without accepting URL tokens', async () => {
     const { users, auth } = await initUsers()
     const user = users.bootstrapDefaultSuperAdmin('admin', '123456')!
     const token = auth.signUserJwt(user, 'test-secret')
     const ctx = {
       path: '/api/hermes/download',
       headers: {},
-      query: { token },
+      query: { token: 'must-not-be-used' },
+      cookies: { get: vi.fn(() => token) },
       state: {},
       request: { body: {} },
       status: 200,
@@ -405,7 +405,7 @@ describe('user auth tables and middleware', () => {
     expect(ctx.body).toEqual({ error: 'Unauthorized' })
   })
 
-  it('bootstraps the default super admin through password login and returns a user JWT', async () => {
+  it('does not let an unauthenticated password request claim an empty installation', async () => {
     await initUsers()
     const ctrl = await import('../../packages/server/src/controllers/auth')
     const ctx = {
@@ -418,11 +418,11 @@ describe('user auth tables and middleware', () => {
 
     await ctrl.login(ctx)
 
-    expect(ctx.status).toBe(200)
-    expect(ctx.body.token).toMatch(/^[^.]+\.[^.]+\.[^.]+$/)
+    expect(ctx.status).toBe(401)
+    expect(ctx.body).toEqual({ error: 'Invalid username or password' })
   })
 
-  it('marks only admin with password 123456 as requiring a credential change', async () => {
+  it('does not rely on a fixed default credential-change rule', async () => {
     const { users } = await initUsers()
     const admin = users.bootstrapDefaultSuperAdmin('admin', '123456')!
     const ctrl = await import('../../packages/server/src/controllers/auth')
@@ -433,7 +433,7 @@ describe('user auth tables and middleware', () => {
       body: null,
     } as any
     await ctrl.currentUser(defaultCtx)
-    expect(defaultCtx.body.user.requiresCredentialChange).toBe(true)
+    expect(defaultCtx.body.user.requiresCredentialChange).toBe(false)
 
     users.updateUserPassword(admin.id, 'stronger-password')
     const passwordChangedCtx = {

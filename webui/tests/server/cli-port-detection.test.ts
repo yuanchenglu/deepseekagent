@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { scryptSync, timingSafeEqual } from 'crypto'
-import { DatabaseSync } from 'node:sqlite'
 
 type ChildProcessMocks = {
   execFileSync: ReturnType<typeof vi.fn>
@@ -24,14 +22,6 @@ async function loadCli(overrides: Partial<ChildProcessMocks> = {}) {
     ...mod,
     mocks: { execFileSync, execSync, spawn },
   }
-}
-
-function verifyPassword(password: string, passwordHash: string): boolean {
-  const [scheme, salt, expectedHex] = passwordHash.split(':')
-  if (scheme !== 'scrypt' || !salt || !expectedHex) return false
-  const expected = Buffer.from(expectedHex, 'hex')
-  const actual = scryptSync(password, salt, expected.length)
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
 describe('CLI port detection', () => {
@@ -127,7 +117,7 @@ describe('CLI port detection', () => {
 
   it('cleans a stale server PID file during stop', async () => {
     const home = mkdtempSync(join(tmpdir(), 'hermes-web-ui-cli-stale-pid-'))
-    process.env.HERMES_WEB_UI_HOME = home
+    process.env.DEEPAGENT_WEBUI_RUNTIME_DIR = home
     const pidFile = join(home, 'server.pid')
     writeFileSync(pidFile, '999999999\n')
 
@@ -187,40 +177,8 @@ describe('CLI port detection', () => {
     ])
   })
 
-  it('resets an existing admin user to the default password', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'hermes-web-ui-cli-default-login-'))
-    process.env.HERMES_WEB_UI_HOME = home
-    const dbPath = join(home, 'hermes-web-ui.db')
-
-    try {
-      const { resetDefaultLogin } = await loadCli()
-      const created = await resetDefaultLogin({ silent: true })
-      expect(created.action).toBe('created')
-
-      const db = new DatabaseSync(dbPath)
-      try {
-        const initial = db.prepare('SELECT id, username, password_hash FROM users WHERE username = ?').get('admin') as any
-        expect(verifyPassword('123456', initial.password_hash)).toBe(true)
-        db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run('scrypt:bad:bad', 'admin')
-      } finally {
-        db.close()
-      }
-
-      const updated = await resetDefaultLogin({ silent: true })
-      expect(updated.action).toBe('updated')
-
-      const verifyDb = new DatabaseSync(dbPath)
-      try {
-        const rows = verifyDb.prepare('SELECT id, username, password_hash, role, status FROM users WHERE username = ?').all('admin') as any[]
-        expect(rows).toHaveLength(1)
-        expect(verifyPassword('123456', rows[0].password_hash)).toBe(true)
-        expect(rows[0].role).toBe('super_admin')
-        expect(rows[0].status).toBe('active')
-      } finally {
-        verifyDb.close()
-      }
-    } finally {
-      rmSync(home, { recursive: true, force: true })
-    }
+  it('does not expose a fixed-credential reset helper', async () => {
+    const cli = await loadCli()
+    expect(cli.resetDefaultLogin).toBeUndefined()
   })
 })

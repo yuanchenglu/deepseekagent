@@ -1,7 +1,7 @@
 # ============================================================================
 # DeepAgent — Release Build & Publish Workflow
 # ============================================================================
-# Release 流水线：构建 tarball + Desktop DMG → GitHub Releases + R2 + Pages。
+# 第一阶段发布流水线：构建 MIT Core → GitHub Releases + R2 + Pages。
 #
 # 触发方式:
 #   1. 推送 tag（如 v0.9.0-alpha.1）自动触发
@@ -9,12 +9,11 @@
 #   3. 手动 dry run：gh workflow run release.yml -f version=0.9.0 -f dry_run=true
 #
 # Job 依赖链:
-#   build-tarball + build-dmg (并行) → publish → deploy-r2 → deploy-pages
+#   build-tarball → publish (GitHub + R2) → deploy-pages
 #
 # 输出物:
 #   - deepagent-{version}.tar.gz + .sha256  → GitHub Releases + R2
-#   - Deep.Agent-{version}-arm64.dmg        → GitHub Releases + R2
-#   - Deep.Agent-{version}-x64.dmg          → GitHub Releases + R2
+#   - version manifest + promoted alpha channel
 #   - Landing Page + Docs                    → Cloudflare Pages
 #
 # 所需 Secrets:
@@ -68,6 +67,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Go for secret scanning
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Scan all Git history for secrets
+        run: |
+          go run github.com/zricethezav/gitleaks/v8@v8.30.1 git \
+            --redact \
+            --no-banner \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            .
+
+      - name: Upload redacted secret scan report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-redacted-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+
       - name: Determine release version
         id: version
         run: |
@@ -84,16 +105,41 @@ jobs:
           echo "Detected version: $VERSION"
 
       - name: Write VERSION file
-        run: echo "${{ steps.version.outputs.version }}" > VERSION
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if ! [[ "$VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z._-]{0,127}$ ]] || [[ "$VERSION" == *..* ]]; then
+            echo "Invalid release version: $VERSION" >&2
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            [ "$GITHUB_REF" = "refs/tags/v${VERSION}" ] || exit 1
+          elif [ "${{ inputs.dry_run }}" != "true" ]; then
+            TAG_COMMIT="$(git rev-list -n 1 "v${VERSION}")"
+            HEAD_COMMIT="$(git rev-parse HEAD)"
+            [ "$TAG_COMMIT" = "$HEAD_COMMIT" ] || {
+              echo "Publishing requires tag v${VERSION} to point at HEAD" >&2
+              exit 1
+            }
+          fi
+          printf '%s\n' "$VERSION" > VERSION
 
       - name: Build tarball (pre-release mode — skip pre-built checks)
         run: |
           chmod +x scripts/build-release.sh
-          SKIP_WEBUI_CHECK=1 SKIP_OPENCODE_CHECK=1 SKIP_SKILLS_MANIFEST=1 \
-            bash scripts/build-release.sh --version "${{ steps.version.outputs.version }}"
+          bash scripts/build-release.sh \
+            --core-only \
+            --version "${{ steps.version.outputs.version }}"
 
       - name: List build artifacts
         run: ls -lh dist/releases/
+
+      - name: Verify Core-only artifact boundary
+        run: |
+          TARBALL="dist/releases/deepagent-${{ steps.version.outputs.version }}.tar.gz"
+          if tar -tzf "$TARBALL" | grep -Eq '^(webui|embedded/opencode)(/|$)'; then
+            echo "Core artifact contains Phase 2/3 files" >&2
+            exit 1
+          fi
 
       # ─── Smoke Test：验证 tarball 在实际环境中可用 ───────────────────────
       # 解压 tarball → 安装 uv → uv sync --no-dev → deepagent --version
@@ -107,7 +153,7 @@ jobs:
           tar -xzf "$TARBALL" -C "$SMOKE_DIR"
 
           # 安装 uv
-          curl -fsSL https://astral.sh/uv/install.sh | sh
+          curl -fsSL https://astral.sh/uv/0.6.12/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
 
           # 在解压目录中创建 venv 并安装依赖
@@ -117,11 +163,9 @@ jobs:
 
           # 验证 deepagent --version 可执行
           echo "=== Running: deepagent --version ==="
-          .venv/bin/deepagent --version || {
-            echo "WARNING: deepagent --version exited with non-zero (may need full env)"
-            echo "Checking if binary exists..."
-            ls -la .venv/bin/deepagent
-          }
+          .venv/bin/deepagent --version
+          .venv/bin/python scripts/audit-python-licenses.py \
+            --output "$GITHUB_WORKSPACE/dist/releases/deepagent-python-licenses-${{ steps.version.outputs.version }}.json"
 
           echo "=== Smoke Test PASSED ==="
 
@@ -136,6 +180,9 @@ jobs:
   # --------------------------------------------------------------------------
   build-dmg:
     name: Build Desktop DMG (${{ matrix.arch }})
+    # Phase 1 publishes CLI Core only. Re-enable from the dedicated Desktop
+    # preview workflow after Phase 3 signing/notarization gates exist.
+    if: ${{ false }}
     strategy:
       matrix:
         include:
@@ -183,7 +230,7 @@ jobs:
   # --------------------------------------------------------------------------
   publish:
     name: Publish to GitHub Releases & R2
-    needs: [build-tarball, build-dmg]
+    needs: [build-tarball]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     steps:
@@ -210,21 +257,16 @@ jobs:
         run: |
           echo "=== release-tarball ==="
           ls -lh release-tarball/
-          echo ""
-          echo "=== dmg-arm64 ==="
-          ls -lh dmg-arm64/ || echo "(empty)"
-          echo ""
-          echo "=== dmg-x64 ==="
-          ls -lh dmg-x64/ || echo "(empty)"
 
-      - name: Create GitHub Release
+      - name: Create draft GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
+            --draft \
             --title "DeepAgent v${{ steps.version.outputs.version }}" \
             --notes "See [CHANGELOG](docs/releases/CHANGELOG.md) for details." \
-            release-tarball/* dmg-arm64/* dmg-x64/*
+            release-tarball/*
 
       - name: Upload assets to Cloudflare R2
         env:
@@ -235,23 +277,66 @@ jobs:
           ENDPOINT_URL="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
           BUCKET="deepagent-releases"
 
-          echo "Uploading tarball + checksum to R2..."
-          for f in release-tarball/*; do
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Uploading immutable Core artifact and checksum to R2..."
+          for f in "release-tarball/deepagent-${VERSION}.tar.gz" \
+                   "release-tarball/deepagent-${VERSION}.tar.gz.sha256"; do
             echo "  uploading: ${f##*/}"
             aws s3 cp "$f" "s3://${BUCKET}/${f##*/}" \
               --endpoint-url "$ENDPOINT_URL" \
               --region auto
           done
 
-          echo "Uploading DMGs to R2..."
-          for f in dmg-arm64/* dmg-x64/*; do
-            echo "  uploading: ${f##*/}"
-            aws s3 cp "$f" "s3://${BUCKET}/${f##*/}" \
-              --endpoint-url "$ENDPOINT_URL" \
-              --region auto
-          done
+          aws s3 cp "release-tarball/deepagent-manifest-${VERSION}.json" \
+            "s3://${BUCKET}/manifests/${VERSION}.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          aws s3 cp "release-tarball/deepagent-python-licenses-${VERSION}.json" \
+            "s3://${BUCKET}/licenses/${VERSION}.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
 
-          echo "R2 upload complete."
+          echo "Reading immutable objects back from R2..."
+          aws s3 cp "s3://${BUCKET}/deepagent-${VERSION}.tar.gz" \
+            "/tmp/deepagent-${VERSION}.tar.gz" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          aws s3 cp "s3://${BUCKET}/manifests/${VERSION}.json" \
+            "/tmp/deepagent-manifest-${VERSION}.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          aws s3 cp "s3://${BUCKET}/licenses/${VERSION}.json" \
+            "/tmp/deepagent-python-licenses-${VERSION}.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          (cd /tmp && sha256sum -c \
+            "$GITHUB_WORKSPACE/release-tarball/deepagent-${VERSION}.tar.gz.sha256")
+          cmp "release-tarball/deepagent-manifest-${VERSION}.json" \
+            "/tmp/deepagent-manifest-${VERSION}.json"
+          cmp "release-tarball/deepagent-python-licenses-${VERSION}.json" \
+            "/tmp/deepagent-python-licenses-${VERSION}.json"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release edit "v${VERSION}" --draft=false
+          [ "$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)" = "false" ]
+
+      - name: Promote verified Alpha channel
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          ENDPOINT_URL="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+          # Promotion is last: users cannot see this version until GitHub and
+          # all immutable R2 objects have passed verification.
+          aws s3 cp "release-tarball/deepagent-channel-alpha.json" \
+            "s3://${BUCKET}/channels/alpha.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          aws s3 cp "s3://${BUCKET}/channels/alpha.json" \
+            "/tmp/deepagent-channel-alpha.json" \
+            --endpoint-url "$ENDPOINT_URL" --region auto
+          cmp release-tarball/deepagent-channel-alpha.json \
+            /tmp/deepagent-channel-alpha.json
 
   # --------------------------------------------------------------------------
   # Job 4: Deploy Landing Page + Docs to Cloudflare Pages
@@ -274,15 +359,7 @@ jobs:
         run: npm install -g wrangler
 
       - name: Build website (landing page + docs)
-        run: |
-          if [ -f scripts/build-website.sh ]; then
-            chmod +x scripts/build-website.sh
-            bash scripts/build-website.sh
-          else
-            echo "scripts/build-website.sh not found — using landingpage/ directly"
-            mkdir -p website/build
-            cp -r landingpage/* website/build/ 2>/dev/null || true
-          fi
+        run: bash scripts/build-website.sh
 
       - name: Deploy to Cloudflare Pages
         env:
@@ -304,10 +381,18 @@ jobs:
             grep -oE 'https://[a-f0-9]+\.deepagent-website\.pages\.dev' | head -1)
 
           if [ -z "$PAGES_URL" ]; then
-            echo "WARNING: Could not determine Pages URL — check Cloudflare dashboard"
-          else
-            echo "Pages URL: $PAGES_URL"
-            # 验证首页可访问
-            curl -sI "$PAGES_URL/" | head -1 || echo "WARNING: Could not verify page"
+            echo "Could not determine Pages URL" >&2
+            exit 1
           fi
+          echo "Pages URL: $PAGES_URL"
+          curl -fsSI "$PAGES_URL/" | head -1
+          curl -fsSL "$PAGES_URL/install.sh" -o /tmp/deepagent-install.sh
+          head -1 /tmp/deepagent-install.sh | grep -q '^#!/usr/bin/env bash$'
+          bash -n /tmp/deepagent-install.sh
+
+          # The official domain is the public contract, not only pages.dev.
+          curl -fsSL https://deepseekagent.starseas.org/install.sh \
+            -o /tmp/deepagent-install-official.sh
+          head -1 /tmp/deepagent-install-official.sh | grep -q '^#!/usr/bin/env bash$'
+          bash -n /tmp/deepagent-install-official.sh
           echo "=== Pages deployment complete ==="

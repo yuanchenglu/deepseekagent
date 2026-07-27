@@ -6,13 +6,13 @@ import { homedir } from 'os'
  *
  * Server/listen:
  * - PORT: Web UI listen port. Default: 8648.
- * - BIND_HOST: Web UI bind host. Default: 0.0.0.0.
+ * - BIND_HOST: Web UI bind host. Default: 127.0.0.1.
  * - CORS_ORIGINS: Comma/space-separated cross-origin allowlist. Default: same host only.
  *
  * Web UI storage:
  * - HERMES_WEB_UI_HOME: Web UI data home for auth token, credentials, logs, DB, and default uploads.
  * - HERMES_WEBUI_STATE_DIR: Compatibility alias for HERMES_WEB_UI_HOME.
- *   Default: join(homedir(), '.hermes-web-ui').
+ *   Default: join(DEEPAGENT_HOME, 'data', 'webui').
  * - UPLOAD_DIR: Upload directory override. Default: join(HERMES_WEB_UI_HOME, 'upload').
  * - dataDir: Development-only internal Web UI runtime data directory.
  *
@@ -30,7 +30,7 @@ import { homedir } from 'os'
  * - HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN: Whether Web UI shutdown also stops managed gateways.
  * - HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT: Disable Hermes Studio MCP config injection.
  * - HERMES_WEB_UI_ALLOW_TRANSIENT_MCP_AUTOINJECT: Allow MCP injection when HERMES_WEB_UI_HOME is under a temp dir.
- * - HERMES_LAN_DISCOVERY_ENABLED: Set false/0/off to disable UDP LAN discovery responder.
+ * - HERMES_LAN_DISCOVERY_ENABLED: Set true/1/on to explicitly enable UDP LAN discovery. Default: disabled.
  * - HERMES_LAN_DISCOVERY_HTTP_PORTS: HTTP ports to probe during UDP discovery scans. Default: 8648,8748 plus current PORT.
  *   Discovery probes are sent to the fixed UDP port 48640 plus legacy mapped ports for compatibility.
  * - WORKSPACE_BASE: Base directory for workspace browsing. Default: current user's home directory.
@@ -44,12 +44,23 @@ import { homedir } from 'os'
 
 export function getListenHost(env: Record<string, string | undefined> = process.env): string {
   const host = env.BIND_HOST?.trim()
-  return host || '0.0.0.0'
+  return host || '127.0.0.1'
 }
 
 export function getWebUiHome(env: Record<string, string | undefined> = process.env): string {
   const appHome = env.HERMES_WEB_UI_HOME?.trim() || env.HERMES_WEBUI_STATE_DIR?.trim()
-  return appHome ? resolve(appHome) : join(homedir(), '.deepagent-webui')
+  const productHome = env.DEEPAGENT_HOME?.trim()
+  return appHome
+    ? resolve(appHome)
+    : join(productHome ? resolve(productHome) : join(homedir(), '.deepagent'), 'data', 'webui')
+}
+
+export function getWebUiRuntimeDir(env: Record<string, string | undefined> = process.env): string {
+  const explicit = env.DEEPAGENT_WEBUI_RUNTIME_DIR?.trim()
+  const productHome = env.DEEPAGENT_HOME?.trim()
+  return explicit
+    ? resolve(explicit)
+    : join(productHome ? resolve(productHome) : join(homedir(), '.deepagent'), 'runtime', 'webui')
 }
 
 export function shouldCreateWebUiDataDir(env: Record<string, string | undefined> = process.env): boolean {

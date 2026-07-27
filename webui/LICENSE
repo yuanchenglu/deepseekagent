@@ -3,12 +3,12 @@ Business Source License 1.1
 Parameters
 
 Licensor:             EKKOLearnAI
-Licensed Work:        Hermes Studio, formerly known as Hermes Web UI,
-                      including the hermes-web-ui npm package and CLI,
-                      Hermes Studio desktop applications, web applications,
-                      server components, runtime integrations, firmware,
-                      release artifacts, documentation, and all associated
-                      files in this repository.
+Licensed Work:        The WebUI and desktop software contained under this
+                      repository's webui/ directory, formerly known as Hermes
+                      Studio or Hermes Web UI, including its npm packages,
+                      desktop applications, web applications, server
+                      components, runtime integrations, release artifacts,
+                      documentation, and associated files in webui/.
 Additional Use Grant: You may use the Licensed Work for non-commercial purposes,
                       including personal use, education, and research.
                       Commercial use (including but not limited to selling,
@@ -38,13 +38,13 @@ limitations under the License.
 
 For the purposes of this License:
 
-- "Licensed Work" refers to Hermes Studio and all source code,
-  documentation, firmware, desktop applications, web applications, server
-  components, runtime integrations, release artifacts, packages, command-line
-  tools, and associated files in this repository. This includes materials
-  distributed or identified under the current Hermes Studio name, the former
-  Hermes Web UI name, the hermes-web-ui npm package name, and the
-  hermes-studio desktop application name.
+- "Licensed Work" refers only to the source code, documentation, desktop
+  applications, web applications, server components, runtime integrations,
+  release artifacts, packages, and associated files contained under webui/.
+  It includes materials distributed or identified under the current Hermes
+  Studio name, the former Hermes Web UI name, the hermes-web-ui npm package
+  name, and the hermes-studio desktop application name. It does not include
+  DeepAgent Core files outside webui/.
 
 - "Non-commercial use" means use that is not primarily intended for or
   directed toward commercial advantage or monetary compensation.

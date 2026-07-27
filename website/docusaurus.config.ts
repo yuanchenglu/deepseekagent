@@ -3,22 +3,23 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'DeepSeek Agent',
-  tagline: 'AI 智能助手，即装即用',
+  title: 'DeepAgent',
+  tagline: 'CLI Alpha for macOS Apple Silicon',
   favicon: 'img/favicon.ico',
 
   url: 'https://deepseekagent.starseas.org',
-  baseUrl: '/',
+  baseUrl: '/docs/',
 
   organizationName: '7ColorAI',
   projectName: 'deepagent',
 
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
+  onBrokenAnchors: 'throw',
 
   markdown: {
     mermaid: true,
     hooks: {
-      onBrokenMarkdownLinks: 'warn',
+      onBrokenMarkdownLinks: 'throw',
     },
   },
 
@@ -49,6 +50,14 @@ const config: Config = {
         docs: {
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
+          include: [
+            'index.md',
+            'getting-started/quickstart.md',
+            'getting-started/installation.md',
+            'getting-started/termux.md',
+            'reference/faq.md',
+            'developer-guide/contributing.md',
+          ],
           editUrl: 'https://github.com/yuanchenglu/deepseekagent/edit/main/website/',
         },
         blog: false,
@@ -72,9 +81,9 @@ const config: Config = {
       },
     },
     navbar: {
-      title: 'DeepSeek Agent',
+      title: 'DeepAgent',
       logo: {
-        alt: 'DeepSeek Agent',
+        alt: 'DeepAgent',
         src: 'img/logo.png',
       },
       items: [
@@ -83,11 +92,6 @@ const config: Config = {
           sidebarId: 'docs',
           position: 'left',
           label: '文档',
-        },
-        {
-          to: '/skills',
-          label: '技能',
-          position: 'left',
         },
         {
           href: 'https://github.com/yuanchenglu/deepseekagent',
@@ -103,9 +107,9 @@ const config: Config = {
           title: '文档',
           items: [
             { label: '快速开始', to: '/getting-started/quickstart' },
-            { label: '用户指南', to: '/user-guide/cli' },
-            { label: '开发指南', to: '/developer-guide/architecture' },
-            { label: '参考', to: '/reference/cli-commands' },
+            { label: '安装', to: '/getting-started/installation' },
+            { label: 'CLI Alpha FAQ', to: '/reference/faq' },
+            { label: '贡献', to: '/developer-guide/contributing' },
           ],
         },
         {
@@ -121,7 +125,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `由 <a href="#">7ColorAI</a> 构建 · MIT License · ${new Date().getFullYear()}`,
+      copyright: `由 <a href="#">7ColorAI</a> 构建 · Core MIT / UI BSL-1.1 · ${new Date().getFullYear()}`,
     },
     prism: {
       theme: prismThemes.github,

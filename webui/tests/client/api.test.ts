@@ -28,6 +28,7 @@ function fakeJwt(payload: Record<string, unknown>) {
 describe('API Client', () => {
   beforeEach(() => {
     localStorage.clear()
+    clearApiKey()
     vi.clearAllMocks()
   })
 
@@ -41,9 +42,16 @@ describe('API Client', () => {
       expect(hasApiKey()).toBe(true)
     })
 
-    it('getApiKey returns the stored token', () => {
+    it('getApiKey returns the in-memory token without browser persistence', () => {
       setApiKey('my-token')
       expect(getApiKey()).toBe('my-token')
+      expect(localStorage.getItem('hermes_api_key')).toBeNull()
+    })
+
+    it('migrates and erases a legacy persisted token', () => {
+      localStorage.setItem('hermes_api_key', 'legacy-token')
+      expect(getApiKey()).toBe('legacy-token')
+      expect(localStorage.getItem('hermes_api_key')).toBeNull()
     })
 
     it('clearApiKey removes the token', () => {

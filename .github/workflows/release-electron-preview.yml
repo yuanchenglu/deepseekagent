@@ -1,0 +1,259 @@
+name: Release Electron Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Preview version, for example 1.0.0-preview.1
+        required: true
+        type: string
+      publish:
+        description: Publish signed/notarized DMG and promote preview channel
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-sign-notarize:
+    name: Build, sign, notarize, and verify Apple Silicon DMG
+    runs-on: macos-14
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Scan all Git refs for secrets
+        run: |
+          go run github.com/zricethezav/gitleaks/v8@v8.30.1 git \
+            --redact --no-banner --report-format json \
+            --report-path gitleaks-electron-preview.json .
+
+      - name: Upload redacted secret scan
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-preview-secret-scan
+          path: gitleaks-electron-preview.json
+          if-no-files-found: ignore
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.5.0'
+          cache: npm
+          cache-dependency-path: |
+            webui/package-lock.json
+            webui/packages/desktop/package-lock.json
+
+      - name: Validate source version, tag, platform promise, and signing inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]] || {
+            echo "Electron Preview requires X.Y.Z-preview.N" >&2
+            exit 1
+          }
+          RUNTIME_VERSION="$(tr -d '[:space:]' < VERSION)"
+          RUNTIME_VERSION="${RUNTIME_VERSION#v}"
+          [ "$(node -p "require('./webui/package.json').version")" = "$RUNTIME_VERSION" ] || {
+            echo "VERSION and webui/package.json do not identify the same Phase 2 Runtime" >&2
+            exit 1
+          }
+          [ "$(node -p "require('./webui/packages/desktop/package.json').version")" = "$VERSION" ] || {
+            echo "Desktop package version mismatch" >&2
+            exit 1
+          }
+          [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] || {
+            echo "Electron Preview is built only on macOS Apple Silicon" >&2
+            exit 1
+          }
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name:-}" ] || { echo "Required signing secret is missing: ${name}" >&2; exit 1; }
+          done
+          if [ "$PUBLISH" = "true" ]; then
+            [ "$(git rev-list -n 1 "v${VERSION}")" = "$(git rev-parse HEAD)" ] || {
+              echo "Publishing requires tag v${VERSION} at HEAD" >&2
+              exit 1
+            }
+          fi
+
+      - name: Install, test, and build shared WebUI
+        working-directory: webui
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+          npm run licenses:audit -- \
+            --output "../dist/releases/deepagent-electron-npm-licenses-${{ inputs.version }}.json"
+
+      - name: Install and test Electron main process
+        working-directory: webui
+        run: |
+          npm run desktop:install
+          npx vitest run --config packages/desktop/vitest.config.ts
+          npm --prefix packages/desktop run build:main
+
+      - name: Enforce Phase 2 Runtime reuse and preview-only target
+        run: |
+          ! grep -q 'ensureDesktopRuntime' webui/packages/desktop/src/main/index.ts
+          ! grep -q 'from: "../.."' webui/packages/desktop/electron-builder.yml
+          grep -q 'appId: org.starseas.deepagent' webui/packages/desktop/electron-builder.yml
+          grep -q 'arch: \[arm64\]' webui/packages/desktop/electron-builder.yml
+          ! grep -Eq '^[[:space:]]*(win|linux):' webui/packages/desktop/electron-builder.yml
+
+      - name: Build signed and notarized DMG
+        working-directory: webui/packages/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+        run: npm run dist:preview
+
+      - name: Verify DMG signature, notarization, Bundle ID, and architecture
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          DMG="webui/packages/desktop/release/DeepAgent-${VERSION}-arm64.dmg"
+          [ -f "$DMG" ] || { echo "Expected DMG missing: $DMG" >&2; exit 1; }
+          xcrun stapler validate "$DMG"
+          MOUNT="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DMG"
+          APP="$MOUNT/DeepAgent.app"
+          [ -d "$APP" ]
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --type execute --verbose=4 "$APP"
+          [ "$(defaults read "$APP/Contents/Info" CFBundleIdentifier)" = "org.starseas.deepagent" ]
+          file "$APP/Contents/MacOS/DeepAgent" | grep -q 'Mach-O.*arm64'
+          hdiutil detach "$MOUNT"
+          rmdir "$MOUNT"
+
+      - name: Generate immutable Desktop manifest and checksum
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p dist/releases
+          DMG="webui/packages/desktop/release/DeepAgent-${VERSION}-arm64.dmg"
+          cp "$DMG" "dist/releases/DeepAgent-${VERSION}-arm64.dmg"
+          cd dist/releases
+          shasum -a 256 "DeepAgent-${VERSION}-arm64.dmg" > "DeepAgent-${VERSION}-arm64.dmg.sha256"
+          python3 - "$VERSION" <<'PY'
+          import hashlib, json, pathlib, sys
+          version = sys.argv[1]
+          runtime_version = pathlib.Path("../../VERSION").read_text(encoding="utf-8").strip().removeprefix("v")
+          artifact = pathlib.Path(f"DeepAgent-{version}-arm64.dmg")
+          digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+          manifest = {
+              "schema_version": 1,
+              "product": "deepagent-desktop",
+              "channel": "preview",
+              "version": version,
+              "runtime_version": runtime_version,
+              "platform": {"os": "darwin", "arch": "arm64"},
+              "bundle_id": "org.starseas.deepagent",
+              "artifact": {
+                  "filename": artifact.name,
+                  "url": f"https://deepseekagent.starseas.org/releases/desktop/{artifact.name}",
+                  "size": artifact.stat().st_size,
+                  "sha256": digest,
+              },
+          }
+          pathlib.Path(f"deepagent-desktop-manifest-{version}.json").write_text(
+              json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+          )
+          channel = {
+              "schema_version": 1,
+              "product": "deepagent-desktop",
+              "channel": "preview",
+              "version": version,
+              "manifest_url": f"https://deepseekagent.starseas.org/releases/desktop/manifests/{version}.json",
+          }
+          pathlib.Path("deepagent-desktop-channel-preview.json").write_text(
+              json.dumps(channel, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-preview-release
+          path: dist/releases/*
+
+  publish:
+    name: Publish verified Electron Preview
+    needs: build-sign-notarize
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: electron-preview-release
+          path: release
+
+      - name: Create draft GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v${VERSION}" --draft --prerelease \
+            --title "DeepAgent Electron Preview v${VERSION}" \
+            --notes "Signed and notarized Apple Silicon preview. Requires the matching DeepAgent WebUI Runtime." \
+            release/*
+
+      - name: Upload Desktop objects to R2 and verify readback
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+          DMG="DeepAgent-${VERSION}-arm64.dmg"
+          mkdir -p /tmp/deepagent-desktop-readback
+          for name in "$DMG" "${DMG}.sha256"; do
+            aws s3 cp "release/${name}" "s3://${BUCKET}/desktop/${name}" --endpoint-url "$ENDPOINT" --region auto
+            aws s3 cp "s3://${BUCKET}/desktop/${name}" "/tmp/deepagent-desktop-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
+            cmp "release/${name}" "/tmp/deepagent-desktop-readback/${name}"
+          done
+          MANIFEST="deepagent-desktop-manifest-${VERSION}.json"
+          aws s3 cp "release/${MANIFEST}" "s3://${BUCKET}/desktop/manifests/${VERSION}.json" --endpoint-url "$ENDPOINT" --region auto
+          aws s3 cp "s3://${BUCKET}/desktop/manifests/${VERSION}.json" "/tmp/deepagent-desktop-readback/${MANIFEST}" --endpoint-url "$ENDPOINT" --region auto
+          cmp "release/${MANIFEST}" "/tmp/deepagent-desktop-readback/${MANIFEST}"
+          cd /tmp/deepagent-desktop-readback
+          sha256sum -c "${DMG}.sha256"
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release edit "v${VERSION}" --draft=false --prerelease
+          [ "$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)" = "false" ]
+
+      - name: Promote verified Desktop Preview channel last
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+          aws s3 cp release/deepagent-desktop-channel-preview.json \
+            "s3://${BUCKET}/desktop/channels/preview.json" --endpoint-url "$ENDPOINT" --region auto
+          aws s3 cp "s3://${BUCKET}/desktop/channels/preview.json" /tmp/deepagent-desktop-channel-preview.json \
+            --endpoint-url "$ENDPOINT" --region auto
+          cmp release/deepagent-desktop-channel-preview.json /tmp/deepagent-desktop-channel-preview.json

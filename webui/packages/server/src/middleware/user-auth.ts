@@ -3,7 +3,6 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { getToken } from '../services/auth'
 import {
   findUserById,
-  findFirstUser,
   listUserProfiles,
   touchUserLogin,
   userCanAccessProfile,
@@ -41,6 +40,7 @@ declare module 'koa' {
 }
 
 const JWT_AUDIENCE = 'hermes-web-ui'
+export const SESSION_COOKIE_NAME = 'deepagent_session'
 const DEFAULT_EXPIRES_SECONDS = 60 * 60 * 24 * 30
 const MIN_EXPIRES_SECONDS = 1
 const MAX_EXPIRES_SECONDS = 60 * 60 * 24 * 365
@@ -96,7 +96,29 @@ async function getJwtSecret(): Promise<string> {
 function requestToken(ctx: Context): string {
   const auth = ctx.headers.authorization || ''
   if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim()
-  return typeof ctx.query.token === 'string' ? ctx.query.token.trim() : ''
+  return ctx.cookies?.get?.(SESSION_COOKIE_NAME) || ''
+}
+
+export function setUserSessionCookie(ctx: Context, token: string): void {
+  ctx.cookies.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: ctx.secure,
+    overwrite: true,
+    path: '/',
+    maxAge: getUserJwtExpiresSeconds() * 1000,
+  })
+}
+
+export function clearUserSessionCookie(ctx: Context): void {
+  ctx.cookies.set(SESSION_COOKIE_NAME, '', {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: ctx.secure,
+    overwrite: true,
+    path: '/',
+    expires: new Date(0),
+  })
 }
 
 const SERVER_TOKEN_EXACT_PATHS = new Set([
@@ -108,16 +130,18 @@ function allowsServerTokenPath(path: string): boolean {
   return SERVER_TOKEN_EXACT_PATHS.has(path)
 }
 
-function isLoopbackRequest(ctx: Context): boolean {
+export function isLoopbackRequest(ctx: Context): boolean {
   const ip = String(ctx.ip || ctx.request.ip || '').trim()
   const remote = String(ctx.req.socket.remoteAddress || '').trim()
-  const values = [ip, remote].map(value => value.startsWith('::ffff:') ? value.slice(7) : value)
-  return values.some(value => (
+  const normalize = (value: string) => value.startsWith('::ffff:') ? value.slice(7) : value
+  const isLoopback = (value: string) => (
     value === '127.0.0.1' ||
     value === '::1' ||
     value === 'localhost' ||
     value.startsWith('127.')
-  ))
+  )
+  if (remote) return isLoopback(normalize(remote))
+  return isLoopback(normalize(ip))
 }
 
 async function allowServerTokenForAgentEndpoint(ctx: Context, token: string): Promise<boolean> {
@@ -216,45 +240,33 @@ export async function isAuthEnabled(): Promise<boolean> {
 }
 
 export async function requireUserJwt(ctx: Context, next: Next): Promise<void> {
-  // DeepAgent: 默认跳过登录验证，直接通过
-  // 如需恢复，在环境变量中设置 DEEPAGENT_REQUIRE_AUTH=true
-  if (process.env.DEEPAGENT_REQUIRE_AUTH === 'true') {
-    if (!isProtectedHttpPath(ctx.path)) {
-      await next()
-      return
-    }
-
-    const secret = await getJwtSecret()
-    const token = requestToken(ctx)
-    const payload = token ? verifyUserJwt(token, secret) : null
-    if (!payload) {
-      if (await allowServerTokenForAgentEndpoint(ctx, token)) {
-        await next()
-        return
-      }
-      ctx.status = 401
-      ctx.body = { error: 'Unauthorized' }
-      return
-    }
-
-    const user = findUserById(payload.sub)
-    if (!user || user.status !== 'active') {
-      ctx.status = 403
-      ctx.body = { error: 'User is disabled or does not exist' }
-      return
-    }
-
-    ctx.state.user = toAuthenticatedUser(user)
-    touchUserLogin(user.id)
+  if (!isProtectedHttpPath(ctx.path)) {
     await next()
     return
   }
 
-  // 无认证模式：使用第一个可用用户直接通过
-  const defaultUser = findFirstUser()
-  if (defaultUser) {
-    ctx.state.user = toAuthenticatedUser(defaultUser)
+  const secret = await getJwtSecret()
+  const token = requestToken(ctx)
+  const payload = token ? verifyUserJwt(token, secret) : null
+  if (!payload) {
+    if (await allowServerTokenForAgentEndpoint(ctx, token)) {
+      await next()
+      return
+    }
+    ctx.status = 401
+    ctx.body = { error: 'Unauthorized' }
+    return
   }
+
+  const user = findUserById(payload.sub)
+  if (!user || user.status !== 'active') {
+    ctx.status = 403
+    ctx.body = { error: 'User is disabled or does not exist' }
+    return
+  }
+
+  ctx.state.user = toAuthenticatedUser(user)
+  touchUserLogin(user.id)
   await next()
 }
 

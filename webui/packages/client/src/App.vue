@@ -26,7 +26,7 @@ const appStore = useAppStore()
 const route = useRoute()
 const router = useRouter()
 // 双模式状态：assistant（助理模式）| code（Code 模式）
-const { mode: appMode, setMode } = useAppMode()
+const { mode: appMode } = useAppMode()
 
 const themeOverrides = computed(() => getThemeOverrides(isDark.value, isComic.value))
 const naiveTheme = computed(() => isDark.value ? darkTheme : null)
@@ -54,6 +54,7 @@ const hasDesktopTitleBar = computed(() => {
 // 双模式：是否显示模式切换栏 + 当前是否 Code 模式
 const showModeSwitcher = computed(() => !isLoginPage.value && !isDesktopPetRoute.value)
 const isCodeMode = computed(() => appMode.value === 'code')
+const LAST_ASSISTANT_ROUTE_KEY = 'deepagent_last_assistant_route'
 // Code 模式下不显示助理侧边栏
 const showSidebarInCurrentMode = computed(() => showAppSidebar.value && !isCodeMode.value)
 
@@ -83,12 +84,19 @@ onUnmounted(() => {
 // 双模式路由联动：进入 Code 模式时切到 /hermes/code，切回助理模式则不强行跳转
 // （切回助理模式保留用户离开前的 hermes 路由）
 // 登录页不受双模式影响，忽略模式切换以防路由循环
+watch(() => route.fullPath, (path) => {
+  if (route.name !== 'login' && route.name !== 'hermes.code') {
+    localStorage.setItem(LAST_ASSISTANT_ROUTE_KEY, path)
+  }
+}, { immediate: true })
+
 watch(appMode, (next) => {
   if (route.name === 'login') return
   if (next === 'code' && route.name !== 'hermes.code') {
     router.push({ name: 'hermes.code' }).catch(() => { /* navigation duplicated */ })
   } else if (next === 'assistant' && route.name === 'hermes.code') {
-    router.push({ name: 'hermes.chat' }).catch(() => {})
+    const previous = localStorage.getItem(LAST_ASSISTANT_ROUTE_KEY) || '/hermes/chat'
+    router.push(previous).catch(() => {})
   }
 }, { immediate: false })
 

@@ -1,5 +1,6 @@
 import { app, dialog } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
+import { safeChildEnvironment } from './child-env'
 import { execFile } from 'node:child_process'
 import { rm } from 'node:fs/promises'
 import { basename } from 'node:path'
@@ -125,7 +126,7 @@ Get-HermesStudioProcess | ForEach-Object {
   try {
     await execFileAsync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
       env: {
-        ...process.env,
+        ...safeChildEnvironment(),
         HERMES_STUDIO_UPDATE_EXE: normalizedExecPath,
         HERMES_STUDIO_UPDATE_PID: String(currentPid),
       },

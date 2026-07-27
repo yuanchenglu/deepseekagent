@@ -33,6 +33,9 @@ GH_REPO = "yuanchenglu/deepseekagent"
 R2_BASE_URL = "https://deepseekagent.starseas.org/releases"
 GH_BASE_URL = f"https://github.com/{GH_REPO}/releases/download"
 GH_API_LATEST = f"https://api.github.com/repos/{GH_REPO}/releases/latest"
+ALPHA_CHANNEL_URL = f"{R2_BASE_URL}/channels/alpha.json"
+BETA_CHANNEL_URL = f"{R2_BASE_URL}/channels/beta.json"
+SUPPORTED_CHANNELS = {"alpha", "beta"}
 
 # Resolve PROJECT_ROOT to avoid circular import from hermes_cli.main
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
@@ -55,9 +58,8 @@ def _detect_install_mode() -> str:
         return "source"
 
     # Check if DEEPAGENT_HOME is set and VERSION file exists
-    from hermes_constants import get_deepagent_home
-    hermes_home = get_deepagent_home()
-    version_file = hermes_home / "VERSION"
+    deepagent_home = _get_deepagent_home()
+    version_file = deepagent_home / "VERSION"
     if version_file.exists():
         return "release"
 
@@ -116,15 +118,17 @@ def get_current_version() -> str:
         return "unknown"
 
 
-def fetch_latest_version() -> Optional[str]:
-    """Query GitHub API for the latest release version.
+def fetch_latest_version(channel: str = "alpha") -> Optional[str]:
+    """Query a promoted release channel for the latest version.
 
     Returns:
         Version string without leading "v" (e.g. "0.9.1"), or None on failure.
     """
+    if channel not in SUPPORTED_CHANNELS:
+        return None
     try:
         req = urllib.request.Request(
-            GH_API_LATEST,
+            f"{R2_BASE_URL}/channels/{channel}.json",
             headers={
                 "Accept": "application/json",
                 "User-Agent": "DeepAgent-update/1.0",
@@ -132,8 +136,13 @@ def fetch_latest_version() -> Optional[str]:
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
-            tag = data.get("tag_name", "")
-            return tag.lstrip("v") if tag else None
+            if data.get("schema_version") != 1 or data.get("product") != "deepagent" or data.get("channel") != channel:
+                return None
+            version = data.get("version", "")
+            normalized = version.lstrip("v") if isinstance(version, str) else ""
+            if not normalized or ".." in normalized or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for c in normalized):
+                return None
+            return normalized
     except Exception:
         return None
 
@@ -628,6 +637,20 @@ def _do_rollback(backup_path: Path) -> bool:
 # ===========================================================================
 
 
+def _update_channel(args) -> str:
+    explicit = getattr(args, "channel", None) if args is not None else None
+    if explicit in SUPPORTED_CHANNELS:
+        return explicit
+    try:
+        manifest = json.loads((_get_deepagent_home() / "install-manifest.json").read_text(encoding="utf-8"))
+        stored = manifest.get("channel")
+        if manifest.get("product") == "deepagent" and stored in SUPPORTED_CHANNELS:
+            return stored
+    except (OSError, json.JSONDecodeError):
+        pass
+    return "alpha"
+
+
 def cmd_check(args) -> None:
     """Check current version and compare with latest release.
 
@@ -639,7 +662,8 @@ def cmd_check(args) -> None:
     print(f"Current version: v{current}")
 
     print("\nChecking for updates...")
-    latest = fetch_latest_version()
+    channel = _update_channel(args)
+    latest = fetch_latest_version(channel)
 
     if latest is None:
         print("  ⚠ Could not check for updates (network issue)")
@@ -659,18 +683,7 @@ def cmd_check(args) -> None:
 
 
 def cmd_update_release(args) -> None:
-    """Perform a tarball-based update for release installs.
-
-    Workflow:
-      1. Check current version
-      2. Fetch latest version from GitHub API
-      3. Compare versions (skip if current >= latest, unless --force)
-      4. Download tarball from R2 (fallback to GitHub)
-      5. Verify SHA256 checksum
-      6. Backup current installation to .backup/{timestamp}/
-      7. Extract and install new files
-      8. Run uv sync
-    """
+    """Update through the same manifest-verified installer used for setup."""
     force = getattr(args, "force", False)
 
     current = get_current_version()
@@ -679,7 +692,8 @@ def cmd_update_release(args) -> None:
     print(f"Current version: v{current}")
 
     print("\n→ Checking for latest version...")
-    latest = fetch_latest_version()
+    channel = _update_channel(args)
+    latest = fetch_latest_version(channel)
 
     if latest is None:
         print("  ✗ Could not fetch latest version info.")
@@ -697,123 +711,119 @@ def cmd_update_release(args) -> None:
     else:
         print(f"\n  Force update to v{latest} (--force)")
 
-    # Step 1 — Download tarball
-    print("\n→ Downloading release tarball...")
-    with tempfile.TemporaryDirectory(prefix="deepagent-update-") as tmp_dir_str:
-        tmp_dir = Path(tmp_dir_str)
+    installer = PROJECT_ROOT / "scripts" / "install-release.sh"
+    if not installer.is_file():
+        print(f"  ✗ Managed installer is missing: {installer}")
+        sys.exit(1)
 
-        tarball = _download_release_tarball(latest, tmp_dir)
-        if tarball is None:
-            print("  ✗ Download failed. Please try again later.")
-            sys.exit(1)
-
-        # Step 2 — Verify checksum
-        print("\n→ Verifying checksum...")
-        expected_hash = _fetch_checksum(latest)
-        if expected_hash:
-            if not _verify_sha256(tarball, expected_hash):
-                print("  ✗ Checksum verification failed.")
-                print("  The download may be corrupted or incomplete.")
-                print("  Try again or report the issue.")
-                sys.exit(1)
-        else:
-            print("  ⚠ Could not fetch checksum from GitHub, skipping verification")
-
-        # Step 3 — Backup
-        print("\n→ Backing up current installation...")
-        backup_path = _backup_current_install()
-        if backup_path is None:
-            print("  ✗ Backup failed. Aborting update to avoid data loss.")
-            sys.exit(1)
-
-        # Step 4 — Extract and install
-        print("\n→ Installing new version...")
-        if not _extract_and_install(tarball, latest):
-            print("\n  ✗ Installation failed. Attempting rollback...")
-            if backup_path:
-                _do_rollback(backup_path)
-            sys.exit(1)
-
-        # Step 5 — uv sync
-        print("\n→ Updating Python dependencies...")
-        _run_uv_sync()
-
-        print()
-        print("=" * 40)
-        print(f"  ✓ Update complete! v{current} → v{latest}")
-        print()
-        print("  Changes will take effect next time you start DeepAgent.")
-        print("  If you experience issues, run: deepagent update --rollback")
+    command = [
+        "bash",
+        str(installer),
+        "--version",
+        latest,
+        "--dir",
+        str(_get_deepagent_home()),
+        "--skip-setup",
+        "--channel",
+        channel,
+    ]
+    completed = subprocess.run(command, check=False)
+    if completed.returncode != 0:
+        print("  ✗ Update failed; the current symlink was not promoted.")
+        sys.exit(completed.returncode)
+    print(f"  ✓ Update complete! v{current} → v{latest}")
+    print("  Roll back with: deepagent update --rollback")
 
 
 def cmd_rollback(args) -> None:
-    """Rollback to a previous backup.
-
-    Invoked via ``deepagent update --rollback [--to TIMESTAMP]``.
-
-    Lists available backups, verifies integrity, restores deepagent/
-    and webui/, then runs uv sync.
-    """
-    to_timestamp = getattr(args, "to", None)
+    """Atomically point ``current`` at a previously installed version."""
+    requested_version = getattr(args, "to", None)
 
     print("DeepAgent Rollback")
     print("=" * 40)
 
-    backups = list_backups()
+    home = _get_deepagent_home().resolve()
+    versions_dir = home / "versions"
+    current_version = get_current_version()
+    candidates = [
+        path
+        for path in versions_dir.iterdir()
+        if path.is_dir()
+        and path.name != current_version
+        and (path / ".venv" / "bin" / "deepagent").is_file()
+    ] if versions_dir.is_dir() else []
+    candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
 
-    if not backups:
-        print("  No backups found.")
-        print(f"  Backups are stored in: {_get_backup_dir()}")
-        print("  Backups are only created during 'deepagent update'.")
+    if requested_version:
+        requested_version = requested_version.removeprefix("v")
+        target = versions_dir / requested_version
+        if target not in candidates:
+            print(f"  ✗ Installed version not available: {requested_version}")
+            sys.exit(1)
+    elif candidates:
+        target = candidates[0]
+    else:
+        print("  No previous installed version is available.")
         return
 
-    target_backup: Optional[Path] = None
-
-    if to_timestamp:
-        # Find specific backup by timestamp
-        for ts, path in backups:
-            if ts == to_timestamp:
-                target_backup = path
-                break
-        if target_backup is None:
-            print(f"  Backup '{to_timestamp}' not found.")
-            print("  Available backups:")
-            for ts, path in backups:
-                ver = (
-                    (path / "VERSION").read_text().strip()
-                    if (path / "VERSION").exists()
-                    else "unknown"
-                )
-                print(f"    {ts}  (v{ver})")
-            return
-    else:
-        # Use the latest (newest first) backup
-        target_backup = backups[0][1]
-
-    # Verify backup integrity
-    if not (target_backup / "deepagent").exists():
-        print(f"  ✗ Backup is incomplete: missing 'deepagent/' directory")
-        return
-
-    # Read version from backup
-    backup_ver = "unknown"
-    vf = target_backup / "VERSION"
-    if vf.exists():
-        backup_ver = vf.read_text().strip()
-
-    current_ver = get_current_version()
-
-    if to_timestamp:
-        print(f"  Target backup: {to_timestamp} (v{backup_ver})")
-    else:
-        print(f"  Latest backup: {target_backup.name} (v{backup_ver})")
-
-    print(f"  Current: v{current_ver} → Restore to: {backup_ver}")
-    print()
-    print(f"  Restoring from: {target_backup}")
-    print()
-
-    success = _do_rollback(target_backup)
-    if not success:
-        print("  ✗ Rollback failed.")
+    current_link = home / "current"
+    if not current_link.is_symlink():
+        print("  ✗ Managed install is missing the current version symlink.")
         sys.exit(1)
+    previous_target = os.readlink(current_link)
+
+    version_path = home / "VERSION"
+    manifest_path = home / "install-manifest.json"
+    try:
+        original_version = version_path.read_text(encoding="utf-8")
+        original_manifest_text = manifest_path.read_text(encoding="utf-8")
+        manifest = json.loads(original_manifest_text)
+        if manifest.get("product") != "deepagent":
+            raise ValueError("manifest does not belong to DeepAgent")
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"  ✗ Cannot roll back without valid managed-install metadata: {exc}")
+        sys.exit(1)
+
+    next_link = home / "current.rollback"
+    next_link.unlink(missing_ok=True)
+    next_link.symlink_to(Path("versions") / target.name)
+    os.replace(next_link, current_link)
+
+    env = os.environ.copy()
+    env["DEEPAGENT_HOME"] = str(home)
+    env["HERMES_HOME"] = str(home)
+    smoke = subprocess.run(
+        [str(target / ".venv" / "bin" / "deepagent"), "version"],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if smoke.returncode != 0:
+        recovery = home / "current.recovery"
+        recovery.unlink(missing_ok=True)
+        recovery.symlink_to(previous_target)
+        os.replace(recovery, current_link)
+        print("  ✗ Rollback smoke test failed; restored the previous target.")
+        sys.exit(1)
+
+    manifest["current_version"] = target.name
+    version_temporary = home / "VERSION.tmp"
+    manifest_temporary = manifest_path.with_suffix(".tmp")
+    try:
+        version_temporary.write_text(target.name + "\n", encoding="utf-8")
+        manifest_temporary.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        os.replace(version_temporary, version_path)
+        os.replace(manifest_temporary, manifest_path)
+    except OSError as exc:
+        recovery = home / "current.recovery"
+        recovery.unlink(missing_ok=True)
+        recovery.symlink_to(previous_target)
+        os.replace(recovery, current_link)
+        version_path.write_text(original_version, encoding="utf-8")
+        manifest_path.write_text(original_manifest_text, encoding="utf-8")
+        version_temporary.unlink(missing_ok=True)
+        manifest_temporary.unlink(missing_ok=True)
+        print(f"  ✗ Rollback metadata update failed; restored the previous target: {exc}")
+        sys.exit(1)
+    print(f"  ✓ Rolled back: v{current_version} → v{target.name}")

@@ -2,6 +2,15 @@ import router from '@/router'
 
 const DEFAULT_BASE_URL = ''
 const ACTIVE_PROFILE_STORAGE_KEY = 'hermes_active_profile_name'
+const COOKIE_SESSION_STORAGE_KEY = 'deepagent_cookie_session'
+const LEGACY_API_KEY_STORAGE_KEY = 'hermes_api_key'
+let inMemoryApiKey = ''
+
+export interface CookieSessionUser {
+  id: number
+  username: string
+  role: 'super_admin' | 'admin'
+}
 
 function isDesktopShell(): boolean {
   return typeof window !== 'undefined' &&
@@ -25,7 +34,16 @@ function getBaseUrl(): string {
 }
 
 export function getApiKey(): string {
-  return localStorage.getItem('hermes_api_key') || ''
+  if (inMemoryApiKey) return inMemoryApiKey
+  // One-time compatibility migration: old builds persisted a bearer token.
+  // Keep it only for the current renderer lifetime and erase the disk-backed
+  // browser value immediately.
+  const legacy = localStorage.getItem(LEGACY_API_KEY_STORAGE_KEY) || ''
+  if (legacy) {
+    inMemoryApiKey = legacy
+    localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY)
+  }
+  return inMemoryApiKey
 }
 
 export function setServerUrl(url: string) {
@@ -33,20 +51,39 @@ export function setServerUrl(url: string) {
 }
 
 export function setApiKey(key: string) {
-  localStorage.setItem('hermes_api_key', key)
+  inMemoryApiKey = key
+  localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY)
 }
 
 export function clearApiKey() {
-  localStorage.removeItem('hermes_api_key')
+  inMemoryApiKey = ''
+  localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY)
 }
 
-function clearAuthSessionState() {
+function getCookieSessionUser(): CookieSessionUser | null {
+  try {
+    const raw = sessionStorage.getItem(COOKIE_SESSION_STORAGE_KEY)
+    if (!raw) return null
+    const user = JSON.parse(raw) as Partial<CookieSessionUser>
+    if (!Number.isInteger(user.id) || !user.username || (user.role !== 'super_admin' && user.role !== 'admin')) return null
+    return user as CookieSessionUser
+  } catch {
+    return null
+  }
+}
+
+export function markCookieSession(user: CookieSessionUser): void {
+  sessionStorage.setItem(COOKIE_SESSION_STORAGE_KEY, JSON.stringify(user))
+}
+
+export function clearAuthSessionState() {
   clearApiKey()
+  sessionStorage.removeItem(COOKIE_SESSION_STORAGE_KEY)
   localStorage.removeItem(ACTIVE_PROFILE_STORAGE_KEY)
 }
 
 export function hasApiKey(): boolean {
-  return !!getApiKey()
+  return !!getApiKey() || getCookieSessionUser() !== null
 }
 
 export type StoredUserRole = 'super_admin' | 'admin'
@@ -54,7 +91,7 @@ export type StoredUserRole = 'super_admin' | 'admin'
 export function getStoredUserRole(): StoredUserRole | null {
   const token = getApiKey()
   const payload = token.split('.')[1]
-  if (!payload) return null
+  if (!payload) return getCookieSessionUser()?.role || null
   try {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
@@ -72,7 +109,7 @@ export function isStoredSuperAdmin(): boolean {
 export function getStoredUsername(): string | null {
   const token = getApiKey()
   const payload = token.split('.')[1]
-  if (!payload) return null
+  if (!payload) return getCookieSessionUser()?.username || null
   try {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
@@ -178,7 +215,11 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     headers['X-Hermes-Profile'] = profileName
   }
 
-  const res = await fetch(url, { ...options, headers })
+  const res = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers,
+  })
 
   // Global 401 handler — only redirect to login for local BFF endpoints
   // Proxied gateway requests should not trigger logout

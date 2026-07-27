@@ -9,8 +9,8 @@ Thank you for contributing to DeepAgent! This guide covers everything you need: 
 We value contributions in this order:
 
 1. **Bug fixes** — crashes, incorrect behavior, data loss. Always top priority.
-2. **Cross-platform compatibility** — Windows, macOS, different Linux distros, different terminal emulators. We want DeepAgent to work everywhere.
-3. **Security hardening** — shell injection, prompt injection, path traversal, privilege escalation. See [Security](#security-considerations).
+2. **Security hardening** — shell injection, prompt injection, path traversal, privilege escalation. See [Security](#security-considerations).
+3. **Platform expansion** — CLI Alpha is supported only on macOS Apple Silicon. Other platforms require an explicit support decision and test evidence before release.
 4. **Performance and robustness** — retry logic, error handling, graceful degradation.
 5. **New skills** — but only broadly useful ones. See [Should it be a Skill or a Tool?](#should-it-be-a-skill-or-a-tool)
 6. **New tools** — rarely needed. Most capabilities should be skills. See below.
@@ -106,8 +106,11 @@ deepagent chat -q "Hello"
 ### Run tests
 
 ```bash
-pytest tests/ -v
+source venv/bin/activate
+venv/bin/python -m pytest tests/ -q
 ```
+
+Before submitting a release-related change, also run `bash scripts/test-install.sh`.
 
 ---
 

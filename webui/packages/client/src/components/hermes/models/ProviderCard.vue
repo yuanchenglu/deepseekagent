@@ -149,7 +149,7 @@ async function handleDelete() {
       try {
         if (isCopilot.value) {
           // Copilot 走显式 opt-in 模型：disable 把 enabled 置 false，
-          // 仅当 token 来自 ~/.hermes/.env 时才清掉，gh-cli / apps.json 不动。
+          // 仅当 token 来自 ~/.deepagent/config/.env 时才清掉，gh-cli / apps.json 不动。
           await disableCopilot()
           // 服务端会在默认模型属于 copilot 时清掉 model.default，这里再清理本地
           // 会话级 model/provider，避免 Chat 页继续显示已下架的 copilot 模型。

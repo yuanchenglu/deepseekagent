@@ -71,6 +71,15 @@ def _require_tty(command_name: str) -> None:
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
+
+def _initialize_product_home() -> None:
+    """Establish the DeepAgent namespace before importing runtime modules."""
+    os.environ.setdefault("DEEPAGENT_HOME", str(Path.home() / ".deepagent"))
+    os.environ["HERMES_HOME"] = os.environ["DEEPAGENT_HOME"]
+
+
+_initialize_product_home()
+
 # ---------------------------------------------------------------------------
 # Profile override — MUST happen before any deepagent module import.
 #
@@ -137,9 +146,13 @@ def _apply_profile_override() -> None:
 
 _apply_profile_override()
 
-# Load .env from ~/.hermes/.env first, then project root as dev fallback.
+# Internal modules still use the upstream HERMES_HOME name in a few places.
+# Keep that compatibility inside this process without honoring an unrelated
+# value inherited from the user's Hermes installation.
+os.environ["HERMES_HOME"] = os.environ["DEEPAGENT_HOME"]
+
+# Load .env from the DeepAgent product home first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
-from hermes_cli.config import get_hermes_home
 from hermes_cli.env_loader import load_hermes_dotenv
 load_hermes_dotenv(project_env=PROJECT_ROOT / '.env')
 
@@ -2844,10 +2857,10 @@ def cmd_version(args):
 
     if _update_mod.is_release_install():
         ver = _update_mod.get_current_version()
-        print(f"DeepSeek Agent v{ver} (release install)")
+        print(f"DeepAgent v{ver} (release install)")
         print(f"Install: {_update_mod._get_deepagent_home()}")
     else:
-        print(f"DeepSeek Agent v{__version__} ({__release_date__})")
+        print(f"DeepAgent v{__version__} ({__release_date__})")
     print(f"Python: {sys.version.split()[0]}")
 
     # Check for key dependencies
@@ -2857,90 +2870,20 @@ def cmd_version(args):
     except ImportError:
         print("OpenAI SDK: Not installed")
 
-    # Show update status
-    if _update_mod.is_release_install():
-        print()
-        _update_mod.cmd_check(args)
-    else:
-        try:
-            from hermes_cli.banner import check_for_updates
-            from hermes_cli.config import recommended_update_command
-            behind = check_for_updates()
-            if behind and behind > 0:
-                commits_word = "commit" if behind == 1 else "commits"
-                print(
-                    f"Update available: {behind} {commits_word} behind — "
-                    f"run '{recommended_update_command()}'"
-                )
-            elif behind == 0:
-                print("Up to date")
-        except Exception:
-            pass
-
 
 def _webui_install(args):
     """Download and install Web UI (server + optional Electron desktop)."""
-    import tarfile, urllib.request, tempfile
-    from pathlib import Path
-    from hermes_constants import get_hermes_home
-
-    hermes_home = get_hermes_home()
-    version_file = hermes_home / "VERSION"
-    if not version_file.exists():
-        print("Error: DeepAgent is not installed. Run the installer first.")
-        sys.exit(1)
-
-    version = args.version or version_file.read_text().strip()
-    version = version.lstrip("v")
-    r2_base = "https://deepseekagent.starseas.org/releases"
-    webui_dest = hermes_home / "webui"
-
-    server_name = f"deepagent-webui-server-{version}.tar.gz"
-    server_url = f"{r2_base}/{server_name}"
-    print(f"Downloading Web UI server ({server_name})...")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpfile = Path(tmpdir) / server_name
-        try:
-            resp = urllib.request.urlopen(urllib.request.Request(server_url))
-            tmpfile.write_bytes(resp.read())
-        except Exception as e:
-            print(f"Error downloading Web UI: {e}")
-            sys.exit(1)
-
-        webui_dest.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(tmpfile, "r:gz") as tf:
-            for member in tf.getmembers():
-                if member.name.startswith("webui/"):
-                    member.name = member.name[len("webui/"):]
-                    tf.extract(member, webui_dest)
-        print("Web UI server installed.")
-
     if args.electron:
-        import platform
-        machine = platform.machine()
-        arch = "arm64" if machine == "arm64" else "x64"
-        dmg_name = f"DeepAgent-{version}-{arch}.dmg"
-        dmg_path = Path.home() / "Downloads" / dmg_name
-
-        print(f"Downloading Electron desktop app ({dmg_name})...")
-        try:
-            resp = urllib.request.urlopen(urllib.request.Request(f"{r2_base}/{dmg_name}"))
-            dmg_path.write_bytes(resp.read())
-            print(f"Downloaded: {dmg_path}")
-
-            import subprocess
-            subprocess.run(
-                ["hdiutil", "attach", str(dmg_path), "-mountpoint", "/Volumes/DeepAgent"],
-                capture_output=True
-            )
-            subprocess.run(["open", "/Volumes/DeepAgent"])
-            print("DMG mounted. Drag DeepAgent.app to Applications to install.")
-        except Exception as e:
-            print(f"Electron download failed: {e}")
-            print("You can still use the Web UI via browser at http://localhost:8648")
-
-    print("\nWeb UI installed! Run 'deepagent webui start' to launch.")
+        print("Error: legacy Electron is a separate preview and is not installed by this command.")
+        sys.exit(1)
+    from hermes_cli.webui_install import WebUiInstallError, install_webui
+    try:
+        destination = install_webui(args.version)
+    except WebUiInstallError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+    print(f"WebUI installed at {destination}")
+    print("Run 'deepagent webui open' to start an authenticated browser session.")
 
 
 def cmd_webui(args):
@@ -2948,16 +2891,72 @@ def cmd_webui(args):
     command = getattr(args, "webui_command", None)
     if command == "install":
         _webui_install(args)
+    elif command == "uninstall":
+        from hermes_cli.webui import stop_webui
+        from hermes_cli.webui_install import WebUiInstallError, uninstall_webui
+        try:
+            try:
+                stop_webui()
+            except Exception:
+                pass
+            removed = uninstall_webui()
+        except WebUiInstallError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+        print("WebUI package removed; configuration and sessions were preserved." if removed else "WebUI is not installed")
+    elif command in {"start", "open", "status", "stop"}:
+        from hermes_cli.webui import run_webui_command
+        run_webui_command(command)
     else:
         print("Usage: deepagent webui install [--electron]")
         print("       deepagent webui start")
+        print("       deepagent webui open")
         print("       deepagent webui stop")
         print("       deepagent webui status")
+        print("       deepagent webui uninstall")
+
+
+def cmd_deepcode(args):
+    """Manage the isolated Experimental DeepCode runtime."""
+    from hermes_cli.deepcode_install import (
+        DeepCodeInstallError,
+        deepcode_status,
+        install_deepcode,
+        uninstall_deepcode,
+    )
+
+    command = getattr(args, "deepcode_command", None)
+    if command == "install":
+        try:
+            destination = install_deepcode(getattr(args, "version", None))
+        except DeepCodeInstallError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+        print(f"DeepCode Experimental installed at {destination}")
+    elif command == "status":
+        installed, version = deepcode_status()
+        if installed:
+            print(f"DeepCode Experimental is installed (v{version})")
+        else:
+            print("DeepCode Experimental is not installed")
+            sys.exit(1)
+    elif command == "uninstall":
+        try:
+            removed = uninstall_deepcode()
+        except DeepCodeInstallError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+        print("DeepCode runtime removed; projects and task data were preserved." if removed else "DeepCode Experimental is not installed")
+    else:
+        print("Usage: deepagent deepcode install [--version VERSION]")
+        print("       deepagent deepcode status")
+        print("       deepagent deepcode uninstall")
 
 
 def cmd_uninstall(args):
     """Uninstall DeepSeek Agent."""
-    _require_tty("uninstall")
+    if not getattr(args, "yes", False):
+        _require_tty("uninstall")
     from hermes_cli.uninstall import run_uninstall
     run_uninstall(args)
 
@@ -4592,45 +4591,44 @@ def cmd_logs(args):
 def main():
     """Main entry point for hermes CLI."""
     parser = argparse.ArgumentParser(
-        prog="hermes",
-        description="DeepSeek Agent - AI assistant with tool-calling capabilities",
+        prog="deepagent",
+        description="DeepAgent - AI assistant with tool-calling capabilities",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    hermes                        Start interactive chat
-    hermes chat -q "Hello"        Single query mode
-    hermes -c                     Resume the most recent session
-    hermes -c "my project"        Resume a session by name (latest in lineage)
-    hermes --resume <session_id>  Resume a specific session by ID
-    hermes setup                  Run setup wizard
-    hermes logout                 Clear stored authentication
-    hermes auth add <provider>    Add a pooled credential
-    hermes auth list              List pooled credentials
-    hermes auth remove <p> <t>    Remove pooled credential by index, id, or label
-    hermes auth reset <provider>  Clear exhaustion status for a provider
-    hermes model                  Select default model
-    hermes config                 View configuration
-    hermes config edit            Edit config in $EDITOR
-    hermes config set model gpt-4 Set a config value
-    hermes gateway                Run messaging gateway
-    hermes -s hermes-agent-dev,github-auth
-    hermes -w                     Start in isolated git worktree
-    hermes gateway install        Install gateway background service
-    hermes sessions list          List past sessions
-    hermes sessions browse        Interactive session picker
-    hermes sessions rename ID T   Rename/title a session
-    hermes logs                   View agent.log (last 50 lines)
-    hermes logs -f                Follow agent.log in real time
-    hermes logs errors            View errors.log
-    hermes logs --since 1h        Lines from the last hour
-    hermes debug share             Upload debug report for support
-    hermes update                 Update to latest version
+    deepagent                        Start interactive chat
+    deepagent chat -q "Hello"        Single query mode
+    deepagent -c                     Resume the most recent session
+    deepagent -c "my project"        Resume a session by name (latest in lineage)
+    deepagent --resume <session_id>  Resume a specific session by ID
+    deepagent setup                  Run setup wizard
+    deepagent logout                 Clear stored authentication
+    deepagent auth add <provider>    Add a pooled credential
+    deepagent auth list              List pooled credentials
+    deepagent auth remove <p> <t>    Remove pooled credential by index, id, or label
+    deepagent auth reset <provider>  Clear exhaustion status for a provider
+    deepagent model                  Select default model
+    deepagent config                 View configuration
+    deepagent config edit            Edit config in $EDITOR
+    deepagent config set model gpt-4 Set a config value
+    deepagent gateway                Run messaging gateway
+    deepagent -s hermes-agent-dev,github-auth
+    deepagent -w                     Start in isolated git worktree
+    deepagent gateway install        Install gateway background service
+    deepagent sessions list          List past sessions
+    deepagent sessions browse        Interactive session picker
+    deepagent sessions rename ID T   Rename/title a session
+    deepagent logs                   View agent.log (last 50 lines)
+    deepagent logs -f                Follow agent.log in real time
+    deepagent logs errors            View errors.log
+    deepagent logs --since 1h        Lines from the last hour
+    deepagent debug share            Upload debug report for support
+    deepagent update                 Update to latest version
 
 For more help on a command:
-    hermes <command> --help
+    deepagent <command> --help
 """
     )
-    
     parser.add_argument(
         "--version", "-V",
         action="store_true",
@@ -5957,12 +5955,16 @@ Examples:
         help="Rollback to the previous version from backup"
     )
     update_parser.add_argument(
-        "--to", metavar="TIMESTAMP", default=None,
-        help="Rollback to a specific backup timestamp (used with --rollback)"
+        "--to", metavar="VERSION", default=None,
+        help="Rollback to a specific installed version (used with --rollback)"
     )
     update_parser.add_argument(
         "--force", action="store_true", default=False,
         help="Force update even if already up to date (release mode only)"
+    )
+    update_parser.add_argument(
+        "--channel", choices=("alpha", "beta"), default=None,
+        help="Override the installed release channel"
     )
     update_parser.set_defaults(func=cmd_update)
     
@@ -5974,10 +5976,16 @@ Examples:
         help="Uninstall DeepSeek Agent",
         description="Remove DeepSeek Agent from your system. Can keep configs/data for reinstall."
     )
-    uninstall_parser.add_argument(
+    uninstall_mode = uninstall_parser.add_mutually_exclusive_group()
+    uninstall_mode.add_argument(
         "--full",
         action="store_true",
         help="Full uninstall - remove everything including configs and data"
+    )
+    uninstall_mode.add_argument(
+        "--keep-data",
+        action="store_true",
+        help="Remove installed code while preserving configuration and user data (default)"
     )
     uninstall_parser.add_argument(
         "--yes", "-y",
@@ -6012,6 +6020,50 @@ Examples:
         help="Specific version to download (default: current installed version)"
     )
     webui_install.set_defaults(func=cmd_webui)
+
+    for action, help_text in (
+        ("start", "Start the local WebUI without opening a browser"),
+        ("open", "Start if needed and open a one-time authenticated browser session"),
+        ("status", "Show local WebUI status"),
+        ("stop", "Stop only the DeepAgent-owned WebUI process"),
+    ):
+        lifecycle_parser = webui_subparsers.add_parser(action, help=help_text)
+        lifecycle_parser.set_defaults(func=cmd_webui)
+    webui_uninstall = webui_subparsers.add_parser(
+        "uninstall",
+        help="Remove only the managed WebUI package and preserve user data",
+    )
+    webui_uninstall.set_defaults(func=cmd_webui)
+    # =========================================================================
+
+    # =========================================================================
+    # deepcode command (Phase 2 Experimental runtime)
+    # =========================================================================
+    deepcode_parser = subparsers.add_parser(
+        "deepcode",
+        help="Manage the isolated DeepCode Experimental runtime",
+        description="Install or inspect the product-managed DeepCode runtime. Never uses global OpenCode.",
+    )
+    deepcode_subparsers = deepcode_parser.add_subparsers(dest="deepcode_command")
+    deepcode_install = deepcode_subparsers.add_parser(
+        "install",
+        help="Install the verified macOS Apple Silicon DeepCode runtime",
+    )
+    deepcode_install.add_argument(
+        "--version", default=None,
+        help="Specific version to download (default: current installed Core version)",
+    )
+    deepcode_install.set_defaults(func=cmd_deepcode)
+    deepcode_status_parser = deepcode_subparsers.add_parser(
+        "status",
+        help="Show whether the managed DeepCode runtime is installed",
+    )
+    deepcode_status_parser.set_defaults(func=cmd_deepcode)
+    deepcode_uninstall_parser = deepcode_subparsers.add_parser(
+        "uninstall",
+        help="Remove managed DeepCode binaries and preserve project/task data",
+    )
+    deepcode_uninstall_parser.set_defaults(func=cmd_deepcode)
     # =========================================================================
 
     # =========================================================================
