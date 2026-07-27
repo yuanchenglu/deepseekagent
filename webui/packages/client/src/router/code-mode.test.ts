@@ -1,6 +1,6 @@
 // router/code-mode — Code 路由测试
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 // Mock api/client before importing router
 vi.mock('@/api/client', () => ({
