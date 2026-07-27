@@ -14,12 +14,21 @@ export class WorkspaceLockManager {
     if (!workspace || !taskId || !/^[A-Za-z0-9._:-]{1,128}$/.test(taskId)) return false
     const key = resolve(workspace)
     const state = this.locks.get(key) ?? { writer: null, readers: new Set<string>() }
+
     if (access === 'write') {
+      // A writer is exclusive. A task may upgrade its own read lock only when
+      // no other readers are present.
       if (state.writer && state.writer !== taskId) return false
+      if ([...state.readers].some(reader => reader !== taskId)) return false
+      state.readers.delete(taskId)
       state.writer = taskId
     } else {
-      state.readers.add(taskId)
+      // Readers may run concurrently, but never alongside another task's writer.
+      // Re-entrant read access by the current writer is treated as already held.
+      if (state.writer && state.writer !== taskId) return false
+      if (!state.writer) state.readers.add(taskId)
     }
+
     this.locks.set(key, state)
     return true
   }
