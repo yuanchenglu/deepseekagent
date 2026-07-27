@@ -3,17 +3,27 @@
 Covers: compare_versions, _detect_install_mode, is_release_install,
 get_current_version, and cmd_check output formatting.
 
-This test file has NO network-dependent tests (fetch_latest_version,
-cmd_update_release, cmd_rollback are integration-level).
+All network and subprocess boundaries are mocked.
 """
 
+import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
 
 import hermes_cli.update as update_mod
+
+
+@pytest.fixture(autouse=True)
+def isolate_update_home(tmp_path, monkeypatch):
+    home = tmp_path / "deepagent-home"
+    home.mkdir()
+    monkeypatch.setattr(update_mod, "_get_deepagent_home", lambda: home)
+    return home
 
 
 # =========================================================================
@@ -89,11 +99,10 @@ class TestDetectInstallMode:
             (tmp_path / ".git").mkdir()
             assert update_mod._detect_install_mode() == "source"
 
-    def test_detect_install_mode_release(self, tmp_path):
+    def test_detect_install_mode_release(self, tmp_path, isolate_update_home):
         """Returns 'release' when VERSION file exists at DEEPAGENT_HOME and no .git."""
         with patch.object(update_mod, "PROJECT_ROOT", tmp_path):
-            hermes_home = Path(os.environ["HERMES_HOME"])
-            (hermes_home / "VERSION").write_text("v0.9.0\n")
+            (isolate_update_home / "VERSION").write_text("v0.9.0\n")
             assert update_mod._detect_install_mode() == "release"
 
     def test_detect_install_mode_unknown(self, tmp_path):
@@ -101,11 +110,10 @@ class TestDetectInstallMode:
         with patch.object(update_mod, "PROJECT_ROOT", tmp_path):
             assert update_mod._detect_install_mode() == "unknown"
 
-    def test_is_release_install_true(self, tmp_path):
+    def test_is_release_install_true(self, tmp_path, isolate_update_home):
         """is_release_install() returns True when operating in release mode."""
         with patch.object(update_mod, "PROJECT_ROOT", tmp_path):
-            hermes_home = Path(os.environ["HERMES_HOME"])
-            (hermes_home / "VERSION").write_text("v0.9.0\n")
+            (isolate_update_home / "VERSION").write_text("v0.9.0\n")
             assert update_mod.is_release_install() is True
 
     def test_is_release_install_source(self, tmp_path):
@@ -123,10 +131,9 @@ class TestDetectInstallMode:
 class TestGetCurrentVersion:
     """Version resolution: DEEPAGENT_HOME/VERSION > PROJECT_ROOT/VERSION > __version__."""
 
-    def test_get_current_version_from_home(self):
+    def test_get_current_version_from_home(self, isolate_update_home):
         """Reads version from DEEPAGENT_HOME/VERSION (priority 1)."""
-        hermes_home = Path(os.environ["HERMES_HOME"])
-        (hermes_home / "VERSION").write_text("v0.9.0-alpha.1\n")
+        (isolate_update_home / "VERSION").write_text("v0.9.0-alpha.1\n")
         assert update_mod.get_current_version() == "0.9.0-alpha.1"
 
     def test_get_current_version_from_project_root(self, tmp_path):
@@ -146,10 +153,9 @@ class TestGetCurrentVersion:
             # Without __version__ and without VERSION files, should return "unknown"
             assert result == "unknown"
 
-    def test_get_current_version_strips_v_prefix(self):
+    def test_get_current_version_strips_v_prefix(self, isolate_update_home):
         """The leading 'v' is stripped from the version string."""
-        hermes_home = Path(os.environ["HERMES_HOME"])
-        (hermes_home / "VERSION").write_text("v0.9.0\n")
+        (isolate_update_home / "VERSION").write_text("v0.9.0\n")
         assert update_mod.get_current_version() == "0.9.0"
 
 
@@ -161,10 +167,9 @@ class TestGetCurrentVersion:
 class TestCmdCheck:
     """CLI output formatting for version check command."""
 
-    def test_cmd_check_update_available(self, capsys):
+    def test_cmd_check_update_available(self, capsys, isolate_update_home):
         """Prints 'Update available' when current < latest."""
-        hermes_home = Path(os.environ["HERMES_HOME"])
-        (hermes_home / "VERSION").write_text("v0.9.0\n")
+        (isolate_update_home / "VERSION").write_text("v0.9.0\n")
         with patch.object(update_mod, "fetch_latest_version", return_value="0.10.0"):
             update_mod.cmd_check(None)
         captured = capsys.readouterr()
@@ -172,19 +177,17 @@ class TestCmdCheck:
         assert "v0.9.0" in captured.out
         assert "v0.10.0" in captured.out
 
-    def test_cmd_check_up_to_date(self, capsys):
+    def test_cmd_check_up_to_date(self, capsys, isolate_update_home):
         """Prints 'Already up to date' when current == latest."""
-        hermes_home = Path(os.environ["HERMES_HOME"])
-        (hermes_home / "VERSION").write_text("v0.9.0\n")
+        (isolate_update_home / "VERSION").write_text("v0.9.0\n")
         with patch.object(update_mod, "fetch_latest_version", return_value="0.9.0"):
             update_mod.cmd_check(None)
         captured = capsys.readouterr()
         assert "Already up to date" in captured.out
 
-    def test_cmd_check_current_newer(self, capsys):
+    def test_cmd_check_current_newer(self, capsys, isolate_update_home):
         """Prints 'newer than latest' when current > latest (dev/pre-release version)."""
-        hermes_home = Path(os.environ["HERMES_HOME"])
-        (hermes_home / "VERSION").write_text("v0.10.0\n")
+        (isolate_update_home / "VERSION").write_text("v0.10.0\n")
         with patch.object(update_mod, "fetch_latest_version", return_value="0.9.0"):
             update_mod.cmd_check(None)
         captured = capsys.readouterr()
@@ -196,3 +199,126 @@ class TestCmdCheck:
             update_mod.cmd_check(None)
         captured = capsys.readouterr()
         assert "Could not check for updates" in captured.out
+
+
+class TestReleaseChannel:
+    def test_fetch_latest_version_reads_promoted_alpha_channel(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(
+            {"schema_version": 1, "product": "deepagent", "channel": "alpha", "version": "v0.9.1-alpha.2"}
+        ).encode()
+        with patch("hermes_cli.update.urllib.request.urlopen", return_value=response) as urlopen:
+            assert update_mod.fetch_latest_version() == "0.9.1-alpha.2"
+        assert urlopen.call_args.args[0].full_url == update_mod.ALPHA_CHANNEL_URL
+
+    def test_fetch_latest_version_fails_closed_on_invalid_json(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"not-json"
+        with patch("hermes_cli.update.urllib.request.urlopen", return_value=response):
+            assert update_mod.fetch_latest_version() is None
+
+    def test_fetch_latest_version_reads_promoted_beta_channel(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps(
+            {"schema_version": 1, "product": "deepagent", "channel": "beta", "version": "0.9.1-beta.2"}
+        ).encode()
+        with patch("hermes_cli.update.urllib.request.urlopen", return_value=response) as urlopen:
+            assert update_mod.fetch_latest_version("beta") == "0.9.1-beta.2"
+        assert urlopen.call_args.args[0].full_url == update_mod.BETA_CHANNEL_URL
+
+    def test_update_channel_uses_managed_install_channel(self, isolate_update_home):
+        (isolate_update_home / "install-manifest.json").write_text(json.dumps({
+            "schema_version": 1,
+            "product": "deepagent",
+            "channel": "beta",
+        }))
+
+        assert update_mod._update_channel(SimpleNamespace(channel=None)) == "beta"
+
+
+class TestReleaseUpdate:
+    def test_release_update_invokes_verified_installer_with_explicit_version(self, tmp_path):
+        installer = tmp_path / "scripts" / "install-release.sh"
+        installer.parent.mkdir()
+        installer.write_text("#!/bin/sh\n")
+        home = tmp_path / "home"
+        home.mkdir()
+        completed = SimpleNamespace(returncode=0)
+
+        with patch.object(update_mod, "PROJECT_ROOT", tmp_path), \
+             patch.object(update_mod, "get_current_version", return_value="0.9.0-alpha.1"), \
+             patch.object(update_mod, "fetch_latest_version", return_value="0.9.0-alpha.2"), \
+             patch.object(update_mod, "_get_deepagent_home", return_value=home), \
+             patch.object(update_mod.subprocess, "run", return_value=completed) as run:
+            update_mod.cmd_update_release(SimpleNamespace(force=False))
+
+        assert run.call_args.args[0] == [
+            "bash", str(installer), "--version", "0.9.0-alpha.2",
+            "--dir", str(home), "--skip-setup", "--channel", "alpha",
+        ]
+
+    def test_release_update_preserves_current_when_installer_fails(self, tmp_path):
+        installer = tmp_path / "scripts" / "install-release.sh"
+        installer.parent.mkdir()
+        installer.write_text("#!/bin/sh\n")
+        home = tmp_path / "home"
+        home.mkdir()
+
+        with patch.object(update_mod, "PROJECT_ROOT", tmp_path), \
+             patch.object(update_mod, "get_current_version", return_value="0.9.0-alpha.1"), \
+             patch.object(update_mod, "fetch_latest_version", return_value="0.9.0-alpha.2"), \
+             patch.object(update_mod, "_get_deepagent_home", return_value=home), \
+             patch.object(update_mod.subprocess, "run", return_value=SimpleNamespace(returncode=23)), \
+             pytest.raises(SystemExit) as exc:
+            update_mod.cmd_update_release(SimpleNamespace(force=False))
+        assert exc.value.code == 23
+
+
+def _managed_install(tmp_path: Path) -> Path:
+    home = tmp_path / "home"
+    versions = home / "versions"
+    for version in ("0.9.0-alpha.1", "0.9.0-alpha.2"):
+        cli = versions / version / ".venv" / "bin" / "deepagent"
+        cli.parent.mkdir(parents=True)
+        cli.write_text("#!/bin/sh\nexit 0\n")
+    (home / "current").symlink_to(Path("versions") / "0.9.0-alpha.2")
+    (home / "VERSION").write_text("0.9.0-alpha.2\n")
+    (home / "install-manifest.json").write_text(json.dumps({
+        "schema_version": 1,
+        "product": "deepagent",
+        "current_version": "0.9.0-alpha.2",
+    }))
+    return home
+
+
+class TestRollback:
+    def test_rollback_switches_symlink_and_metadata(self, tmp_path):
+        home = _managed_install(tmp_path)
+        with patch.object(update_mod, "_get_deepagent_home", return_value=home), \
+             patch.object(update_mod.subprocess, "run", return_value=SimpleNamespace(returncode=0)):
+            update_mod.cmd_rollback(SimpleNamespace(to="0.9.0-alpha.1"))
+
+        assert os.readlink(home / "current") == "versions/0.9.0-alpha.1"
+        assert (home / "VERSION").read_text() == "0.9.0-alpha.1\n"
+        manifest = json.loads((home / "install-manifest.json").read_text())
+        assert manifest["current_version"] == "0.9.0-alpha.1"
+
+    def test_rollback_restores_current_when_smoke_test_fails(self, tmp_path):
+        home = _managed_install(tmp_path)
+        with patch.object(update_mod, "_get_deepagent_home", return_value=home), \
+             patch.object(update_mod.subprocess, "run", return_value=SimpleNamespace(returncode=1)), \
+             pytest.raises(SystemExit):
+            update_mod.cmd_rollback(SimpleNamespace(to="0.9.0-alpha.1"))
+
+        assert os.readlink(home / "current") == "versions/0.9.0-alpha.2"
+        assert (home / "VERSION").read_text() == "0.9.0-alpha.2\n"
+        manifest = json.loads((home / "install-manifest.json").read_text())
+        assert manifest["current_version"] == "0.9.0-alpha.2"
+
+    def test_rollback_refuses_invalid_install_manifest(self, tmp_path):
+        home = _managed_install(tmp_path)
+        (home / "install-manifest.json").write_text("not json")
+        with patch.object(update_mod, "_get_deepagent_home", return_value=home), \
+             pytest.raises(SystemExit):
+            update_mod.cmd_rollback(SimpleNamespace(to="0.9.0-alpha.1"))
+        assert os.readlink(home / "current") == "versions/0.9.0-alpha.2"
