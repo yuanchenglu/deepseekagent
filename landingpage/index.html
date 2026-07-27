@@ -6,14 +6,14 @@
     <title>DeepAgent — 为 DeepSeek 定制的 AI Agent</title>
     <meta
       name="description"
-      content="为 DeepSeek 深度定制的 AI Agent — 一条命令安装，开箱即用。内置虚拟研发团队，WebUI + Desktop 双界面。"
+      content="DeepAgent CLI Alpha — macOS Apple Silicon 一条命令安装，与 Hermes 和 OpenCode 隔离共存。"
     />
     <meta name="theme-color" content="#0A0E1A" />
 
     <meta property="og:title" content="DeepAgent — 为 DeepSeek 定制的 AI Agent" />
     <meta
       property="og:description"
-      content="为 DeepSeek 深度定制的 AI Agent — 一条命令安装，开箱即用。内置虚拟研发团队，WebUI + Desktop 双界面，多平台消息网关。"
+      content="DeepAgent CLI Alpha — macOS Apple Silicon 一条命令安装，与 Hermes 和 OpenCode 隔离共存。"
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://deepseekagent.starseas.org" />
@@ -48,7 +48,7 @@
     <nav class="nav">
       <div class="nav-inner">
         <a href="#" class="nav-logo">
-          <img src="assets/banner.png" alt="7ColorAI" class="nav-logo" />
+          <img src="hermes-agent-banner.png" alt="DeepAgent" class="nav-logo" />
           <span class="nav-brand"
             >DeepAgent <span class="nav-by">by 7ColorAI</span></span
           >
@@ -92,7 +92,7 @@
       <div class="hero-content">
         <div class="hero-badge">
           <span class="badge-dot"></span>
-          Open Source &bull; MIT License
+          CLI Alpha &bull; Core MIT &bull; UI BSL-1.1
         </div>
 
         <!-- prettier-ignore -->
@@ -126,10 +126,10 @@
               <div class="install-tabs">
                 <button
                   class="install-tab active"
-                  data-platform="linux"
-                  onclick="switchPlatform('linux')"
+                  data-platform="macosArm64"
+                  onclick="switchPlatform('macosArm64')"
                 >
-                  Linux / macOS / WSL
+                  macOS Apple Silicon
                 </button>
               </div>
             </div>
@@ -165,8 +165,7 @@
             </div>
           </div>
           <p class="install-note" id="install-note">
-            Works on Linux, macOS & WSL2 · No prerequisites · Installs
-            everything automatically
+            CLI Alpha supports macOS Apple Silicon only · No sudo
           </p>
         </div>
 
@@ -191,10 +190,10 @@
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            下载 macOS (Apple Silicon)
+            查看 CLI Alpha Release
           </a>
           <a
-            href="https://github.com/yuanchenglu/deepseekagent/releases"
+            href="/docs/getting-started/installation"
             class="btn btn-secondary"
             target="_blank"
             rel="noopener"
@@ -213,7 +212,7 @@
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            下载 macOS (Intel)
+            查看安装与卸载说明
           </a>
         </div>
       </div>
@@ -235,10 +234,10 @@
                   <div class="code-tabs">
                     <button
                       class="code-tab active"
-                      data-platform="linux"
-                      onclick="switchStepPlatform('linux')"
+                      data-platform="macosArm64"
+                      onclick="switchStepPlatform('macosArm64')"
                     >
-                      Linux / macOS / WSL
+                      macOS Apple Silicon
                     </button>
                   </div>
                   <button
@@ -253,8 +252,8 @@
                 <pre><code id="step1-command">curl -fsSL https://deepseekagent.starseas.org/install.sh | bash</code></pre>
               </div>
               <p class="step-note" id="step1-note">
-                Installs uv, Python 3.11, clones the repo, sets up everything.
-                No sudo needed.
+                Installs a checksum-verified, versioned Core release under
+                ~/.deepagent. No sudo needed.
               </p>
             </div>
           </div>
@@ -304,7 +303,7 @@ deepagent model</code></pre>
                 <pre><code>deepagent</code></pre>
               </div>
               <p class="step-note">
-                That's it. Full interactive CLI with tools, memory, and skills.
+                That's it. Interactive CLI with tools, local sessions, and memory.
               </p>
             </div>
           </div>
@@ -313,7 +312,7 @@ deepagent model</code></pre>
             <div class="step-number">4</div>
             <div class="step-content">
               <h4>
-                Go multi-platform <span class="step-optional">(optional)</span>
+                Verify the installation
               </h4>
               <div class="code-block">
                 <div class="code-header">
@@ -321,23 +320,17 @@ deepagent model</code></pre>
                   <button
                     class="copy-btn"
                     onclick="copyText(this)"
-                    data-text="deepagent gateway setup"
+                    data-text="deepagent doctor"
                   >
                     Copy
                   </button>
                 </div>
-                <pre><code><span class="code-comment"># Interactive gateway setup wizard</span>
-deepagent gateway setup
-
-<span class="code-comment"># Start the messaging gateway</span>
-deepagent gateway
-
-<span class="code-comment"># Install as a system service</span>
-deepagent gateway install</code></pre>
+                <pre><code><span class="code-comment"># Check configuration and runtime health</span>
+deepagent doctor</code></pre>
               </div>
               <p class="step-note">
-                Walk through connecting Telegram, Discord, Slack, or WhatsApp.
-                Runs as a systemd service.
+                Resolve any provider or local environment problem before the
+                first real task.
               </p>
             </div>
           </div>
@@ -360,8 +353,8 @@ deepagent gateway install</code></pre>
                 <pre><code>deepagent update</code></pre>
               </div>
               <p class="step-note">
-                Pulls the latest changes and reinstalls dependencies. Run
-                anytime to get new features and fixes.
+                Reads the promoted Alpha channel, verifies the immutable
+                release manifest and SHA-256, then switches versions.
               </p>
             </div>
           </div>
@@ -369,15 +362,8 @@ deepagent gateway install</code></pre>
 
         <div class="install-windows">
           <p>
-            Native Windows support is extremely experimental and unsupported.
-            Please install
-            <a
-              href="https://learn.microsoft.com/en-us/windows/wsl/install"
-              target="_blank"
-              rel="noopener"
-              >WSL2</a
-            >
-            and run DeepAgent from there.
+            本轮不承诺 Intel macOS、Linux、Windows、WSL 或 Android。
+            安装器会在不支持的平台明确停止，不会尝试实验性安装。
           </p>
         </div>
       </div>
@@ -478,10 +464,10 @@ deepagent gateway install</code></pre>
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
-              <h3>内置虚拟研发团队</h3>
+              <h3>独立安装与数据目录</h3>
             </div>
             <p>
-              内置 OpenCode 研发小组，CEO 指挥隔离的研发团队执行复杂编程任务。
+              所有产品文件位于 ~/.deepagent，不读取或覆盖 Hermes 与用户 OpenCode 数据。
             </p>
           </div>
 
@@ -504,10 +490,10 @@ deepagent gateway install</code></pre>
                   <path d="M18 3v12a9 9 0 0 1-9-9" />
                 </svg>
               </div>
-              <h3>WebUI + Desktop 双界面</h3>
+              <h3>可验证更新与回滚</h3>
             </div>
             <p>
-              Web 工作台 + Electron 桌面应用，提供聊天、模型管理、设置等完整功能。
+              版本 Manifest、文件大小和 SHA-256 全部匹配后才切换版本，失败保留当前版本。
             </p>
           </div>
 
@@ -528,10 +514,10 @@ deepagent gateway install</code></pre>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>多平台消息网关</h3>
+              <h3>安全卸载</h3>
             </div>
             <p>
-              Telegram、Discord、Slack、WhatsApp，单一网关连接所有平台。
+              卸载只处理安装 Manifest 登记且通过路径边界校验的文件，可选择保留用户数据。
             </p>
           </div>
 
@@ -595,16 +581,16 @@ deepagent gateway install</code></pre>
             </div>
 
             <div class="spec-row">
-              <h3 class="spec-label">Platforms</h3>
+              <h3 class="spec-label">Supported release</h3>
               <p class="spec-value">
-                Telegram, Discord, Slack, WhatsApp, Signal, Email, and CLI — all
-                from a single gateway. Connect to
+                CLI Alpha is tested and released only for macOS Apple Silicon.
+                Connect to
                 <a
                   href="https://deepseek.starseas.org"
                   target="_blank"
                   rel="noopener"
                   >DeepSeek API</a
-                >, OpenRouter, or any OpenAI-compatible API.
+                >, OpenRouter, or a configured OpenAI-compatible API.
               </p>
             </div>
 
@@ -666,7 +652,7 @@ deepagent gateway install</code></pre>
           <a href="https://7colorai.com" target="_blank" rel="noopener"
             >7ColorAI</a
           >
-          &middot; MIT License &middot; &copy; 2026
+          &middot; Core MIT / UI BSL-1.1 &middot; &copy; 2026
         </p>
       </div>
     </footer>
