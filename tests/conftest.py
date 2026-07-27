@@ -15,16 +15,34 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Some production modules resolve their data directory at import time.  Pytest
+# imports test modules before fixtures run, so isolate both names before test
+# collection as well as once per test below.
+_IMPORT_HOME_CONTEXT = tempfile.TemporaryDirectory(prefix="deepagent-tests-")
+_IMPORT_HOME = Path(_IMPORT_HOME_CONTEXT.name)
+os.environ["HOME"] = str(_IMPORT_HOME)
+os.environ["DEEPAGENT_HOME"] = str(_IMPORT_HOME)
+os.environ["HERMES_HOME"] = str(_IMPORT_HOME)
+os.environ["DEEPAGENT_TEST_ISOLATION"] = "1"
+for _key in tuple(os.environ):
+    if _key.endswith(("_API_KEY", "_TOKEN", "_SECRET")) or _key in {
+        "FAL_KEY",
+        "GH_TOKEN",
+        "HF_TOKEN",
+    }:
+        os.environ.pop(_key, None)
+
 
 @pytest.fixture(autouse=True)
 def _isolate_hermes_home(tmp_path, monkeypatch):
-    """Redirect HERMES_HOME to a temp dir so tests never write to ~/.hermes/."""
+    """Redirect product/runtime homes so tests never write to user data."""
     fake_home = tmp_path / "hermes_test"
     fake_home.mkdir()
     (fake_home / "sessions").mkdir()
     (fake_home / "cron").mkdir()
     (fake_home / "memories").mkdir()
     (fake_home / "skills").mkdir()
+    monkeypatch.setenv("DEEPAGENT_HOME", str(fake_home))
     monkeypatch.setenv("HERMES_HOME", str(fake_home))
     # Reset plugin singleton so tests don't leak plugins from ~/.hermes/plugins/
     try:
