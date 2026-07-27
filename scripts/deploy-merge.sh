@@ -23,8 +23,8 @@ cp -r "$LANDING_SRC"/* "$BUILD_DIR/"
 if [ -f "$DOCS_SRC/package.json" ]; then
     echo "→ 构建 Docusaurus 文档站..."
     cd "$DOCS_SRC"
-    npm ci --ignore-scripts 2>/dev/null || true
-    npm run build 2>/dev/null || echo "  ⚠ Docusaurus build failed (skip)"
+    npm ci --ignore-scripts
+    npm run build
     cd "$PROJECT_ROOT"
 
     # Copy docs build output
@@ -42,11 +42,10 @@ else
     echo "  ⚠ Docusaurus not found at $DOCS_SRC (skip)"
 fi
 
-# Step 4: Create _redirects for install.sh
+# Step 4: Publish the canonical installer and release proxy redirects
 echo "→ 创建 _redirects..."
+cp "$PROJECT_ROOT/scripts/install-release.sh" "$BUILD_DIR/install.sh"
 cat > "$BUILD_DIR/_redirects" << 'REDIRECTS'
-# DeepAgent install.sh download redirect
-/install.sh  https://deepseekagent.starseas.org/releases/deepagent-latest.tar.gz  302
 /releases/*  https://deepseekagent.starseas.org/releases/:splat  302
 REDIRECTS
 
@@ -59,6 +58,11 @@ cat > "$BUILD_DIR/_headers" << 'HEADERS'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+/install.sh
+  Content-Type: text/x-shellscript; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+  X-Content-Type-Options: nosniff
 HEADERS
 
 # Step 6: Show result
