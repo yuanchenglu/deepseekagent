@@ -12,6 +12,11 @@ async function loadAuth(overrides: Partial<FsMocks> & { home?: string } = {}) {
   const writeFile = overrides.writeFile ?? vi.fn()
   const mkdir = overrides.mkdir ?? vi.fn()
   const home = overrides.home ?? '/tmp/hermes-home'
+  const productHome = join(home, '.deepagent')
+
+  process.env.DEEPAGENT_HOME = productHome
+  delete process.env.HERMES_WEB_UI_HOME
+  delete process.env.HERMES_WEBUI_STATE_DIR
 
   vi.resetModules()
   vi.doMock('fs/promises', () => ({ readFile, writeFile, mkdir }))
@@ -21,8 +26,8 @@ async function loadAuth(overrides: Partial<FsMocks> & { home?: string } = {}) {
   return {
     ...mod,
     mocks: { readFile, writeFile, mkdir },
-    appHome: join(home, '.hermes-web-ui'),
-    tokenFile: join(home, '.hermes-web-ui', '.token'),
+    appHome: join(productHome, 'data', 'webui'),
+    tokenFile: join(productHome, 'data', 'webui', '.token'),
   }
 }
 
@@ -188,7 +193,7 @@ describe('Auth Service', () => {
       expect(next).toHaveBeenCalledOnce()
     })
 
-    it('allows request with the correct query token', async () => {
+    it('rejects query tokens because URLs leak into history and logs', async () => {
       const { requireAuth } = await loadAuth()
       const middleware = requireAuth('secret')
       const ctx = createMockCtx('/api/hermes/sessions', {}, { token: 'secret' })
@@ -196,7 +201,8 @@ describe('Auth Service', () => {
 
       await middleware(ctx, next)
 
-      expect(next).toHaveBeenCalledOnce()
+      expect(ctx.status).toBe(401)
+      expect(next).not.toHaveBeenCalled()
     })
 
     it('returns 401 JSON on auth failure', async () => {
