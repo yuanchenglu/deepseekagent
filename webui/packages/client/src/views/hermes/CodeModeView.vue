@@ -92,19 +92,12 @@ onMounted(() => {
         <p class="placeholder-subtle">{{ t('mode.startingHint') }}</p>
       </div>
 
-      <!-- 运行态：桌面用 webview，浏览器用降级提示 -->
-      <webview
-        v-if="state === 'running' && isDesktop"
-        class="code-mode-webview"
-        :src="codeUrl"
-        :partition="'code-mode'"
-        allowpopups
-      />
       <iframe
-        v-else-if="state === 'running' && !isDesktop"
+        v-if="state === 'running'"
         class="code-mode-webview"
         :src="codeUrl"
-        title="OpenCode"
+        title="DeepCode"
+        sandbox="allow-downloads allow-forms allow-same-origin allow-scripts"
       />
 
       <!-- 错误态 -->
@@ -280,7 +273,7 @@ onMounted(() => {
   margin-top: 8px;
   padding: 8px 24px;
   background-color: $accent-primary;
-  color: $text-on-accent;
+  color: var(--text-on-accent);
   border: none;
   border-radius: $radius-sm;
   font-weight: 600;

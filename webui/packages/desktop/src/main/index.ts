@@ -1,26 +1,22 @@
-import { app, BrowserWindow, Menu, Tray, shell, ipcMain, nativeImage, Notification, screen } from 'electron'
+import { app, BrowserWindow, Menu, Tray, shell, ipcMain, nativeImage, Notification, safeStorage, screen } from 'electron'
 import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { startWebUiServer, stopWebUiServer, getToken } from './webui-server'
-import { bundledNode, desktopIcon, desktopRuntimeVersion, desktopTrayTemplateIcon, desktopWindowsTrayIcon, hermesBinExists, hermesBin, webuiDir } from './paths'
+import { startWebUiServer, stopWebUiServer } from './webui-server'
+import { deepAgentHome, desktopIcon, desktopTrayTemplateIcon, desktopWindowsTrayIcon, webuiDir } from './paths'
 import { checkForDesktopUpdates, initAutoUpdater } from './updater'
 import { t } from './desktop-i18n'
-import { installHermesStudioCliShim, installHermesStudioMcpShim } from './cli-shim'
-import { parseHermesCliArgs, runBundledHermesCli } from './hermes-cli'
-import {
-  ensureDesktopRuntime,
-  isDesktopRuntimeReady,
-  writeActiveRuntimeVersion,
-  type RuntimeDownloadSource,
-  type RuntimeProgress,
-} from './runtime-manager'
 // 双模式切换管理器（Stage 9 新增）
 import { ModeManager, type AppMode, type SharedConfig, type StartCodeModeResult } from './mode-manager'
+import { CredentialVault } from './credential-vault'
+import { createDesktopLoginUrl } from './login-ticket'
+import { runPhase3Migration } from './migration'
+import { WorkspaceLockManager, type WorkspaceAccess } from './workspace-lock'
 
 const PORT = Number(process.env.HERMES_DESKTOP_PORT) || 8748
 const START_HIDDEN = process.argv.includes('--hidden')
 const QUIT_EXISTING = process.argv.includes('--quit')
-const APP_USER_MODEL_ID = 'com.hermeswebui.studio'
+const APP_USER_MODEL_ID = 'org.starseas.deepagent'
 const PET_WINDOW_DEFAULT_WIDTH = 300
 const PET_WINDOW_DEFAULT_HEIGHT = 320
 const PET_WINDOW_MIN_SIZE = 72
@@ -32,6 +28,8 @@ let mainWindow: BrowserWindow | null = null
 let petWindow: BrowserWindow | null = null
 // 双模式管理器（Stage 9）：由 app.whenReady 时实例化
 let modeManager: ModeManager | null = null
+let credentialVault: CredentialVault | null = null
+const workspaceLocks = new WorkspaceLockManager()
 let petWindowLoadPromise: Promise<void> | null = null
 let serverUrl: string | null = null
 let tray: Tray | null = null
@@ -139,7 +137,7 @@ function ensurePetWindow(): BrowserWindow {
 
   petWindow = new BrowserWindow({
     ...defaultPetWindowBounds(),
-    title: 'Hermes Pet',
+    title: 'DeepAgent Pet',
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -159,7 +157,7 @@ function ensurePetWindow(): BrowserWindow {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       additionalArguments: ['--hermes-window-kind=pet'],
     },
   })
@@ -174,10 +172,9 @@ function ensurePetWindow(): BrowserWindow {
     petWindowLoadPromise = null
   })
   petWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
-      return { action: 'allow' }
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url).catch(() => undefined)
     }
-    shell.openExternal(url).catch(() => undefined)
     return { action: 'deny' }
   })
   return petWindow
@@ -301,7 +298,7 @@ function createTray() {
     icon.setTemplateImage(true)
   }
   tray = new Tray(icon)
-  tray.setToolTip('Hermes Studio')
+  tray.setToolTip('DeepAgent')
   tray.on('click', () => {
     showMainWindow()
     updateTrayMenu()
@@ -315,7 +312,7 @@ function createWindow() {
     height: 820,
     minWidth: 960,
     minHeight: 600,
-    title: 'Hermes Studio',
+    title: 'DeepAgent',
     backgroundColor: '#1a1a1a',
     autoHideMenuBar: true,
     show: false,
@@ -334,7 +331,7 @@ function createWindow() {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   })
 
@@ -355,10 +352,9 @@ function createWindow() {
 
   // External links → system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
-      return { action: 'allow' }
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url).catch(() => undefined)
     }
-    shell.openExternal(url).catch(() => undefined)
     return { action: 'deny' }
   })
 
@@ -375,7 +371,7 @@ function createWindow() {
 
 function splashHtml(label = t('desktop.startingLocalServices')): string {
   const startingLabel = escapeHtml(label)
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Hermes Studio</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>DeepAgent</title>
 <style>
   html,body{margin:0;height:100%;background:#1a1a1a;color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;-webkit-app-region:drag;}
   .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px}
@@ -389,7 +385,7 @@ function splashHtml(label = t('desktop.startingLocalServices')): string {
   .bar{width:0;height:100%;background:#d8d8d8;transition:width .18s ease}
   h1{font-weight:500;margin:0;font-size:18px}
 </style></head><body><div class="wrap">
-<h1>Hermes Studio</h1>
+<h1>DeepAgent</h1>
 <div class="row"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
 <div id="label" class="label">${startingLabel}</div>
 <div class="progress"><div id="bar" class="bar"></div></div>
@@ -422,172 +418,14 @@ function escapeHtml(value: string): string {
   }[char] || char))
 }
 
-function resolveRuntimeSourceLogo(): string {
-  const candidates = [
-    join(webuiDir(), 'dist', 'client', 'logo.png'),
-    join(webuiDir(), 'packages', 'client', 'public', 'logo.png'),
-    join(webuiDir(), 'logo.png'),
-    desktopIcon(),
-  ]
-  return candidates.find(candidate => existsSync(candidate)) || desktopIcon()
-}
-
-function runtimeSourceLogoDataUri(): string {
-  const logoPath = resolveRuntimeSourceLogo()
-  try {
-    const image = nativeImage.createFromPath(logoPath)
-    if (image.isEmpty()) return ''
-    return image.resize({ width: 68, height: 68, quality: 'best' }).toDataURL()
-  } catch {
-    return ''
-  }
-}
-
-function runtimeSourceHtml(errorMessage?: string): string {
-  const safeError = errorMessage ? escapeHtml(errorMessage) : ''
-  const logoUrl = runtimeSourceLogoDataUri()
-  const errorBlock = safeError
-    ? `<section class="error" aria-live="polite">
-        <div class="error-title">${escapeHtml(t('desktop.downloadFailed'))}</div>
-        <pre>${safeError}</pre>
-       </section>`
-    : ''
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Hermes Studio</title>
-<style>
-  :root{color-scheme:dark}
-  *{box-sizing:border-box}
-  html,body{margin:0;width:100%;height:100%;background:#191919;color:#f1f1f1;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;}
-  body{min-height:100%;display:grid;place-items:center;padding:32px;-webkit-app-region:drag;}
-  .wrap{width:min(720px,100%);display:flex;flex-direction:column;align-items:center;gap:22px;text-align:center}
-  .brand{display:flex;align-items:center;gap:10px;color:#f6f6f6}
-  .mark{width:34px;height:34px;border-radius:8px;object-fit:contain;display:block}
-  h1{font-weight:560;margin:0;font-size:22px;line-height:1.25}
-  .label{max-width:520px;font-size:14px;line-height:1.6;color:#b9b9b9;margin:0}
-  .actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  button{min-height:86px;border:1px solid #4c4c4c;border-radius:8px;background:#242424;color:#f2f2f2;cursor:pointer;padding:16px;text-align:left;display:flex;flex-direction:column;gap:7px;transition:background .14s ease,border-color .14s ease,transform .14s ease;-webkit-app-region:no-drag}
-  button:hover{background:#2d2d2d;border-color:#747474;transform:translateY(-1px)}
-  button:active{transform:translateY(0)}
-  button:focus-visible{outline:2px solid #dcdcdc;outline-offset:3px}
-  .button-title{font-size:15px;font-weight:650;line-height:1.2}
-  .button-detail{font-size:12px;line-height:1.45;color:#aaaaaa}
-  .error{width:100%;text-align:left;background:#241b1b;border:1px solid #6b3939;border-radius:8px;padding:14px}
-  .error-title{font-size:13px;font-weight:650;color:#ffc3c3;margin-bottom:8px}
-  pre{width:100%;max-height:180px;overflow:auto;white-space:pre-wrap;margin:0;color:#ffaaaa;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;-webkit-app-region:no-drag}
-  @media (max-width:560px){
-    body{padding:24px}
-    .actions{grid-template-columns:1fr}
-    button{min-height:78px}
-  }
-</style></head><body><main class="wrap">
-<div class="brand">${logoUrl ? `<img class="mark" src="${logoUrl}" alt="Hermes Studio">` : ''}<h1>Hermes Studio</h1></div>
-<p class="label">${escapeHtml(t('desktop.selectRuntimeSource'))}</p>
-${errorBlock}
-<div class="actions">
-  <button id="cf">
-    <span class="button-title">${escapeHtml(t('desktop.downloadCloudflareTitle'))}</span>
-    <span class="button-detail">${escapeHtml(t('desktop.downloadCloudflareDetail'))}</span>
-  </button>
-  <button id="github">
-    <span class="button-title">${escapeHtml(t('desktop.downloadGithubTitle'))}</span>
-    <span class="button-detail">${escapeHtml(t('desktop.downloadGithubDetail'))}</span>
-  </button>
-</div>
-<script>
-  document.getElementById('cf')?.addEventListener('click', () => {
-    window.hermesDesktop?.retryBootstrap?.('cf')
-  })
-  document.getElementById('github')?.addEventListener('click', () => {
-    window.hermesDesktop?.retryBootstrap?.('github')
-  })
-</script>
-</main></body></html>`
-  return 'data:text/html;charset=utf-8,' + encodeURIComponent(html)
-}
-
-function envRuntimeDownloadSource(): RuntimeDownloadSource | undefined {
-  const source = process.env.HERMES_DESKTOP_RUNTIME_SOURCE?.trim().toLowerCase()
-  return source === 'cf' || source === 'github' ? source : undefined
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB']
-  let value = bytes / 1024
-  let unit = units[0]
-  for (let i = 1; i < units.length && value >= 1024; i += 1) {
-    value /= 1024
-    unit = units[i]
-  }
-  return `${value.toFixed(value >= 100 ? 0 : 1)} ${unit}`
-}
-
-function updateSplash(progress: RuntimeProgress) {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  const label = progress.message
-  const percent = typeof progress.percent === 'number' ? Math.round(progress.percent) : null
-  let detail = ''
-  if (progress.receivedBytes && progress.totalBytes) {
-    detail = `${formatBytes(progress.receivedBytes)} / ${formatBytes(progress.totalBytes)}`
-    if (percent !== null) detail += ` (${percent}%)`
-  } else if (percent !== null) {
-    detail = `${percent}%`
-  }
-
-  mainWindow.webContents.executeJavaScript(`
-    {
-      const label = document.getElementById('label');
-      const detail = document.getElementById('detail');
-      const bar = document.getElementById('bar');
-      if (label) label.textContent = ${JSON.stringify(label)};
-      if (detail) detail.textContent = ${JSON.stringify(detail)};
-      if (bar) bar.style.width = ${JSON.stringify(percent === null ? '100%' : `${percent}%`)};
-    }
-  `).catch(() => undefined)
-}
-
-async function bootstrap(source?: RuntimeDownloadSource) {
+async function bootstrap() {
   if (isBootstrapping) return
   isBootstrapping = true
 
   try {
-    const selectedSource = source || envRuntimeDownloadSource()
-    const runtimeUrlOverride = !!process.env.HERMES_DESKTOP_RUNTIME_URL?.trim()
-    const manifestOverride = !!process.env.HERMES_DESKTOP_RUNTIME_MANIFEST_URL?.trim()
-    const forceUpdate = !!process.env.HERMES_DESKTOP_RUNTIME_FORCE_UPDATE
-    const runtimeReady = isDesktopRuntimeReady()
-    const needsRuntimeWork = !runtimeReady || forceUpdate || runtimeUrlOverride || manifestOverride
-
-    if (needsRuntimeWork) {
-      if (!selectedSource && !runtimeUrlOverride && !manifestOverride) {
-        if (mainWindow) await mainWindow.loadURL(runtimeSourceHtml())
-        isBootstrapping = false
-        return
-      }
-      await ensureDesktopRuntime(updateSplash, selectedSource)
-    }
-    if (isDesktopRuntimeReady()) {
-      writeActiveRuntimeVersion()
-    }
-  } catch (err) {
-    console.error('Failed to prepare Hermes runtime:', err)
-    if (mainWindow) {
-      const msg = String(err instanceof Error ? err.message : err)
-      await mainWindow.loadURL(runtimeSourceHtml(`${t('desktop.failedPrepareRuntime')}\n\n${msg}`))
-    }
-    isBootstrapping = false
-    return
-  }
-
-  if (!hermesBinExists()) {
-    console.error(`hermes binary missing at ${hermesBin()}`)
-    console.error('Run: npm run prepare:runtime (to build a local Hermes runtime)')
-  }
-
-  try {
-    updateSplash({ stage: 'resolve', message: t('desktop.startingLocalServices') })
     const url = await startWebUiServer(PORT)
     serverUrl = url
-    if (mainWindow) await mainWindow.loadURL(url)
+    if (mainWindow) await mainWindow.loadURL(createDesktopLoginUrl(url, deepAgentHome()))
     await loadPetWindowRoute()
   } catch (err) {
     console.error('Failed to start Web UI server:', err)
@@ -604,7 +442,6 @@ async function bootstrap(source?: RuntimeDownloadSource) {
   }
 }
 
-ipcMain.handle('hermes-desktop:get-token', () => getToken())
 ipcMain.handle('hermes-desktop:get-window-state', () => windowState())
 ipcMain.handle('hermes-desktop:window-control', (_event, action?: unknown) => {
   if (action !== 'minimize' && action !== 'toggle-maximize' && action !== 'close') return windowState()
@@ -652,7 +489,7 @@ ipcMain.handle('hermes-desktop:notify-completion', (_event, payload?: { title?: 
 
   const title = typeof payload?.title === 'string' && payload.title.trim()
     ? payload.title.trim()
-    : 'Hermes Studio'
+    : 'DeepAgent'
   const body = typeof payload?.body === 'string' ? payload.body.trim().slice(0, 240) : ''
   const icon = resolveNotificationIcon(payload?.icon)
   const notification = new Notification({
@@ -677,14 +514,13 @@ ipcMain.handle('hermes-desktop:notify-completion', (_event, payload?: { title?: 
   notification.show()
   return true
 })
-ipcMain.handle('hermes-desktop:retry-bootstrap', async (_event, source?: RuntimeDownloadSource) => {
+ipcMain.handle('hermes-desktop:retry-bootstrap', async () => {
   if (serverUrl) {
     await mainWindow?.loadURL(serverUrl)
     return
   }
-  const selectedSource = source === 'cf' || source === 'github' ? source : undefined
   await mainWindow?.loadURL(splashHtml(t('runtime.downloading')))
-  await bootstrap(selectedSource)
+  await bootstrap()
 })
 
 // ─── 双模式 IPC（Stage 9） ───────────────────────────────────────────
@@ -702,10 +538,33 @@ ipcMain.handle('hermes-desktop:set-mode', async (_event, mode?: unknown) => {
 })
 ipcMain.handle('hermes-desktop:start-code-mode', async (_event, config?: unknown): Promise<StartCodeModeResult> => {
   if (!modeManager) return { ok: false, error: 'not-ready' }
-  return modeManager.startCodeMode((config as SharedConfig) ?? { apiKey: '', model: '', provider: '' })
+  return modeManager.startCodeMode((config as SharedConfig) ?? { model: '', provider: '' })
 })
 ipcMain.handle('hermes-desktop:stop-code-mode', async () => {
   await modeManager?.stopCodeMode()
+})
+ipcMain.handle('deepagent:credential:set', (_event, provider?: unknown, value?: unknown) => {
+  if (!credentialVault || typeof provider !== 'string' || typeof value !== 'string') return { ok: false }
+  credentialVault.set(provider, value)
+  return { ok: true }
+})
+ipcMain.handle('deepagent:credential:has', (_event, provider?: unknown) => (
+  Boolean(credentialVault && typeof provider === 'string' && credentialVault.has(provider))
+))
+ipcMain.handle('deepagent:credential:delete', (_event, provider?: unknown) => {
+  if (credentialVault && typeof provider === 'string') credentialVault.delete(provider)
+  return { ok: true }
+})
+ipcMain.handle('deepagent:workspace-lock:acquire', (_event, workspace?: unknown, taskId?: unknown, access?: unknown) => (
+  typeof workspace === 'string' && typeof taskId === 'string' && (access === 'read' || access === 'write')
+    ? workspaceLocks.acquire(workspace, taskId, access as WorkspaceAccess)
+    : false
+))
+ipcMain.handle('deepagent:workspace-lock:release', (_event, workspace?: unknown, taskId?: unknown) => {
+  if (typeof workspace === 'string' && typeof taskId === 'string') workspaceLocks.release(workspace, taskId)
+})
+ipcMain.handle('deepagent:workspace-lock:release-task', (_event, taskId?: unknown) => {
+  if (typeof taskId === 'string') workspaceLocks.releaseTask(taskId)
 })
 
 function runDesktopApp() {
@@ -724,6 +583,11 @@ function runDesktopApp() {
   })
 
   app.whenReady().then(() => {
+    runPhase3Migration(deepAgentHome(), {
+      legacyWebUiHome: join(homedir(), '.hermes-web-ui'),
+      legacyDesktopHome: join(homedir(), 'Library', 'Application Support', 'Hermes Studio'),
+    })
+    credentialVault = new CredentialVault(deepAgentHome(), safeStorage)
     if (QUIT_EXISTING) {
       quitApp()
       return
@@ -734,36 +598,13 @@ function runDesktopApp() {
     // visual clutter. macOS keeps a menu (system requirement) but Electron's
     // default is fine there.
     if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
-    if (app.isPackaged) {
-      installHermesStudioCliShim({
-        nodePath: bundledNode(),
-        runtimeVersion: desktopRuntimeVersion(),
-        webUiScriptPath: join(webuiDir(), 'bin', 'hermes-web-ui.mjs'),
-      }).then(result => {
-        if (result.status === 'skipped') {
-          console.warn(`[cli-shim] ${result.reason}: ${result.shimPath}`)
-        }
-      }).catch(err => {
-        console.warn(`[cli-shim] failed to install hermes-studio command: ${err instanceof Error ? err.message : String(err)}`)
-      })
-      installHermesStudioMcpShim({
-        nodePath: bundledNode(),
-        scriptPath: join(webuiDir(), 'bin', 'hermes-studio-mcp.mjs'),
-        webUiUrl: `http://127.0.0.1:${PORT}`,
-      }).then(result => {
-        if (result.status === 'skipped') {
-          console.warn(`[cli-shim] ${result.reason}: ${result.shimPath}`)
-        }
-      }).catch(err => {
-        console.warn(`[cli-shim] failed to install hermes-studio-mcp command: ${err instanceof Error ? err.message : String(err)}`)
-      })
-    }
     createTray()
     createWindow()
     // 双模式管理器：注册 IPC，其 broadcast 推送到所有窗口
     modeManager = new ModeManager({
-      userDataPath: app.getPath('userData'),
+      productHome: deepAgentHome(),
       broadcast: broadcastMode,
+      resolveCredentials: provider => Promise.resolve(credentialVault?.environmentFor(provider) ?? {}),
     })
     bootstrap()
     initAutoUpdater({
@@ -799,14 +640,4 @@ function runDesktopApp() {
   })
 }
 
-const hermesCliArgs = parseHermesCliArgs(process.argv)
-if (hermesCliArgs) {
-  runBundledHermesCli(hermesCliArgs)
-    .then(code => app.exit(code))
-    .catch(err => {
-      console.error(`Failed to run bundled Hermes CLI: ${err instanceof Error ? err.message : String(err)}`)
-      app.exit(1)
-    })
-} else {
-  runDesktopApp()
-}
+runDesktopApp()

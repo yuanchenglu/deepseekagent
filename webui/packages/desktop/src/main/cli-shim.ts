@@ -12,6 +12,7 @@ import { homedir } from 'node:os'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { HERMES_CLI_ARG } from './cli-constants'
+import { safeChildEnvironment } from './child-env'
 
 const execFileAsync = promisify(execFile)
 
@@ -375,7 +376,7 @@ async function writeWindowsUserPath(pathValue: string): Promise<void> {
   await execFileAsync('powershell.exe', powershellArgs(command), {
     encoding: 'utf-8',
     env: {
-      ...process.env,
+      ...safeChildEnvironment(),
       [WINDOWS_USER_PATH_ENV_B64]: Buffer.from(pathValue, 'utf-8').toString('base64'),
     },
     timeout: 3000,

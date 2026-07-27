@@ -70,7 +70,7 @@ describe('CodeModeView', () => {
     await flushPromises()
   })
 
-  it('renders webview when startCodeMode succeeds on desktop', async () => {
+  it('renders a sandboxed iframe when DeepCode starts', async () => {
     setBridge({
       isDesktop: true,
       platform: 'linux',
@@ -78,8 +78,9 @@ describe('CodeModeView', () => {
     })
     const wrapper = mount(CodeModeView, { global: { plugins: [i18n()] } })
     await flushPromises()
-    expect(wrapper.find('webview').exists()).toBe(true)
-    expect(wrapper.find('webview').attributes('src')).toBe('http://127.0.0.1:1234')
+    expect(wrapper.find('iframe').exists()).toBe(true)
+    expect(wrapper.find('iframe').attributes('src')).toBe('http://127.0.0.1:1234')
+    expect(wrapper.find('iframe').attributes('sandbox')).not.toContain('allow-popups')
   })
 
   it('shows error panel when startCodeMode fails', async () => {
