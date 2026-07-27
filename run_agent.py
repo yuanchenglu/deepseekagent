@@ -829,10 +829,10 @@ class AIAgent:
         self._rate_limit_state: Optional["RateLimitState"] = None
 
         # Centralized logging — agent.log (INFO+) and errors.log (WARNING+)
-        # both live under ~/.hermes/logs/.  Idempotent, so gateway mode
+        # both live under the active DeepAgent home. Idempotent, so gateway mode
         # (which creates a new AIAgent per message) won't duplicate handlers.
         from hermes_logging import setup_logging, setup_verbose_logging
-        setup_logging(hermes_home=_hermes_home)
+        setup_logging(hermes_home=get_hermes_home())
 
         if self.verbose_logging:
             setup_verbose_logging()
