@@ -77,7 +77,7 @@ function listen(app: Koa, port: number, host: string): Promise<any> {
 }
 
 async function listenWithFallback(app: Koa, port: number, host?: string): Promise<ListenResult> {
-  const bindHost = host || '0.0.0.0'
+  const bindHost = host || '127.0.0.1'
   console.log(`[bootstrap] listening on ${bindHost}:${port}`)
   const primary = await listen(app, port, bindHost)
   return { primary, servers: [primary] }
@@ -373,9 +373,10 @@ export async function bootstrap() {
 
   const interfaces = safeNetworkInterfaces()
   const localIp = Object.values(interfaces).flat().find(i => i?.family === 'IPv4' && !i?.internal)?.address || 'localhost'
-  console.log(`Server: http://localhost:${config.port} (LAN: http://${localIp}:${config.port})`)
+  const lanSuffix = isLoopbackAddress(config.host) ? '' : ` (LAN: http://${localIp}:${config.port})`
+  console.log(`Server: http://localhost:${config.port}${lanSuffix}`)
   console.log(`Log: ${config.appHome}/logs/server.log`)
-  logger.info('Server: http://localhost:%d (LAN: http://%s:%d)', config.port, localIp, config.port)
+  logger.info('Server: http://localhost:%d%s', config.port, lanSuffix)
   startLanDiscovery()
   refreshConfiguredProviderModelCatalogsInBackground('bootstrap')
 

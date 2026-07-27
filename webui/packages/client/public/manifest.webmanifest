@@ -1,7 +1,7 @@
 {
-  "name": "Hermes Studio",
-  "short_name": "Hermes",
-  "description": "Self-hosted AI chat dashboard for Hermes Agent",
+  "name": "DeepAgent",
+  "short_name": "DeepAgent",
+  "description": "Local AI agent and coding workspace",
   "start_url": "/#/hermes/chat",
   "scope": "/",
   "display": "standalone",

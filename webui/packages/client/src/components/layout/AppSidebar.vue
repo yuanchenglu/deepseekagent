@@ -12,7 +12,8 @@ import LanguageSwitch from "@/components/layout/LanguageSwitch.vue";
 import ThemeSwitch from "@/components/layout/ThemeSwitch.vue";
 import VersionManagementModal from "@/components/layout/VersionManagementModal.vue";
 import { changelog } from "@/data/changelog";
-import { getStoredUsername, isStoredSuperAdmin } from "@/api/client";
+import { clearAuthSessionState, getStoredUsername, isStoredSuperAdmin } from "@/api/client";
+import { logoutSession } from "@/api/auth";
 
 const { t } = useI18n();
 const message = useMessage();
@@ -76,9 +77,10 @@ function handleReloadClient() {
   appStore.reloadClient();
 }
 
-function handleLogout() {
-  localStorage.clear();
-  window.location.reload();
+async function handleLogout() {
+  await logoutSession();
+  clearAuthSessionState();
+  await router.replace({ name: 'login' });
 }
 
 function openChangelog() {

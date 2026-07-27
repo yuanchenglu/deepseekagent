@@ -1,13 +1,11 @@
 import type { Context } from 'koa'
 import { checkPassword, recordPasswordFailure, recordPasswordSuccess, extractIp, getLockedIps, unlockIp, unlockAll } from '../services/login-limiter'
 import {
-  DEFAULT_PASSWORD,
-  DEFAULT_USERNAME,
-  bootstrapDefaultSuperAdmin,
   countActiveSuperAdmins,
   countUsers,
   createUser,
   deleteUser,
+  ensureLocalSuperAdmin,
   findUserById,
   findUserByUsername,
   getUserAvatar,
@@ -22,7 +20,13 @@ import {
   type UserRecord,
   type UserStatus,
 } from '../db/hermes/users-store'
-import { issueUserJwt } from '../middleware/user-auth'
+import {
+  clearUserSessionCookie,
+  isLoopbackRequest,
+  issueUserJwt,
+  setUserSessionCookie,
+} from '../middleware/user-auth'
+import { consumeLoginTicket } from '../services/login-ticket'
 import { listProfileNamesFromDisk } from '../services/hermes/hermes-profile'
 import { startOutboundRelayClient, stopOutboundRelayClient } from '../services/global-agent/outbound-relay-client'
 
@@ -59,9 +63,7 @@ export async function currentUser(ctx: Context) {
       updated_at: user.updated_at,
       last_login_at: user.last_login_at,
       avatar: user.avatar || '',
-      requiresCredentialChange: process.env.HERMES_DESKTOP === 'true'
-        ? false
-        : user.username === DEFAULT_USERNAME && verifyPassword(DEFAULT_PASSWORD, user.password_hash),
+      requiresCredentialChange: false,
     },
   }
 }
@@ -172,12 +174,9 @@ async function passwordLogin(
     return { ok: false }
   }
 
-  const existingUserCount = countUsers()
-  const user = existingUserCount === 0
-    ? bootstrapDefaultSuperAdmin(username, password)
-    : findUserByUsername(username)
+  const user = findUserByUsername(username)
 
-  if (!user || user.status !== 'active' || (existingUserCount > 0 && !verifyPassword(password, user.password_hash))) {
+  if (!user || user.status !== 'active' || !verifyPassword(password, user.password_hash)) {
     recordPasswordFailure(ip)
     ctx.status = 401
     ctx.body = { error: 'Invalid username or password' }
@@ -215,7 +214,56 @@ export async function login(ctx: Context) {
 
   const result = await passwordLogin(ctx, username, password)
   if (!result.ok) return
-  ctx.body = { token: result.token }
+  setUserSessionCookie(ctx, result.token)
+  ctx.body = {
+    user: {
+      id: result.user.id,
+      username: result.user.username,
+      role: result.user.role,
+    },
+  }
+}
+
+/**
+ * POST /api/auth/ticket
+ * Exchange a short-lived, one-time local ticket for an HttpOnly session cookie.
+ */
+export async function loginWithTicket(ctx: Context) {
+  if (!isLoopbackRequest(ctx)) {
+    ctx.status = 403
+    ctx.body = { error: 'Login tickets are only accepted from this computer' }
+    return
+  }
+
+  const { ticket } = ctx.request.body as { ticket?: string }
+  if (typeof ticket !== 'string' || !consumeLoginTicket(ticket)) {
+    ctx.status = 401
+    ctx.body = { error: 'Login ticket is invalid or expired' }
+    return
+  }
+
+  const user = ensureLocalSuperAdmin()
+  if (!user) {
+    ctx.status = 409
+    ctx.body = { error: 'No active local super administrator is available' }
+    return
+  }
+
+  const token = await issueUserJwt(user)
+  setUserSessionCookie(ctx, token)
+  ctx.body = {
+    ok: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    },
+  }
+}
+
+export async function logout(ctx: Context) {
+  clearUserSessionCookie(ctx)
+  ctx.body = { ok: true }
 }
 
 function normalizeRelayUrl(input: string): string | null {

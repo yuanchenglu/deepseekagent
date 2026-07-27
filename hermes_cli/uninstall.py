@@ -1,326 +1,194 @@
-"""
-DeepSeek Agent Uninstaller.
+"""Manifest-bound DeepAgent uninstaller.
 
-Provides options for:
-- Full uninstall: Remove everything including configs and data
-- Keep data: Remove code but keep ~/.hermes/ (configs, sessions, logs)
+Only paths recorded by a DeepAgent installer and contained by DEEPAGENT_HOME
+may be removed. The current working tree and legacy Hermes variables never
+establish file ownership.
 """
 
+from __future__ import annotations
+
+import json
 import os
 import shutil
-import subprocess
 from pathlib import Path
+from typing import Any
 
-from hermes_constants import get_hermes_home
-
+from hermes_constants import get_deepagent_home
 from hermes_cli.colors import Colors, color
 
-def log_info(msg: str):
+
+MANIFEST_NAME = "install-manifest.json"
+PRODUCT_NAME = "deepagent"
+
+
+def log_info(msg: str) -> None:
     print(f"{color('→', Colors.CYAN)} {msg}")
 
-def log_success(msg: str):
+
+def log_success(msg: str) -> None:
     print(f"{color('✓', Colors.GREEN)} {msg}")
 
-def log_warn(msg: str):
+
+def log_warn(msg: str) -> None:
     print(f"{color('⚠', Colors.YELLOW)} {msg}")
 
-def get_project_root() -> Path:
-    """Get the project installation directory."""
-    return Path(__file__).parent.parent.resolve()
 
-
-def find_shell_configs() -> list:
-    """Find shell configuration files that might have PATH entries."""
-    home = Path.home()
-    configs = []
-    
-    candidates = [
-        home / ".bashrc",
-        home / ".bash_profile",
-        home / ".profile",
-        home / ".zshrc",
-        home / ".zprofile",
-    ]
-    
-    for config in candidates:
-        if config.exists():
-            configs.append(config)
-    
-    return configs
-
-
-def remove_path_from_shell_configs():
-    """Remove Hermes PATH entries from shell configuration files."""
-    configs = find_shell_configs()
-    removed_from = []
-    
-    for config_path in configs:
-        try:
-            content = config_path.read_text()
-            original_content = content
-            
-            # Remove lines containing hermes-agent or hermes PATH entries
-            new_lines = []
-            skip_next = False
-            
-            for line in content.split('\n'):
-                # Skip the "# Hermes Agent" comment and following line
-                if '# Hermes Agent' in line or '# hermes-agent' in line:
-                    skip_next = True
-                    continue
-                if skip_next and ('hermes' in line.lower() and 'PATH' in line):
-                    skip_next = False
-                    continue
-                skip_next = False
-                
-                # Remove any PATH line containing hermes
-                if 'hermes' in line.lower() and ('PATH=' in line or 'path=' in line.lower()):
-                    continue
-                    
-                new_lines.append(line)
-            
-            new_content = '\n'.join(new_lines)
-            
-            # Clean up multiple blank lines
-            while '\n\n\n' in new_content:
-                new_content = new_content.replace('\n\n\n', '\n\n')
-            
-            if new_content != original_content:
-                config_path.write_text(new_content)
-                removed_from.append(config_path)
-                
-        except Exception as e:
-            log_warn(f"Could not update {config_path}: {e}")
-    
-    return removed_from
-
-
-def remove_wrapper_script():
-    """Remove the hermes wrapper script if it exists."""
-    wrapper_paths = [
-        Path.home() / ".local" / "bin" / "hermes",
-        Path("/usr/local/bin/hermes"),
-    ]
-    
-    removed = []
-    for wrapper in wrapper_paths:
-        if wrapper.exists():
-            try:
-                # Check if it's our wrapper (contains hermes_cli reference)
-                content = wrapper.read_text()
-                if 'hermes_cli' in content or 'hermes-agent' in content:
-                    wrapper.unlink()
-                    removed.append(wrapper)
-            except Exception as e:
-                log_warn(f"Could not remove {wrapper}: {e}")
-    
-    return removed
-
-
-def uninstall_gateway_service():
-    """Stop and uninstall the gateway service if running."""
-    import platform
-    
-    if platform.system() != "Linux":
-        return False
-
-    prefix = os.getenv("PREFIX", "")
-    if os.getenv("TERMUX_VERSION") or "com.termux/files/usr" in prefix:
-        return False
-    
+def _load_manifest(product_home: Path) -> dict[str, Any]:
+    manifest_path = product_home / MANIFEST_NAME
     try:
-        from hermes_cli.gateway import get_service_name
-        svc_name = get_service_name()
-    except Exception:
-        svc_name = "hermes-gateway"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"No {MANIFEST_NAME} found in {product_home}; refusing to guess file ownership"
+        ) from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read a valid install manifest: {exc}") from exc
 
-    service_file = Path.home() / ".config" / "systemd" / "user" / f"{svc_name}.service"
-    
-    if not service_file.exists():
-        return False
-    
+    if manifest.get("product") != PRODUCT_NAME:
+        raise ValueError("Install manifest does not belong to DeepAgent")
+    if manifest.get("schema_version") != 1:
+        raise ValueError("Unsupported install manifest schema")
+    return manifest
+
+
+def _resolve_owned_path(product_home: Path, relative_path: str) -> Path:
+    """Resolve a manifest path and prove it is below product_home."""
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        raise ValueError("Manifest contains an empty owned path")
+    relative = Path(relative_path)
+    if relative.is_absolute() or ".." in relative.parts or relative == Path("."):
+        raise ValueError(f"Unsafe owned path in manifest: {relative_path!r}")
+
+    root = product_home.resolve()
+    # Resolve the parent to catch an intermediate symlink escape, but keep the
+    # final component unresolved so removing ``current`` unlinks the symlink
+    # itself rather than deleting its target directory.
+    parent = (root / relative.parent).resolve(strict=False)
     try:
-        # Stop the service
-        subprocess.run(
-            ["systemctl", "--user", "stop", svc_name],
-            capture_output=True,
-            check=False
-        )
-        
-        # Disable the service
-        subprocess.run(
-            ["systemctl", "--user", "disable", svc_name],
-            capture_output=True,
-            check=False
-        )
-        
-        # Remove service file
-        service_file.unlink()
-        
-        # Reload systemd
-        subprocess.run(
-            ["systemctl", "--user", "daemon-reload"],
-            capture_output=True,
-            check=False
-        )
-        
+        parent.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"Owned path escapes DEEPAGENT_HOME: {relative_path!r}") from exc
+    candidate = parent / relative.name
+    if candidate == root:
+        raise ValueError("The product root cannot be an owned child path")
+    return candidate
+
+
+def _remove_owned_path(path: Path) -> bool:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
         return True
-        
-    except Exception as e:
-        log_warn(f"Could not fully remove gateway service: {e}")
+    if path.is_dir():
+        shutil.rmtree(path)
+        return True
+    return False
+
+
+def _managed_launcher_path(manifest: dict[str, Any]) -> Path | None:
+    raw = manifest.get("command_path")
+    if not isinstance(raw, str) or not raw:
+        return None
+    candidate = Path(raw).expanduser().resolve(strict=False)
+    expected = (Path.home() / ".local" / "bin" / "deepagent").resolve(strict=False)
+    if candidate != expected:
+        raise ValueError(f"Refusing unexpected command path: {candidate}")
+    return candidate
+
+
+def _remove_managed_launcher(manifest: dict[str, Any]) -> bool:
+    launcher = _managed_launcher_path(manifest)
+    if launcher is None or not launcher.exists():
+        return False
+    if launcher.is_symlink():
+        launcher.unlink()
+        return True
+    try:
+        content = launcher.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"Cannot verify DeepAgent launcher ownership: {exc}") from exc
+    if "# DeepAgent managed launcher" not in content:
+        raise ValueError(f"Refusing to remove an unmanaged launcher: {launcher}")
+    launcher.unlink()
+    return True
+
+
+def _confirm(full_uninstall: bool) -> bool:
+    action = (
+        "delete registered DeepAgent code and data"
+        if full_uninstall
+        else "remove registered DeepAgent code but keep user data"
+    )
+    print(f"This will {action}.")
+    try:
+        return input("Type 'yes' to confirm: ").strip().lower() == "yes"
+    except (KeyboardInterrupt, EOFError):
         return False
 
 
-def run_uninstall(args):
-    """
-    Run the uninstall process.
-    
-    Options:
-    - Full uninstall: removes code + ~/.hermes/ (configs, data, logs)
-    - Keep data: removes code but keeps ~/.hermes/ for future reinstall
-    """
-    project_root = get_project_root()
-    hermes_home = get_hermes_home()
-    
-    print()
-    print(color("┌─────────────────────────────────────────────────────────┐", Colors.MAGENTA, Colors.BOLD))
-    print(color("│            ⚕ DeepSeek Agent Uninstaller                  │", Colors.MAGENTA, Colors.BOLD))
-    print(color("└─────────────────────────────────────────────────────────┘", Colors.MAGENTA, Colors.BOLD))
-    print()
-    
-    # Show what will be affected
-    print(color("Current Installation:", Colors.CYAN, Colors.BOLD))
-    print(f"  Code:    {project_root}")
-    print(f"  Config:  {hermes_home / 'config.yaml'}")
-    print(f"  Secrets: {hermes_home / '.env'}")
-    print(f"  Data:    {hermes_home / 'cron/'}, {hermes_home / 'sessions/'}, {hermes_home / 'logs/'}")
-    print()
-    
-    # Ask for confirmation
-    print(color("Uninstall Options:", Colors.YELLOW, Colors.BOLD))
-    print()
-    print("  1) " + color("Keep data", Colors.GREEN) + " - Remove code only, keep configs/sessions/logs")
-    print("     (Recommended - you can reinstall later with your settings intact)")
-    print()
-    print("  2) " + color("Full uninstall", Colors.RED) + " - Remove everything including all data")
-    print("     (Warning: This deletes all configs, sessions, and logs permanently)")
-    print()
-    print("  3) " + color("Cancel", Colors.CYAN) + " - Don't uninstall")
-    print()
-    
-    try:
-        choice = input(color("Select option [1/2/3]: ", Colors.BOLD)).strip()
-    except (KeyboardInterrupt, EOFError):
-        print()
-        print("Cancelled.")
-        return
-    
-    if choice == "3" or choice.lower() in ("c", "cancel", "q", "quit", "n", "no"):
-        print()
-        print("Uninstall cancelled.")
-        return
-    
-    full_uninstall = (choice == "2")
-    
-    # Final confirmation
-    print()
-    if full_uninstall:
-        print(color("⚠️  WARNING: This will permanently delete ALL Hermes data!", Colors.RED, Colors.BOLD))
-        print(color("   Including: configs, API keys, sessions, scheduled jobs, logs", Colors.RED))
-    else:
-        print("This will remove the Hermes code but keep your configuration and data.")
-    
-    print()
-    try:
-        confirm = input(f"Type '{color('yes', Colors.YELLOW)}' to confirm: ").strip().lower()
-    except (KeyboardInterrupt, EOFError):
-        print()
-        print("Cancelled.")
-        return
-    
-    if confirm != "yes":
-        print()
-        print("Uninstall cancelled.")
-        return
-    
-    print()
-    print(color("Uninstalling...", Colors.CYAN, Colors.BOLD))
-    print()
-    
-    # 1. Stop and uninstall gateway service
-    log_info("Checking for gateway service...")
-    if uninstall_gateway_service():
-        log_success("Gateway service stopped and removed")
-    else:
-        log_info("No gateway service found")
-    
-    # 2. Remove PATH entries from shell configs
-    log_info("Removing PATH entries from shell configs...")
-    removed_configs = remove_path_from_shell_configs()
-    if removed_configs:
-        for config in removed_configs:
-            log_success(f"Updated {config}")
-    else:
-        log_info("No PATH entries found to remove")
-    
-    # 3. Remove wrapper script
-    log_info("Removing hermes command...")
-    removed_wrappers = remove_wrapper_script()
-    if removed_wrappers:
-        for wrapper in removed_wrappers:
-            log_success(f"Removed {wrapper}")
-    else:
-        log_info("No wrapper script found")
-    
-    # 4. Remove installation directory (code)
-    log_info("Removing installation directory...")
-    
-    # Check if we're running from within the install dir
-    # We need to be careful here
-    try:
-        if project_root.exists():
-            # If the install is inside ~/.hermes/, just remove the hermes-agent subdir
-            if hermes_home in project_root.parents or project_root.parent == hermes_home:
-                shutil.rmtree(project_root)
-                log_success(f"Removed {project_root}")
-            else:
-                # Installation is somewhere else entirely
-                shutil.rmtree(project_root)
-                log_success(f"Removed {project_root}")
-    except Exception as e:
-        log_warn(f"Could not fully remove {project_root}: {e}")
-        log_info("You may need to manually remove it")
-    
-    # 5. Optionally remove ~/.hermes/ data directory
-    if full_uninstall:
-        log_info("Removing configuration and data...")
+def _prune_empty_parents(product_home: Path) -> None:
+    for relative in ("versions", "runtime", "cache", "logs", "data", "config"):
         try:
-            if hermes_home.exists():
-                shutil.rmtree(hermes_home)
-                log_success(f"Removed {hermes_home}")
-        except Exception as e:
-            log_warn(f"Could not fully remove {hermes_home}: {e}")
-            log_info("You may need to manually remove it")
-    else:
-        log_info(f"Keeping configuration and data in {hermes_home}")
-    
-    # Done
+            (product_home / relative).rmdir()
+        except OSError:
+            pass
+    try:
+        product_home.rmdir()
+    except OSError:
+        pass
+
+
+def run_uninstall(args) -> bool:
+    """Remove only installer-owned DeepAgent paths."""
+    product_home = get_deepagent_home().expanduser().resolve(strict=False)
+    full_uninstall = bool(getattr(args, "full", False))
+    assume_yes = bool(getattr(args, "yes", False))
+
     print()
-    print(color("┌─────────────────────────────────────────────────────────┐", Colors.GREEN, Colors.BOLD))
-    print(color("│              ✓ Uninstall Complete!                      │", Colors.GREEN, Colors.BOLD))
-    print(color("└─────────────────────────────────────────────────────────┘", Colors.GREEN, Colors.BOLD))
-    print()
-    
-    if not full_uninstall:
-        print(color("Your configuration and data have been preserved:", Colors.CYAN))
-        print(f"  {hermes_home}/")
-        print()
-        print("To reinstall later with your existing settings:")
-        print(color("  curl -fsSL https://raw.githubusercontent.com/yuanchenglu/deepseekagent/main/scripts/install.sh | bash", Colors.DIM))
-        print()
-    
-    print(color("Reload your shell to complete the process:", Colors.YELLOW))
-    print("  source ~/.bashrc  # or ~/.zshrc")
-    print()
-    print("Thank you for using DeepSeek Agent! ⚕")
-    print()
+    print(color("DeepAgent Uninstaller", Colors.MAGENTA, Colors.BOLD))
+    print(f"Product home: {product_home}")
+
+    try:
+        manifest = _load_manifest(product_home)
+        launcher = _managed_launcher_path(manifest)
+        code_paths = manifest.get("code_paths", [])
+        data_paths = manifest.get("data_paths", [])
+        if not isinstance(code_paths, list) or not isinstance(data_paths, list):
+            raise ValueError("Install manifest path lists are invalid")
+        selected = code_paths + (data_paths if full_uninstall else [])
+        resolved = [_resolve_owned_path(product_home, item) for item in selected]
+    except ValueError as exc:
+        log_warn(str(exc))
+        log_warn("Nothing was removed. Reinstall DeepAgent to recreate a trusted manifest.")
+        return False
+
+    print(f"Command: {launcher or '(not registered)'}")
+    for path in resolved:
+        print(f"  - {path}")
+
+    if not assume_yes and not _confirm(full_uninstall):
+        log_info("Uninstall cancelled")
+        return False
+
+    try:
+        if _remove_managed_launcher(manifest):
+            log_success("Removed ~/.local/bin/deepagent")
+        for path in sorted(resolved, key=lambda item: len(item.parts), reverse=True):
+            if _remove_owned_path(path):
+                log_success(f"Removed {path}")
+
+        manifest_path = product_home / MANIFEST_NAME
+        if full_uninstall:
+            manifest_path.unlink(missing_ok=True)
+            _prune_empty_parents(product_home)
+        else:
+            manifest["code_paths"] = []
+            manifest["command_path"] = None
+            manifest["current_version"] = None
+            tmp_path = manifest_path.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            os.replace(tmp_path, manifest_path)
+        log_success("Uninstall complete")
+        return True
+    except (OSError, ValueError) as exc:
+        log_warn(f"Uninstall stopped safely: {exc}")
+        return False

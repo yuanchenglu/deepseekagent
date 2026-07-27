@@ -11,13 +11,12 @@
  * 保持 index.ts 不继续膨胀并便于单测。
  */
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
 export type AppMode = 'assistant' | 'code'
 
 export interface SharedConfig {
-  apiKey: string
   model: string
   provider: string
   baseUrl?: string
@@ -29,10 +28,10 @@ export type StartCodeModeResult =
   | { ok: false; error: string }
 
 export interface ModeManagerDeps {
-  /** Electron app.getPath('userData') */
-  userDataPath: string
+  /** DeepAgent product root, normally ~/.deepagent. */
+  productHome: string
   /** 发送广播到主窗口 webContents */
-  broadcast?: (channel: string, payload: unknown) => void
+  broadcast?: (mode: AppMode) => void
   /** 启动 opencode 子进程的工厂（可测试 mock） */
   spawnOpenCode?: (command: string, args: string[], env: NodeJS.ProcessEnv) => ChildProcess
   /** 探测 opencode 二进制路径（可测试 mock），返回 null 表示未找到 */
@@ -41,6 +40,8 @@ export interface ModeManagerDeps {
   waitForPort?: (port: number, timeoutMs?: number) => Promise<boolean>
   /** 分配空闲端口 */
   getFreePort?: () => Promise<number>
+  /** Main-process credential resolver backed by Keychain/safe storage. */
+  resolveCredentials?: (provider: string) => Promise<NodeJS.ProcessEnv>
 }
 
 const MODE_FILE = 'app-mode.json'
@@ -57,7 +58,7 @@ export class ModeManager {
 
   // ─── 持久化 ─────────────────────────────────────────────────
   private modeFile(): string {
-    return join(this.deps.userDataPath, MODE_FILE)
+    return join(this.deps.productHome, 'data', 'electron', MODE_FILE)
   }
 
   private readPersistedMode(): AppMode {
@@ -73,6 +74,7 @@ export class ModeManager {
 
   private persistMode(mode: AppMode): void {
     try {
+      mkdirSync(join(this.deps.productHome, 'data', 'electron'), { recursive: true, mode: 0o700 })
       writeFileSync(this.modeFile(), JSON.stringify({ mode }), 'utf8')
     } catch {
       /* best effort */
@@ -80,7 +82,7 @@ export class ModeManager {
   }
 
   private broadcast(mode: AppMode): void {
-    this.deps.broadcast?.('hermes-desktop:mode-changed', mode)
+    this.deps.broadcast?.(mode)
   }
 
   // ─── 公共 API ───────────────────────────────────────────────
@@ -110,15 +112,27 @@ export class ModeManager {
     if (this.codeModeUrl && this.codeProcess && !this.codeProcess.killed) {
       return { ok: true, url: this.codeModeUrl }
     }
-    const detect = this.deps.detectOpenCode ?? defaultDetectOpenCode
+    const detect = this.deps.detectOpenCode ?? (() => defaultDetectOpenCode(this.deps.productHome))
     const bin = detect()
     if (!bin) {
-      return { ok: false, error: 'opencode binary not found on PATH' }
+      return { ok: false, error: 'DeepCode runtime is not installed' }
+    }
+    const deepCodeRuntimeRoot = resolve(this.deps.productHome, 'runtime', 'deepcode')
+    let realBinary: string
+    let realRuntimeRoot: string
+    try {
+      realBinary = realpathSync(bin)
+      realRuntimeRoot = realpathSync(deepCodeRuntimeRoot)
+    } catch {
+      return { ok: false, error: 'DeepCode runtime path is invalid' }
+    }
+    if (!realBinary.startsWith(`${realRuntimeRoot}/`)) {
+      return { ok: false, error: 'Refusing an OpenCode binary outside DeepAgent runtime' }
     }
     const getPort = this.deps.getFreePort ?? defaultGetFreePort
     const wait = this.deps.waitForPort ?? defaultWaitForPort
     const spawnFn = this.deps.spawnOpenCode ?? defaultSpawnOpenCode
-    const command = bin
+    const command = realBinary
 
     let port = 0
     try {
@@ -126,18 +140,35 @@ export class ModeManager {
     } catch (err) {
       return { ok: false, error: `failed to allocate port: ${(err as Error).message}` }
     }
+    const deepCodeDataRoot = resolve(this.deps.productHome, 'data', 'deepcode')
+    const deepCodeCacheRoot = resolve(this.deps.productHome, 'cache', 'deepcode')
+    const deepCodeHome = resolve(deepCodeDataRoot, 'home')
+    for (const directory of [deepCodeDataRoot, deepCodeCacheRoot, deepCodeHome]) {
+      mkdirSync(directory, { recursive: true, mode: 0o700 })
+    }
+    const credentialEnv = this.deps.resolveCredentials
+      ? await this.deps.resolveCredentials(config.provider).catch(() => ({}))
+      : {}
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      // 把共享配置作为 env 注入；opencode 支持 OPENCODE_API_KEY/MODEL/PROVIDER/BASE_URL
-      OPENCODE_API_KEY: config.apiKey || '',
+      PATH: process.env.PATH,
+      TMPDIR: process.env.TMPDIR,
+      LANG: process.env.LANG,
+      LC_ALL: process.env.LC_ALL,
+      HOME: deepCodeHome,
+      XDG_CONFIG_HOME: join(deepCodeDataRoot, 'config'),
+      XDG_DATA_HOME: join(deepCodeDataRoot, 'data'),
+      XDG_STATE_HOME: join(deepCodeDataRoot, 'state'),
+      XDG_CACHE_HOME: deepCodeCacheRoot,
+      OPENCODE_CONFIG_DIR: join(deepCodeDataRoot, 'config', 'opencode'),
       OPENCODE_MODEL: config.model || '',
       OPENCODE_PROVIDER: config.provider || '',
       ...(config.baseUrl ? { OPENCODE_BASE_URL: config.baseUrl } : {}),
       ...(config.profile ? { OPENCODE_PROFILE: config.profile } : {}),
+      ...credentialEnv,
     }
-    const args = ['serve', '--port', String(port), '--no-open']
+    const args = ['serve', '--hostname', '127.0.0.1', '--port', String(port), '--no-open']
     try {
-      this.codeProcess = spawnFn(bin.includes('/') ? bin : 'opencode', args, env)
+      this.codeProcess = spawnFn(command, args, env)
     } catch (err) {
       return { ok: false, error: `spawn failed: ${(err as Error).message}` }
     }
@@ -165,9 +196,10 @@ export class ModeManager {
 }
 
 // ─── 默认实现（可被 deps 覆盖） ─────────────────────────────
-/** 默认检测：优先 OPENCODE_BIN，否则返回 'opencode' 让 PATH 解析 */
-function defaultDetectOpenCode(): string | null {
-  return process.env.OPENCODE_BIN || 'opencode'
+/** Only use the DeepAgent-managed runtime; never search PATH or user OpenCode. */
+function defaultDetectOpenCode(productHome: string): string | null {
+  const binary = join(resolve(productHome), 'runtime', 'deepcode', 'current', process.platform === 'win32' ? 'opencode.exe' : 'opencode')
+  return existsSync(binary) ? binary : null
 }
 
 function defaultSpawnOpenCode(cmd: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {

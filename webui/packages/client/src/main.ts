@@ -35,14 +35,6 @@ if (isDesktopPetWindow) {
   document.documentElement.classList.add('hermes-desktop-pet-window')
 }
 
-// Read token from URL BEFORE router initializes (hash router strips params)
-const urlParams = new URLSearchParams(window.location.search)
-const hashQuery = window.location.hash.split('?')[1]
-const urlToken = urlParams.get('token') || (hashQuery ? new URLSearchParams(hashQuery).get('token') : null)
-if (urlToken) {
-  ;(window as any).__LOGIN_TOKEN__ = urlToken
-}
-
 const app = createApp(App)
 app.use(createPinia())
 app.use(i18n)

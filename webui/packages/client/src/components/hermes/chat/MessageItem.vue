@@ -102,7 +102,7 @@ function parseContentBlocks(content: string): Array<ContentBlock | Record<string
   try {
     return parse(trimmed)
   } catch {
-    // Hermes Agent stored some multimodal user messages via Python str(list),
+    // The legacy runtime stored some multimodal user messages via Python str(list),
     // e.g. [{'type': 'text'}, {'type': 'image_url', ...}]. Convert that
     // legacy repr into JSON for display only.
     if (!trimmed.startsWith("[{'") && !trimmed.startsWith('[{"')) return null

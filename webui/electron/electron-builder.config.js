@@ -11,15 +11,10 @@ const path = require('path')
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
-  appId: 'com.deepagent.desktop',
-  productName: 'Deep Agent',
+  appId: 'org.starseas.deepagent.legacy',
+  productName: 'DeepAgent Legacy Preview',
   copyright: `Copyright © ${new Date().getFullYear()} Deep Agent Contributors`,
 
-  directories: {
-    output: 'dist/electron-output',
-    buildResources: 'electron/build',
-    app: '.',
-  },
   extraMetadata: {
     main: 'electron/main.js',
   },
@@ -42,13 +37,7 @@ const config = {
    * NOTE: electron-output/ MUST be excluded to prevent recursive nesting
    * when electron-builder copies extraResources into the app bundle.
    */
-  extraResources: [
-    {
-      from: 'dist',
-      to: 'dist',
-      filter: ['client/**/*', 'server/**/*', 'mcu/**/*'],
-    },
-  ],
+  extraResources: [],
 
   /* Node native addons (node-pty etc.) must be unpacked from asar */
   asarUnpack: ['**/*.node'],
@@ -56,23 +45,14 @@ const config = {
   /* macOS target */
   mac: {
     target: [
-      { target: 'dmg', arch: ['arm64', 'x64'] },
-      { target: 'zip', arch: ['arm64', 'x64'] },
+      { target: 'dmg', arch: ['arm64'] },
+      { target: 'zip', arch: ['arm64'] },
     ],
     category: 'public.app-category.developer-tools',
     hardenedRuntime: true,
-    artifactName: 'Deep.Agent-${version}-${arch}.${ext}',
+    artifactName: 'DeepAgent.Legacy.Preview-${version}-${arch}.${ext}',
   },
 
-  /* Linux target */
-  linux: {
-    target: [
-      { target: 'AppImage', arch: ['x64', 'arm64'] },
-      { target: 'deb', arch: ['x64'] },
-    ],
-    category: 'Development',
-    artifactName: 'deep-agent-${version}-${arch}.${ext}',
-  },
 }
 
 module.exports = config

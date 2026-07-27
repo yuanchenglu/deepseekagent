@@ -10,7 +10,8 @@
  *  - 不直接依赖 Pinia store，避免耦合；调用方从 appStore 取值传入
  */
 
-import { desktopBridge, type HermesDesktopBridge } from './desktop-bridge'
+import { desktopBridge, type HermesDesktopBridge, type SharedConfig } from './desktop-bridge'
+export type { SharedConfig } from './desktop-bridge'
 
 /** 模式切换持久化键 */
 export const APP_MODE_STORAGE_KEY = 'hermes_app_mode'
@@ -21,22 +22,8 @@ export type AppMode = 'assistant' | 'code'
 /**
  * 共享配置 —— 两种模式间共享的连接信息
  */
-export interface SharedConfig {
-  /** JWT API Key */
-  apiKey: string
-  /** 选中的模型 ID，如 "claude-sonnet-4-20250514" */
-  model: string
-  /** Provider 标识，如 "anthropic" | "openai" | "custom" */
-  provider: string
-  /** 自定义 base URL（可选） */
-  baseUrl?: string
-  /** 活跃 profile 名称（可选） */
-  profile?: string
-}
-
 /** 空配置常量，用于降级/初始状态 */
 export const EMPTY_SHARED_CONFIG: SharedConfig = {
-  apiKey: '',
   model: '',
   provider: '',
   baseUrl: undefined,
@@ -63,12 +50,11 @@ export function getSharedConfig(appState?: {
   selectedModel?: string
   selectedProvider?: string
 }): SharedConfig {
-  const apiKey = safeGetItem('hermes_api_key')
   const baseUrl = safeGetItem('hermes_server_url') || undefined
   const profile = safeGetItem('hermes_active_profile_name') || undefined
   const model = appState?.selectedModel || safeGetItem('hermes_selected_model') || ''
   const provider = appState?.selectedProvider || safeGetItem('hermes_selected_provider') || ''
-  return { apiKey, model, provider, baseUrl, profile }
+  return { model, provider, baseUrl, profile }
 }
 
 /**
