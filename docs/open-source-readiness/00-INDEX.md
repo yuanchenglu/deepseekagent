@@ -15,6 +15,7 @@
 7. [07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md](./07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md) — 第一阶段：公开、可安装、可用的 CLI Alpha。
 8. [08-PHASE-2-WEBUI-STABLE-BETA.md](./08-PHASE-2-WEBUI-STABLE-BETA.md) — 第二阶段：浏览器 WebUI Beta 与完整本地共存。
 9. [09-PHASE-3-DUAL-MODE-ELECTRON.md](./09-PHASE-3-DUAL-MODE-ELECTRON.md) — 第三阶段：DeepAgent / DeepCode 双模式 Electron。
+10. [10-ELECTRON-PREVIEW-STATUS.md](./10-ELECTRON-PREVIEW-STATUS.md) — PR #1 合入后的 Electron Preview 继续开发状态、无签名发布边界和剩余真实环境门禁。
 
 原 [07-OPEN-SOURCE-ITERATION-PLAN.md](./07-OPEN-SOURCE-ITERATION-PLAN.md) 仅作历史审计记录，不再是执行依据。
 
@@ -35,6 +36,7 @@
 - Agent 基础循环、工具调用和会话持久化可用。
 - 安装、运行和卸载不读写 Hermes 或用户 OpenCode 的数据目录。
 - 安装、升级、卸载和回滚可验证。
-- 第一阶段 Release 产物具备 SHA-256、版本 Manifest 和可追溯 Commit；签名、公证属于第三阶段 DMG 门禁。
+- 第一阶段 Release 产物具备 SHA-256、版本 Manifest 和可追溯 Commit。
+- Electron Preview 在没有 Apple Developer 账号期间允许无签名发布，但 Manifest、CI 和 Release Notes 必须明确 `signed=false`、`notarized=false`、Gatekeeper 人工批准要求；不得标记 Stable。
 - 文档与代码一致，第三方许可证清晰。
 - CI 对失败严格阻断。

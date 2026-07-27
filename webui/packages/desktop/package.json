@@ -16,7 +16,8 @@
     "dev": "npm run build:main && electron .",
     "dist": "npm run build && node scripts/electron-builder.mjs --mac --arm64",
     "dist:mac": "npm run build && node scripts/electron-builder.mjs --mac",
-    "dist:preview": "npm run build && node scripts/electron-builder.mjs --mac --arm64 --publish never"
+    "prepare:preview": "chmod 0755 build/post-install.sh",
+    "dist:preview": "npm run build && npm run prepare:preview && node scripts/electron-builder.mjs --mac --arm64 --publish never"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
