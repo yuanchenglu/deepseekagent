@@ -39,7 +39,18 @@ mac:
     - target: dmg
       arch: [arm64]
   category: public.app-category.developer-tools
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  notarize: true
+  # Preview builds are intentionally unsigned until an Apple Developer account
+  # is available. Explicitly disable identity discovery so local certificates
+  # cannot make otherwise identical builds differ.
+  identity: null
   artifactName: "DeepAgent-${version}-${arch}.${ext}"
+
+dmg:
+  title: "DeepAgent ${version}"
+  contents:
+    - x: 140
+      y: 200
+    - x: 420
+      y: 200
+      type: link
+      path: /Applications
