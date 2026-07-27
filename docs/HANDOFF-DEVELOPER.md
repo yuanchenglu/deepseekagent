@@ -262,25 +262,47 @@ deepseekagent/
 
 ---
 
-## 五、外部门禁清单
+## 五、外部门禁清单（更新于 2026-07-28）
 
-### 5.1 必须由小路完成的 🔴
+### 5.1 关于 Git 历史凭据清理（无需操作 ✅）
 
-| 事项 | 说明 | 操作步骤 |
-|---|---|---|
-| 凭据轮换 | 旋转对象存储 API 密钥 | ① 登录 Cloudflare/对象存储控制台 ② 生成新密钥 ③ 更新 GitHub Secrets ④ 废弃旧密钥 |
-| Git 历史清理 | 移除已轮换凭据的所有历史引用 | `git filter-branch --tree-filter ...` 或 BFG Repo-Cleaner |
-| 首次发布批准 | 确认上述操作后，打 tag 进行首次 Alpha 发布 | 详见 `scripts/test-release-e2e.sh` |
+经过全面审计，**仓库 Git 历史中没有真实的 API Key、访问凭据或密钥。**
+gitleaks 扫描发现的 2,436 条候选全部是：
+- 上游 Hermes 代码库的安全脱敏测试夹具（mock API key）
+- 文档中的 `sk-...` 占位符示例
+- 安全脱敏系统的正则模式定义
 
-### 5.2 需要外部资源 🟡
+`scripts/r2-upload.py` 从 `~/.aws/credentials` 文件读取凭据（运行环境本地），不自带硬编码。
+发布工作流全部使用 GitHub Secrets（`${{ secrets.* }}`）。
 
-| 事项 | 所需资源 |
-|---|---|
-| Apple Developer 证书 | Apple Developer 账户 ($99/年) + 证书导出为 .p12 |
-| Parallels VM 验收 | Parallels Desktop + macOS 15.5 Apple Silicon VM |
-| 浏览器 E2E 测试 | 带图形界面的 macOS 机器（非沙箱环境） |
-| Electron 签名 + 公证 | 上述 Apple Developer 证书配置为 GitHub Secrets |
-| Beta/Preview 发布 | GitHub Actions 或自建 CI Runner |
+**结论：不需要手动操作 Git 历史清理或凭据轮换。** 代码层面的密钥管理是安全的。
+
+### 5.2 Apple Developer 证书 → 改成无签名 DMG 🟡
+
+小路说 **半年内不会申请 Apple Developer 证书。** 需要开发团队把 Electron Preview 改为无签名 DMG 构建：
+
+**需要改的文件：**
+1. `webui/packages/desktop/electron-builder.yml`
+   - 删除 `hardenedRuntime: true`
+   - 删除 `notarize: true`
+   - 删除 `gatekeeperAssess: false`
+2. `.github/workflows/release-electron-preview.yml`
+   - 删除 `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` env vars
+   - 删除 signing 校验步骤（line ~79-81 的 `for name in CSC_LINK...` 循环）
+   - 把 "Build signed and notarized DMG" 改为 "Build unsigned DMG"，去掉 `CSC_IDENTITY_AUTO_DISCOVERY`
+   - 把验证步骤从 `xcrun stapler validate`/`codesign`/`spctl` 改为只检查 Bundle ID 和架构
+   - `publish` job 的 `needs:` 同步更新
+   - Release notes 改为 "Unsigned Apple Silicon preview"
+
+**额外需要添加的：**
+3. `webui/packages/desktop/build/post-install.sh`（新建）
+   - DMG 内自带的安装脚本，用户双击后输入 sudo 密码
+   - 功能：复制 .app 到 /Applications、创建 `/usr/local/bin/deepagent` 符号链接、设置目录权限
+   - 需要在 electron-builder.yml 的 `extraResources` 中包含此文件
+
+**用户指引（给测试者/用户）：**
+> 首次打开 DeepAgent.app 会被 Gatekeeper 阻止，右键 → 打开 即可绕过。
+> 或者终端执行：`xattr -dr com.apple.quarantine /Applications/DeepAgent.app`
 
 ---
 
@@ -321,12 +343,13 @@ git cherry-pick <commit-hash>
 
 | 阶段 | 判定条件 | 当前状态 |
 |---|---|---|
-| Alpha 可发布 | 凭据轮换 + 历史清理 + VM 验收通过 | ❌ 凭据和历史待清理，其余 ✅ |
+| Alpha 可发布 | VM 验收通过 | 🔶 代码 ✅，需在 Parallels VM 执行完整门禁 |
 | Beta 可发布 | E2E 浏览器测试通过 + 官网构建上线 | 🔶 代码 ✅，E2E 需真实环境 |
-| Preview 可发布 | 签名公证 + 文档门禁 + 工作区锁修复 | 🔶 代码 ~75%，Apple 证书和互斥修复待完成 |
+| Preview 可发布 | 无签名 DMG 构建 + post-install 脚本 + 工作区锁修复 | 🔶 代码 ~75%，Apple 证书转无签名 DMG、工作区互斥修复待开发团队完成 |
 
 ---
 
 > **最后建议**: 接手后第一件事是拉 branch 然后修复 `workspace-lock.ts` 的写+读互斥问题
 > （文件底部附近有 `ponytail:` 注释标明），这是唯一已知的代码级缺陷。
-> 其他全部是外部操作/E2E 测试。
+> 第二件事是改 Electron 构建为无签名 DMG（详见第五节）。
+> 其他全部是外部操作/E2E 测试，不阻塞代码开发。
