@@ -36,15 +36,13 @@ export async function getToken(): Promise<string> {
 }
 
 /**
- * Koa middleware: check Authorization header or query token.
+ * Koa middleware: check the Authorization header.
  * No path whitelisting — applied globally after public routes.
  */
 export function requireAuth(token: string | null) {
   return async (ctx: any, next: () => Promise<void>) => {
     const auth = ctx.headers.authorization || ''
-    const provided = auth.startsWith('Bearer ')
-      ? auth.slice(7)
-      : (ctx.query.token as string) || ''
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
     if (!provided || provided !== token) {
       // Skip auth for non-API paths (SPA static files)
