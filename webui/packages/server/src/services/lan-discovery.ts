@@ -66,13 +66,11 @@ let cache: LanDiscoveryState = {
 let scanInFlight: Promise<LanDiscoveryState> | null = null
 let localInfoCache: { value: PublicSystemInfo; expiresAt: number } | null = null
 
-function envFlagDisabled(name: string): boolean {
-  const value = String(process.env[name] || '').trim().toLowerCase()
-  return ['0', 'false', 'no', 'off'].includes(value)
-}
-
-export function isLanDiscoveryEnabled(): boolean {
-  return !envFlagDisabled('HERMES_LAN_DISCOVERY_ENABLED')
+export function isLanDiscoveryEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = String(env.HERMES_LAN_DISCOVERY_ENABLED || '').trim().toLowerCase()
+  return ['1', 'true', 'yes', 'on'].includes(value)
 }
 
 function parsePortList(value: string | undefined): number[] {
