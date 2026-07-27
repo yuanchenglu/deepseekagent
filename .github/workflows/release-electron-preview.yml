@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       publish:
-        description: Publish signed/notarized DMG and promote preview channel
+        description: Publish unsigned DMG and promote preview channel
         required: false
         default: false
         type: boolean
@@ -17,15 +17,9 @@ permissions:
   contents: write
 
 jobs:
-  build-sign-notarize:
-    name: Build, sign, notarize, and verify Apple Silicon DMG
+  build-unsigned:
+    name: Build and verify unsigned Apple Silicon DMG
     runs-on: macos-14
-    env:
-      CSC_LINK: ${{ secrets.CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,7 +51,7 @@ jobs:
             webui/package-lock.json
             webui/packages/desktop/package-lock.json
 
-      - name: Validate source version, tag, platform promise, and signing inputs
+      - name: Validate source version, tag, and platform promise
         env:
           VERSION: ${{ inputs.version }}
           PUBLISH: ${{ inputs.publish }}
@@ -80,9 +74,6 @@ jobs:
             echo "Electron Preview is built only on macOS Apple Silicon" >&2
             exit 1
           }
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            [ -n "${!name:-}" ] || { echo "Required signing secret is missing: ${name}" >&2; exit 1; }
-          done
           if [ "$PUBLISH" = "true" ]; then
             [ "$(git rev-list -n 1 "v${VERSION}")" = "$(git rev-parse HEAD)" ] || {
               echo "Publishing requires tag v${VERSION} at HEAD" >&2
@@ -106,37 +97,54 @@ jobs:
           npx vitest run --config packages/desktop/vitest.config.ts
           npm --prefix packages/desktop run build:main
 
-      - name: Enforce Phase 2 Runtime reuse and preview-only target
+      - name: Enforce Runtime reuse and unsigned preview target
         run: |
           ! grep -q 'ensureDesktopRuntime' webui/packages/desktop/src/main/index.ts
           ! grep -q 'from: "../.."' webui/packages/desktop/electron-builder.yml
           grep -q 'appId: org.starseas.deepagent' webui/packages/desktop/electron-builder.yml
           grep -q 'arch: \[arm64\]' webui/packages/desktop/electron-builder.yml
+          grep -q 'identity: null' webui/packages/desktop/electron-builder.yml
+          grep -q 'post-install.sh' webui/packages/desktop/electron-builder.yml
           ! grep -Eq '^[[:space:]]*(win|linux):' webui/packages/desktop/electron-builder.yml
+          bash -n webui/packages/desktop/build/post-install.sh
 
-      - name: Build signed and notarized DMG
+      - name: Build unsigned DMG
         working-directory: webui/packages/desktop
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist:preview
 
-      - name: Verify DMG signature, notarization, Bundle ID, and architecture
+      - name: Verify unsigned DMG, Bundle ID, architecture, and installer
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
           DMG="webui/packages/desktop/release/DeepAgent-${VERSION}-arm64.dmg"
           [ -f "$DMG" ] || { echo "Expected DMG missing: $DMG" >&2; exit 1; }
-          xcrun stapler validate "$DMG"
           MOUNT="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$MOUNT" >/dev/null 2>&1 || true
+            rmdir "$MOUNT" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
           hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DMG"
+
           APP="$MOUNT/DeepAgent.app"
+          INSTALLER="$MOUNT/Install DeepAgent.command"
+          RESOURCE_INSTALLER="$APP/Contents/Resources/build/post-install.sh"
           [ -d "$APP" ]
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          spctl --assess --type execute --verbose=4 "$APP"
-          [ "$(defaults read "$APP/Contents/Info" CFBundleIdentifier)" = "org.starseas.deepagent" ]
+          [ -f "$INSTALLER" ] && [ -x "$INSTALLER" ]
+          [ -f "$RESOURCE_INSTALLER" ] && [ -x "$RESOURCE_INSTALLER" ]
+          cmp "$INSTALLER" "$RESOURCE_INSTALLER"
+          bash -n "$INSTALLER"
+
+          if codesign --verify --deep --strict "$APP" >/tmp/deepagent-codesign.log 2>&1; then
+            echo "Expected an unsigned Preview, but the app bundle verifies as signed." >&2
+            cat /tmp/deepagent-codesign.log >&2
+            exit 1
+          fi
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "org.starseas.deepagent" ]
           file "$APP/Contents/MacOS/DeepAgent" | grep -q 'Mach-O.*arm64'
-          hdiutil detach "$MOUNT"
-          rmdir "$MOUNT"
 
       - name: Generate immutable Desktop manifest and checksum
         env:
@@ -161,6 +169,11 @@ jobs:
               "runtime_version": runtime_version,
               "platform": {"os": "darwin", "arch": "arm64"},
               "bundle_id": "org.starseas.deepagent",
+              "distribution": {
+                  "signed": False,
+                  "notarized": False,
+                  "gatekeeper_approval_required": True,
+              },
               "artifact": {
                   "filename": artifact.name,
                   "url": f"https://deepseekagent.starseas.org/releases/desktop/{artifact.name}",
@@ -190,7 +203,7 @@ jobs:
 
   publish:
     name: Publish verified Electron Preview
-    needs: build-sign-notarize
+    needs: build-unsigned
     if: ${{ inputs.publish }}
     runs-on: ubuntu-latest
     steps:
@@ -210,7 +223,7 @@ jobs:
         run: |
           gh release create "v${VERSION}" --draft --prerelease \
             --title "DeepAgent Electron Preview v${VERSION}" \
-            --notes "Signed and notarized Apple Silicon preview. Requires the matching DeepAgent WebUI Runtime." \
+            --notes "Unsigned Apple Silicon preview. On first launch, right-click DeepAgent.app and choose Open. Requires the matching DeepAgent WebUI Runtime." \
             release/*
 
       - name: Upload Desktop objects to R2 and verify readback
