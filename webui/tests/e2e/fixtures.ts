@@ -95,6 +95,8 @@ export async function mockHermesApi(page: Page, options: MockHermesApiOptions = 
   const unexpectedRequests: MockedRequest[] = []
   const tokenValidationStatus = options.tokenValidationStatus ?? 200
   let activeProfileName = options.initialProfileName ?? 'research'
+  let cookieSessionAuthenticated = false
+  const consumedTickets = new Set<string>()
 
   await page.route('**/*', async (route: Route) => {
     const request = route.request()
@@ -127,11 +129,44 @@ export async function mockHermesApi(page: Page, options: MockHermesApiOptions = 
         await route.fulfill(jsonResponse({ error: 'Invalid username or password' }, tokenValidationStatus))
         return
       }
-      await route.fulfill(jsonResponse({ token: TEST_ACCESS_KEY }))
+      cookieSessionAuthenticated = true
+      await route.fulfill({
+        ...jsonResponse({ user: { id: 1, username: 'playwright', role: 'super_admin' } }),
+        headers: { 'Set-Cookie': 'deepagent_session=playwright-cookie; Path=/; HttpOnly; SameSite=Strict' },
+      })
+      return
+    }
+
+    if (pathname === '/api/auth/ticket') {
+      const body = JSON.parse(request.postData() || '{}') as { ticket?: string }
+      if (request.method() !== 'POST' || typeof body.ticket !== 'string' || body.ticket.length < 32 || consumedTickets.has(body.ticket)) {
+        await route.fulfill(jsonResponse({ error: 'Login ticket is invalid or expired' }, 401))
+        return
+      }
+      consumedTickets.add(body.ticket)
+      cookieSessionAuthenticated = true
+      await route.fulfill({
+        ...jsonResponse({ user: { id: 1, username: 'playwright', role: 'super_admin' } }),
+        headers: { 'Set-Cookie': 'deepagent_session=playwright-cookie; Path=/; HttpOnly; SameSite=Strict' },
+      })
+      return
+    }
+
+    if (pathname === '/api/auth/logout') {
+      cookieSessionAuthenticated = false
+      await route.fulfill({
+        ...jsonResponse({ ok: true }),
+        headers: { 'Set-Cookie': 'deepagent_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict' },
+      })
       return
     }
 
     if (pathname === '/api/auth/me') {
+      const bearerAuthenticated = request.headers().authorization === `Bearer ${TEST_ACCESS_KEY}`
+      if (!cookieSessionAuthenticated && !bearerAuthenticated) {
+        await route.fulfill(jsonResponse({ error: 'Unauthorized' }, 401))
+        return
+      }
       await route.fulfill(jsonResponse({
         user: {
           id: 1,
