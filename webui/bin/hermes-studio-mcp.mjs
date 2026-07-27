@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const DEFAULT_PORT = process.env.HERMES_WEB_UI_PORT || process.env.PORT || '8648'
 const DEFAULT_BASE_URL = `http://127.0.0.1:${DEFAULT_PORT}`
-const DISPLAY_COMMAND = 'hermes-studio-mcp'
+const DISPLAY_COMMAND = 'deepagent-webui-mcp'
 const SERVER_NAME = process.env.HERMES_MCP_SERVER_NAME || DISPLAY_COMMAND
 const TOOLSETS = new Set(['api', 'devices', 'use'])
 const ALLOWED_PUBLIC_REQUEST_HEADERS = new Set([
@@ -41,7 +41,7 @@ const VERSION = readPackageVersion()
 function printHelp() {
   process.stdout.write(`${DISPLAY_COMMAND} v${VERSION}
 
-Hermes Studio MCP stdio server.
+DeepAgent WebUI MCP stdio server.
 
 Usage:
   ${DISPLAY_COMMAND} [api|devices|use]
@@ -50,9 +50,9 @@ Usage:
 
 Environment:
   HERMES_WEB_UI_URL       Web UI base URL. Default: ${DEFAULT_BASE_URL}
-  HERMES_WEB_UI_HOME      Web UI state directory. Default: ~/.hermes-web-ui
+  HERMES_WEB_UI_HOME      WebUI state directory. Default: ~/.deepagent/data/webui
   HERMES_WEBUI_STATE_DIR  Fallback Web UI state directory.
-  HERMES_WEB_UI_PROFILE   Default Hermes profile when a tool call omits profile.
+  HERMES_WEB_UI_PROFILE   Default DeepAgent profile when a tool call omits profile.
   HERMES_WEB_UI_TOKEN     Optional explicit API token.
   AUTH_TOKEN              Optional explicit API token fallback.
   HERMES_MCP_TOOLSET      Tool category to expose: api, devices, or use. Default: api.
@@ -78,7 +78,7 @@ if (process.argv.includes('-v') || process.argv.includes('--version')) {
 function appHome() {
   return process.env.HERMES_WEB_UI_HOME ||
     process.env.HERMES_WEBUI_STATE_DIR ||
-    join(homedir(), '.hermes-web-ui')
+    join(homedir(), '.deepagent', 'data', 'webui')
 }
 
 function normalizeProfileSegment(profile) {
@@ -122,7 +122,7 @@ function defaultProfile() {
 }
 
 function authHint() {
-  return `Web UI token was not accepted. Pass the current Hermes profile argument so this MCP server can read its temporary token, pass an explicit token argument, or set HERMES_WEB_UI_TOKEN.`
+  return `Web UI token was not accepted. Pass the current DeepAgent profile argument so this MCP server can read its temporary token, pass an explicit token argument, or set HERMES_WEB_UI_TOKEN.`
 }
 
 function baseUrl() {
@@ -386,7 +386,7 @@ const moduleHints = {
     keywords: ['codex', 'claude', 'coding agent', 'install', 'run'],
   },
   Config: {
-    purpose: 'Read and update Hermes Web UI configuration.',
+    purpose: 'Read and update DeepAgent WebUI configuration.',
     keywords: ['config', 'settings', 'preferences'],
   },
   Devices: {
@@ -394,7 +394,7 @@ const moduleHints = {
     keywords: ['device', 'lan', 'peer', 'terminal', 'file transfer'],
   },
   Files: {
-    purpose: 'Browse and operate files exposed through the Hermes file browser.',
+    purpose: 'Browse and operate files exposed through the DeepAgent file browser.',
     keywords: ['files', 'browser', 'read', 'list', 'download'],
   },
   'Group Chat': {
@@ -422,11 +422,11 @@ const moduleHints = {
     keywords: ['memory', 'agent memory', 'notes'],
   },
   Models: {
-    purpose: 'Inspect and configure model ids available to Hermes.',
+    purpose: 'Inspect and configure model ids available to DeepAgent.',
     keywords: ['models', 'model id', 'llm'],
   },
   Profiles: {
-    purpose: 'Manage Hermes profiles and profile-scoped runtime state.',
+    purpose: 'Manage DeepAgent profiles and profile-scoped runtime state.',
     keywords: ['profile', 'workspace', 'account'],
   },
   Providers: {
@@ -438,7 +438,7 @@ const moduleHints = {
     keywords: ['sessions', 'conversation', 'chat history'],
   },
   Skills: {
-    purpose: 'Browse and manage skills available to Hermes agents.',
+    purpose: 'Browse and manage skills available to DeepAgent agents.',
     keywords: ['skills', 'agent skill', 'capability'],
   },
   Terminal: {
@@ -446,7 +446,7 @@ const moduleHints = {
     keywords: ['terminal', 'shell', 'websocket'],
   },
   'Write Gate': {
-    purpose: 'Review and approve Hermes Agent write operations.',
+    purpose: 'Review and approve DeepAgent Runtime write operations.',
     keywords: ['approval', 'write gate', 'review'],
   },
 }
@@ -527,7 +527,7 @@ function compactOpenApiDocument(openapi, args = {}) {
   }
 
   return {
-    title: openapi?.info?.title || 'Hermes Studio API',
+    title: openapi?.info?.title || 'DeepAgent WebUI API',
     version: openapi?.info?.version || '',
     usage: hasFilters
       ? 'Use the selected operation details to call hermes_studio_api_request with method, path, query, and body. Auth and profile are handled by the MCP server.'
@@ -543,11 +543,11 @@ function compactOpenApiDocument(openapi, args = {}) {
 const authArgumentProperties = {
   token: {
     type: 'string',
-    description: 'Optional Hermes Web UI bearer token. Usually omit this and pass profile so the MCP server can read the temporary profile token.',
+    description: 'Optional DeepAgent WebUI bearer token. Usually omit this and pass profile so the MCP server can read the temporary profile token.',
   },
   profile: {
     type: 'string',
-    description: 'Hermes profile name for profile-scoped Web UI requests and temporary profile token lookup.',
+    description: 'DeepAgent profile name for profile-scoped WebUI requests and temporary profile token lookup.',
   },
 }
 
@@ -707,7 +707,7 @@ const tools = [
   {
     name: 'hermes_studio_api_openapi_get',
     toolset: 'api',
-    description: 'Return Hermes Studio API documentation as compact JSON. When the user asks to read/check the operation manual, API docs, endpoint docs, 接口文档, 接口手册, or 操作手册, call this tool without filters first to get the outline/module index. Without filters, returns only module purpose, keywords, and operation counts because the full API catalog is large. For endpoint details, call again with tag, path, or method filters, then use hermes_studio_api_request.',
+    description: 'Return DeepAgent WebUI API documentation as compact JSON. When the user asks to read/check the operation manual, API docs, endpoint docs, 接口文档, 接口手册, or 操作手册, call this tool without filters first to get the outline/module index. Without filters, returns only module purpose, keywords, and operation counts because the full API catalog is large. For endpoint details, call again with tag, path, or method filters, then use hermes_studio_api_request.',
     inputSchema: inputSchema({
         path: {
           type: 'string',
@@ -731,7 +731,7 @@ const tools = [
   {
     name: 'hermes_studio_api_request',
     toolset: 'api',
-    description: 'Execute a Hermes Studio operation by calling an endpoint path. Use hermes_studio_api_openapi_get first as the operation manual to inspect method, parameters, requestBody, and responses.',
+    description: 'Execute a DeepAgent WebUI operation by calling an endpoint path. Use hermes_studio_api_openapi_get first as the operation manual to inspect method, parameters, requestBody, and responses.',
     inputSchema: inputSchema({
         method: {
           type: 'string',
@@ -740,7 +740,7 @@ const tools = [
         },
         path: {
           type: 'string',
-          description: 'Relative Hermes Studio endpoint path from the operation manual, for example /api/hermes/sessions?limit=20. Full URLs and // paths are rejected.',
+          description: 'Relative DeepAgent WebUI endpoint path from the operation manual, for example /api/hermes/sessions?limit=20. Full URLs and // paths are rejected.',
         },
         body: {
           type: ['object', 'array', 'string', 'number', 'boolean', 'null'],
@@ -763,7 +763,7 @@ const tools = [
   {
     name: 'hermes_studio_use_chat_run',
     toolset: 'use',
-    description: 'Start one Hermes Studio chat or coding-agent run through the HTTP bridge and wait for completion.',
+    description: 'Start one DeepAgent WebUI chat or coding-agent run through the HTTP bridge and wait for completion.',
     inputSchema: inputSchema({
         input: {
           oneOf: [
@@ -852,7 +852,7 @@ const tools = [
   {
     name: 'hermes_studio_use_sessions_list',
     toolset: 'use',
-    description: 'List Hermes Studio chat sessions.',
+    description: 'List DeepAgent WebUI chat sessions.',
     inputSchema: inputSchema({
         limit: {
           type: 'number',
@@ -867,7 +867,7 @@ const tools = [
   {
     name: 'hermes_studio_use_sessions_count',
     toolset: 'use',
-    description: 'Count Hermes Studio chat sessions without returning the session list.',
+    description: 'Count DeepAgent WebUI chat sessions without returning the session list.',
     inputSchema: inputSchema({
         source: {
           type: 'string',
@@ -878,7 +878,7 @@ const tools = [
   {
     name: 'hermes_studio_use_usage_stats',
     toolset: 'use',
-    description: 'Query Hermes Studio usage totals, cost estimate, model breakdown, and daily trend for the selected profile.',
+    description: 'Query DeepAgent WebUI usage totals, cost estimate, model breakdown, and daily trend for the selected profile.',
     inputSchema: inputSchema({
         days: {
           type: 'number',
@@ -889,7 +889,7 @@ const tools = [
   {
     name: 'hermes_studio_use_session_get',
     toolset: 'use',
-    description: 'Get one Hermes Studio session by id.',
+    description: 'Get one DeepAgent WebUI session by id.',
     inputSchema: inputSchema({
         session_id: {
           type: 'string',
@@ -900,7 +900,7 @@ const tools = [
   {
     name: 'hermes_studio_use_session_messages',
     toolset: 'use',
-    description: 'Get messages for one Hermes Studio conversation. By default returns user and assistant messages only.',
+    description: 'Get messages for one DeepAgent WebUI conversation. By default returns user and assistant messages only.',
     inputSchema: inputSchema({
         session_id: {
           type: 'string',
@@ -930,7 +930,7 @@ const tools = [
   {
     name: 'hermes_studio_use_session_delete',
     toolset: 'use',
-    description: 'Delete one Hermes Studio session by id.',
+    description: 'Delete one DeepAgent WebUI session by id.',
     inputSchema: inputSchema({
         session_id: {
           type: 'string',
@@ -941,7 +941,7 @@ const tools = [
   {
     name: 'hermes_studio_use_session_rename',
     toolset: 'use',
-    description: 'Rename one Hermes Studio session title.',
+    description: 'Rename one DeepAgent WebUI session title.',
     inputSchema: inputSchema({
         session_id: {
           type: 'string',
@@ -956,13 +956,13 @@ const tools = [
   {
     name: 'hermes_studio_use_profiles_list',
     toolset: 'use',
-    description: 'List Hermes Studio profiles.',
+    description: 'List DeepAgent WebUI profiles.',
     inputSchema: inputSchema(),
   },
   {
     name: 'hermes_studio_use_available_models',
     toolset: 'use',
-    description: 'List available Hermes Studio models for the selected profile.',
+    description: 'List available DeepAgent WebUI models for the selected profile.',
     inputSchema: inputSchema(),
   },
   {
@@ -979,7 +979,7 @@ const tools = [
   {
     name: 'hermes_studio_use_provider_add',
     toolset: 'use',
-    description: 'Add or update a Hermes Studio model provider for the selected profile, then make it the active default provider/model.',
+    description: 'Add or update a DeepAgent WebUI model provider for the selected profile, then make it the active default provider/model.',
     inputSchema: inputSchema({
         name: {
           type: 'string',
@@ -1015,7 +1015,7 @@ const tools = [
   {
     name: 'hermes_studio_use_provider_delete',
     toolset: 'use',
-    description: 'Delete a Hermes Studio model provider or clear a built-in provider credential for the selected profile.',
+    description: 'Delete a DeepAgent WebUI model provider or clear a built-in provider credential for the selected profile.',
     inputSchema: inputSchema({
         pool_key: {
           type: 'string',
@@ -1035,13 +1035,13 @@ const tools = [
   {
     name: 'hermes_studio_use_worker_status',
     toolset: 'use',
-    description: 'Summarize current Hermes worker state, including worker count, completed interactions, and sessions still interacting.',
+    description: 'Summarize current DeepAgent worker state, including worker count, completed interactions, and sessions still interacting.',
     inputSchema: inputSchema(),
   },
   {
     name: 'hermes_studio_use_workflows_list',
     toolset: 'use',
-    description: 'List Hermes Studio workflows for the selected or requested profile.',
+    description: 'List DeepAgent WebUI workflows for the selected or requested profile.',
     inputSchema: inputSchema({
         profile: {
           type: 'string',
@@ -1052,7 +1052,7 @@ const tools = [
   {
     name: 'hermes_studio_use_workflow_get',
     toolset: 'use',
-    description: 'Get one Hermes Studio workflow by id.',
+    description: 'Get one DeepAgent WebUI workflow by id.',
     inputSchema: inputSchema({
         workflow_id: {
           type: 'string',
@@ -1063,7 +1063,7 @@ const tools = [
   {
     name: 'hermes_studio_use_workflow_create',
     toolset: 'use',
-    description: 'Create a Hermes Studio workflow with optional nodes, edges, viewport, workspace, and profile.',
+    description: 'Create a DeepAgent WebUI workflow with optional nodes, edges, viewport, workspace, and profile.',
     inputSchema: inputSchema({
         name: {
           type: 'string',
@@ -1097,7 +1097,7 @@ const tools = [
   {
     name: 'hermes_studio_use_workflow_update',
     toolset: 'use',
-    description: 'Update a Hermes Studio workflow name, workspace, nodes, edges, or viewport.',
+    description: 'Update a DeepAgent WebUI workflow name, workspace, nodes, edges, or viewport.',
     inputSchema: inputSchema({
         workflow_id: {
           type: 'string',
@@ -1131,7 +1131,7 @@ const tools = [
   {
     name: 'hermes_studio_use_workflow_delete',
     toolset: 'use',
-    description: 'Delete one Hermes Studio workflow by id, including its workflow run records.',
+    description: 'Delete one DeepAgent WebUI workflow by id, including its workflow run records.',
     inputSchema: inputSchema({
         workflow_id: {
           type: 'string',
@@ -1238,7 +1238,7 @@ const tools = [
   {
     name: 'hermes_studio_lan_devices_list',
     toolset: 'devices',
-    description: 'List known LAN and remote devices from Hermes Web UI, including pairing and online status.',
+    description: 'List known LAN and remote devices from DeepAgent WebUI, including pairing and online status.',
     inputSchema: inputSchema(),
   },
   {

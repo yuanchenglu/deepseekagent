@@ -1,0 +1,235 @@
+name: Release WebUI Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.9.0-beta.1
+        required: true
+        type: string
+      publish:
+        description: Publish verified artifacts and promote the beta channel
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-verify:
+    name: Build and verify WebUI Beta
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Scan all Git refs for secrets
+        run: |
+          go run github.com/zricethezav/gitleaks/v8@v8.30.1 git \
+            --redact --no-banner --report-format json \
+            --report-path gitleaks-webui-beta.json .
+
+      - name: Upload redacted secret scan
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-beta-secret-scan
+          path: gitleaks-webui-beta.json
+          if-no-files-found: ignore
+
+      - name: Validate version, tag, and source metadata
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]] || {
+            echo "WebUI Beta requires X.Y.Z-beta.N" >&2
+            exit 1
+          }
+          SOURCE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          [ "${SOURCE_VERSION#v}" = "$VERSION" ] || {
+            echo "VERSION does not match the requested release" >&2
+            exit 1
+          }
+          [ "$(node -p "require('./webui/package.json').version")" = "$VERSION" ] || {
+            echo "webui/package.json does not match VERSION" >&2
+            exit 1
+          }
+          if [ "$PUBLISH" = "true" ]; then
+            [ "$(git rev-list -n 1 "v${VERSION}")" = "$(git rev-parse HEAD)" ] || {
+              echo "Publishing requires tag v${VERSION} at HEAD" >&2
+              exit 1
+            }
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.5.0'
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Install, test, and build WebUI
+        working-directory: webui
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+          npm run licenses:audit -- \
+            --output "../dist/releases/deepagent-webui-all-npm-licenses-${{ inputs.version }}.json"
+
+      - name: Build Core, WebUI, and managed DeepCode artifacts
+        run: bash scripts/build-release.sh --version "${{ inputs.version }}" --channel beta
+
+      - name: Verify artifact boundaries
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          CORE="dist/releases/deepagent-${VERSION}.tar.gz"
+          WEBUI="dist/releases/deepagent-webui-server-${VERSION}.tar.gz"
+          DEEPCODE="dist/releases/deepagent-deepcode-${VERSION}.tar.gz"
+          if tar -tzf "$CORE" | grep -Eq '^(webui|embedded)(/|$)'; then
+            echo "Core artifact contains separately licensed runtime files" >&2
+            exit 1
+          fi
+          tar -tzf "$WEBUI" | grep -qx 'webui/dist/client/index.html'
+          tar -tzf "$WEBUI" | grep -qx 'webui/dist/server/index.js'
+          tar -tzf "$WEBUI" | grep -qx 'webui/runtime/node/bin/node'
+          tar -tzf "$WEBUI" | grep -qx 'webui/runtime/node/LICENSE'
+          tar -tzf "$WEBUI" | grep -qx 'webui/node_modules/socket.io/package.json'
+          tar -tzf "$WEBUI" | grep -qx 'webui/node_modules/node-pty/package.json'
+          tar -tzf "$WEBUI" | grep -qx 'webui/THIRD_PARTY_NOTICES.json'
+          tar -tzf "$WEBUI" | grep -qx 'webui/third_party_licenses/only-0.0.2-LICENSE'
+          if tar -tzf "$WEBUI" | grep -Eq '(^|/)(electron|packages/desktop)(/|$)'; then
+            echo "WebUI Beta artifact contains Desktop source" >&2
+            exit 1
+          fi
+          EXPECTED="$(printf '%s\n' embedded/opencode/macos-arm64/opencode embedded/opencode/src/LICENSE)"
+          ACTUAL="$(tar -tzf "$DEEPCODE" | sed 's#/$##' | sort -u)"
+          [ "$ACTUAL" = "$EXPECTED" ] || {
+            echo "DeepCode artifact boundary mismatch" >&2
+            printf '%s\n' "$ACTUAL" >&2
+            exit 1
+          }
+          file embedded/opencode/macos-arm64/opencode | grep -q 'Mach-O.*arm64'
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.6.12'
+
+      - name: Smoke-test packaged Core and audit Python licenses
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          SMOKE_DIR="$(mktemp -d)"
+          tar -xzf "dist/releases/deepagent-${VERSION}.tar.gz" -C "$SMOKE_DIR"
+          cd "$SMOKE_DIR"
+          uv sync --no-dev --python 3.12
+          .venv/bin/deepagent version
+          .venv/bin/python scripts/audit-python-licenses.py \
+            --output "$GITHUB_WORKSPACE/dist/releases/deepagent-python-licenses-${VERSION}.json"
+
+      - name: Verify generated checksums
+        working-directory: dist/releases
+        run: |
+          shasum -a 256 -c "deepagent-${{ inputs.version }}.tar.gz.sha256"
+          shasum -a 256 -c "deepagent-webui-server-${{ inputs.version }}.tar.gz.sha256"
+          shasum -a 256 -c "deepagent-deepcode-${{ inputs.version }}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webui-beta-release
+          path: dist/releases/*
+
+  publish:
+    name: Publish immutable Beta and promote channel
+    needs: build-and-verify
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webui-beta-release
+          path: release
+
+      - name: Create draft GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "v${VERSION}" --draft --prerelease \
+            --title "DeepAgent WebUI Beta v${VERSION}" \
+            --notes "WebUI Beta for macOS Apple Silicon. Core is MIT; WebUI is BSL-1.1." \
+            release/*
+
+      - name: Upload immutable objects to R2 and verify readback
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+          mkdir -p /tmp/deepagent-r2-readback
+          for name in \
+            "deepagent-${VERSION}.tar.gz" \
+            "deepagent-${VERSION}.tar.gz.sha256" \
+            "deepagent-webui-server-${VERSION}.tar.gz" \
+            "deepagent-webui-server-${VERSION}.tar.gz.sha256" \
+            "deepagent-deepcode-${VERSION}.tar.gz" \
+            "deepagent-deepcode-${VERSION}.tar.gz.sha256"; do
+            aws s3 cp "release/${name}" "s3://${BUCKET}/${name}" --endpoint-url "$ENDPOINT" --region auto
+            aws s3 cp "s3://${BUCKET}/${name}" "/tmp/deepagent-r2-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
+            cmp "release/${name}" "/tmp/deepagent-r2-readback/${name}"
+          done
+          aws s3 cp "release/deepagent-manifest-${VERSION}.json" \
+            "s3://${BUCKET}/manifests/${VERSION}.json" --endpoint-url "$ENDPOINT" --region auto
+          aws s3 cp "release/deepagent-python-licenses-${VERSION}.json" \
+            "s3://${BUCKET}/licenses/python/${VERSION}.json" --endpoint-url "$ENDPOINT" --region auto
+          aws s3 cp "release/deepagent-webui-npm-licenses-${VERSION}.json" \
+            "s3://${BUCKET}/licenses/webui/${VERSION}.json" --endpoint-url "$ENDPOINT" --region auto
+          for object in \
+            "manifests/${VERSION}.json:deepagent-manifest-${VERSION}.json" \
+            "licenses/python/${VERSION}.json:deepagent-python-licenses-${VERSION}.json" \
+            "licenses/webui/${VERSION}.json:deepagent-webui-npm-licenses-${VERSION}.json"; do
+            key="${object%%:*}"
+            name="${object#*:}"
+            aws s3 cp "s3://${BUCKET}/${key}" "/tmp/deepagent-r2-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
+            cmp "release/${name}" "/tmp/deepagent-r2-readback/${name}"
+          done
+          cd /tmp/deepagent-r2-readback
+          sha256sum -c "deepagent-${VERSION}.tar.gz.sha256"
+          sha256sum -c "deepagent-webui-server-${VERSION}.tar.gz.sha256"
+          sha256sum -c "deepagent-deepcode-${VERSION}.tar.gz.sha256"
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release edit "v${VERSION}" --draft=false --prerelease
+          [ "$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)" = "false" ]
+
+      - name: Promote verified Beta channel last
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          BUCKET="deepagent-releases"
+          aws s3 cp release/deepagent-channel-beta.json \
+            "s3://${BUCKET}/channels/beta.json" --endpoint-url "$ENDPOINT" --region auto
+          aws s3 cp "s3://${BUCKET}/channels/beta.json" /tmp/deepagent-channel-beta.json \
+            --endpoint-url "$ENDPOINT" --region auto
+          cmp release/deepagent-channel-beta.json /tmp/deepagent-channel-beta.json
