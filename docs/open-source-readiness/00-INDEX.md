@@ -36,7 +36,7 @@
 - PR #19 squash merge：`f1f9457e0443db74e9aab9ceb0ea28405917db3a`。
 - PR #20：PLAN v2.8.0、状态、E2E 报告和 Owner Gate 同步。
 - PR #22：凭据轮换脱敏证据模板。
-- Remote release audit run `30386154565`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404。
+- Remote release audit run `30386865073`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404；artifact `8699299635`。
 - `master` 历史快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
 - 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过 `14-REMOTE-RELEASE-STATE-AUDIT.md` 或等价实时审计重新确认。
 
