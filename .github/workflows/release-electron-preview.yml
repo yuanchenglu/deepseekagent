@@ -5,6 +5,7 @@ on:
     branches: [develop]
     paths:
       - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
       - "VERSION"
       - "webui/package.json"
       - "webui/package-lock.json"
@@ -25,12 +26,22 @@ permissions:
   contents: read
 
 concurrency:
-  group: electron-preview-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: electron-preview-${{ github.event_name == 'workflow_dispatch' && inputs.publish && format('publish-run-{0}', github.run_id) || format('validation-{0}', github.event.pull_request.number || github.ref) }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.publish) }}
 
 jobs:
+  concurrency-contract:
+    name: Validate Electron Preview concurrency contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check validation and publish isolation
+        run: python3 scripts/check-electron-preview-concurrency.py
+
   build-unsigned:
     name: Build and verify unsigned Apple Silicon DMG
+    needs: concurrency-contract
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -248,6 +259,9 @@ jobs:
     needs: build-unsigned
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: electron-preview-publish
+      queue: max
     permissions:
       contents: write
     steps:
