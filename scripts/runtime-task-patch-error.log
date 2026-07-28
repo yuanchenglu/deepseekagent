@@ -1,0 +1,85 @@
+Checking patch webui/packages/desktop/src/main/runtime-task-supervisor.ts...
+Hunk #1 succeeded at 102 (offset 2 lines).
+Hunk #2 succeeded at 225 (offset 1 line).
+Hunk #3 succeeded at 344 (offset 6 lines).
+Hunk #4 succeeded at 357 (offset 1 line).
+Hunk #5 succeeded at 472 (offset -10 lines).
+Hunk #6 succeeded at 507 (offset -9 lines).
+Hunk #7 succeeded at 516 (offset -13 lines).
+error: while searching for:
+      })
+      if (!bound.ok) continue
+      this.records.set(stableTaskKey(task.runtime, task.taskId), {
+
+error: patch failed: webui/packages/desktop/src/main/runtime-task-supervisor.ts:531
+error: webui/packages/desktop/src/main/runtime-task-supervisor.ts: patch does not apply
+Checking patch webui/packages/server/src/services/runtime-task-supervisor-client.ts...
+error: while searching for:
+    if (this.boundPid) await this.bindProcess(this.boundPid)
+  }
+
+  private async resume(): Promise<void> {
+
+error: patch failed: webui/packages/server/src/services/runtime-task-supervisor-client.ts:230
+error: webui/packages/server/src/services/runtime-task-supervisor-client.ts: patch does not apply
+Checking patch webui/packages/desktop/src/main/webui-server.ts...
+error: while searching for:
+import { safeChildEnvironment } from './child-env'
+import { deepAgentHome } from './paths'
+
+error: patch failed: webui/packages/desktop/src/main/webui-server.ts:6
+error: webui/packages/desktop/src/main/webui-server.ts: patch does not apply
+Checking patch webui/packages/desktop/src/main/index.ts...
+error: while searching for:
+import { createDesktopLoginUrl } from './login-ticket'
+import { runPhase3Migration } from './migration'
+import { registerWorkspaceLockIpc } from './workspace-lock-ipc'
+
+error: patch failed: webui/packages/desktop/src/main/index.ts:14
+error: webui/packages/desktop/src/main/index.ts: patch does not apply
+Checking patch hermes_cli/webui.py...
+Hunk #1 succeeded at 40 (offset -1 lines).
+Checking patch webui/bin/hermes-web-ui.mjs...
+Checking patch webui/packages/server/src/services/hermes/agent-bridge/manager.ts...
+error: while searching for:
+import { logger } from '../../logger'
+import { detectHermesHome, getHermesBin } from '../hermes-path'
+import { AgentBridgeClient, DEFAULT_AGENT_BRIDGE_ENDPOINT } from './client'
+
+error: patch failed: webui/packages/server/src/services/hermes/agent-bridge/manager.ts:7
+error: webui/packages/server/src/services/hermes/agent-bridge/manager.ts: patch does not apply
+Checking patch webui/packages/server/src/services/hermes/run-chat/types.ts...
+error: while searching for:
+import type { ChatMessage } from '../../../lib/context-compressor'
+
+error: patch failed: webui/packages/server/src/services/hermes/run-chat/types.ts:1
+error: webui/packages/server/src/services/hermes/run-chat/types.ts: patch does not apply
+Checking patch webui/packages/server/src/services/hermes/run-chat/handle-bridge-run.ts...
+error: while searching for:
+import { AgentBridgeClient, type AgentBridgeContextEstimate, type AgentBridgeMessage, type AgentBridgeOutput } from '../agent-bridge'
+
+error: patch failed: webui/packages/server/src/services/hermes/run-chat/handle-bridge-run.ts:12
+error: webui/packages/server/src/services/hermes/run-chat/handle-bridge-run.ts: patch does not apply
+Checking patch webui/packages/server/src/services/hermes/run-chat/abort.ts...
+Hunk #1 succeeded at 75 (offset -2 lines).
+Checking patch webui/packages/server/src/services/hermes/run-chat/handle-coding-agent-run.ts...
+error: while searching for:
+import { getSystemPrompt } from '../../../lib/llm-prompt'
+import { getSession } from '../../../db/hermes/session-store'
+
+error: patch failed: webui/packages/server/src/services/hermes/run-chat/handle-coding-agent-run.ts:15
+error: webui/packages/server/src/services/hermes/run-chat/handle-coding-agent-run.ts: patch does not apply
+Checking patch webui/packages/server/src/services/coding-agents.ts...
+error: while searching for:
+import type { SessionState } from './hermes/run-chat/types'
+import { normalizeWindowsCommandPath, windowsCmdShimExecution, windowsCommandNeedsShell, type WindowsCommandExecution } from './windows-command'
+
+error: patch failed: webui/packages/server/src/services/coding-agents.ts:21
+error: webui/packages/server/src/services/coding-agents.ts: patch does not apply
+Checking patch webui/packages/server/src/services/agent-runner/coding-agent-run-manager.ts...
+error: while searching for:
+import { mapCodingAgentResponseEvent } from './coding-agent-event-mapper'
+import { normalizeWindowsCommandPath, windowsCmdShimExecution, windowsCommandNeedsShell } from '../windows-command'
+
+error: patch failed: webui/packages/server/src/services/agent-runner/coding-agent-run-manager.ts:12
+error: webui/packages/server/src/services/agent-runner/coding-agent-run-manager.ts: patch does not apply
