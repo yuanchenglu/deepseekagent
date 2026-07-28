@@ -103,12 +103,21 @@ jobs:
           echo "RUNTIME_VERSION=${RUNTIME_VERSION}" >> "$GITHUB_ENV"
           echo "Resolved Desktop Preview ${PREVIEW_VERSION} for Runtime ${RUNTIME_VERSION}"
 
-      - name: Install, test, and build shared WebUI
+      - name: Install WebUI dependencies
+        working-directory: webui
+        run: npm ci --no-audit --no-fund
+
+      - name: Run WebUI tests
+        working-directory: webui
+        run: npm test
+
+      - name: Build shared WebUI
+        working-directory: webui
+        run: npm run build
+
+      - name: Audit WebUI licenses
         working-directory: webui
         run: |
-          npm ci --no-audit --no-fund
-          npm test
-          npm run build
           npm run licenses:audit -- \
             --output "../dist/releases/deepagent-electron-npm-licenses-${PREVIEW_VERSION}.json"
 
