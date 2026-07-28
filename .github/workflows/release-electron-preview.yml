@@ -109,7 +109,18 @@ jobs:
 
       - name: Run WebUI tests
         working-directory: webui
-        run: npm test
+        run: |
+          mkdir -p ../dist/test-results
+          npm test -- --reporter=json --outputFile=../dist/test-results/webui-vitest.json
+
+      - name: Upload WebUI test report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-preview-webui-tests
+          path: dist/test-results/webui-vitest.json
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build shared WebUI
         working-directory: webui
