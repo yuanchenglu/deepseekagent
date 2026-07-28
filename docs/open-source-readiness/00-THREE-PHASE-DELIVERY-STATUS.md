@@ -13,13 +13,15 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 更新前 develop Head | `1fc31324343c574a9e03bac8e2435f72b474d45a` |
-| PR #6 | 已 squash 合入；Electron Preview 自动无签名 DMG 门禁全绿 |
-| PR #10 | 已 squash 合入；Workspace Lock Renderer 所有权与销毁回收全绿 |
-| PR #11 | 已 squash 合入；Electron 专项状态已同步 |
-| Browser E2E | PR #5、#6、#10 真实通过 |
-| Electron artifact | PR #6 生成约 118 MB 的 `electron-preview-release` artifact |
-| 过期 PR #2 | 已关闭，不合并；包含 171 个被后续 PR 替代的旧文件变更 |
+| concurrency 修复前 develop Head | `d2bccd3fe3f72f01fddf543fe0fa6709b6ad8b70` |
+| PR #13 Head | `9cbb302d7a5af144c80177548b3d3cfc17e5b639` |
+| PR #13 merge | 已 squash 合入 `develop`，提交 `888696c8fcf86c76003b49d97f48997fccbf4628` |
+| WebUI i18n | PR #13 真实通过 |
+| Browser E2E | PR #13 真实通过 |
+| Electron workflow | concurrency contract、WebUI、许可证、Electron Main、无签名 DMG、Manifest、SHA-256、artifact 全部成功 |
+| review | 自动 review 的 `queue: max` 旧语法误报经 GitHub 当前官方文档核验后回复并解决；未修改正确实现 |
+| 发布动作 | 未执行 `publish=true`；未创建 Tag、Release 或公开 Preview channel |
+| 过期 PR #2 | 已关闭，不合并；分支内容已被后续 PR 替代 |
 | 本地未推送代码 | **无**；代码和文档均存在于 GitHub 远程 |
 
 新会话必须先读取最新 `develop` Head、最近 commits、开放 PR 和当前 Actions，不得机械沿用本文 SHA。
@@ -32,9 +34,9 @@
 |---|---:|---|---|
 | CLI Alpha | 约 90%–95% | **No-Go** | 主体代码接近完成；凭据、历史、干净机、真实模型和 P0/P1 门禁未关闭 |
 | WebUI Beta | 约 90% | **No-Go** | Browser E2E 和核心自动化已完成；迁移、共存、正式渠道和外测未关闭 |
-| Electron Preview | 约 87%–90% | **No-Go** | 自动 DMG、Main IPC 锁所有权已完成；发布 concurrency、Runtime 租约、真实并发和干净机未关闭 |
+| Electron Preview | 约 90% | **No-Go** | 发布 concurrency 已完成；Runtime 租约、真实并发和干净机未关闭 |
 
-**整体判断**：主体工程约九成完成，项目已进入发布收敛阶段。当前重点不是增加功能，而是关闭安全、发布事务、生命周期、迁移、共存、故障恢复和真实用户验收。
+**整体判断**：主体工程约九成完成，项目已进入发布收敛阶段。当前重点不是增加功能，而是关闭安全、生命周期、迁移、共存、故障恢复和真实用户验收。
 
 ---
 
@@ -93,28 +95,37 @@
 - DeepAgent / DeepCode 双模式架构。
 - Main Process、独立 Runtime、Keychain、环境白名单和状态目录边界。
 - 多读单写 Workspace Lock 算法。
-- PR #10：`webContents.id + taskId` 所有权隔离。
+- `webContents.id + taskId` 所有权隔离。
 - Renderer 不能释放其他 Renderer 的锁。
 - Renderer 销毁后 Main 自动回收跨 Workspace 租约。
 - 无签名、未公证 Apple Silicon DMG 自动门禁。
 - DMG、Bundle ID、版本、arm64、安装脚本、未签名状态、Manifest 和 SHA-256 校验。
 - Browser E2E、i18n、WebUI 测试/构建/许可审计和 Electron Main 测试全绿。
 
-### 尚未关闭的工程技术债务
+### 正式发布 concurrency：已关闭
 
-1. `.github/workflows/release-electron-preview.yml` 仍使用：
+PR #13 已实现并验证：
 
-```yaml
-concurrency:
-  group: electron-preview-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-```
+- 同一 PR 的新提交可以取消旧 PR 验证。
+- PR 验证与正式发布使用不同 group。
+- `publish=true` 的正式运行不会被后续运行取消。
+- GitHub prerelease 与 R2 Preview channel 的公开发布 Job 使用固定 group 串行排队。
+- 静态脚本对表达式、分组和事件真值表失败关闭。
+- i18n、Browser E2E、Electron Main/DMG 全链路真实成功。
+- 未改变无签名定位、版本、Tag、Manifest、SHA-256 和 `publish=true` 边界。
 
-PR 验证可以取消，但正式 `workflow_dispatch + publish=true` 必须串行、不可被后续运行取消，避免 GitHub prerelease 与 R2 Preview channel 不一致。
+### 当前唯一第一优先工程任务
 
-2. Workspace Lock 尚未强制绑定真实 Runtime task/PID 生命周期。
-3. 真实任务启动、结束、取消、超时、进程树退出和 Runtime 崩溃仍需 Main Lease 协议。
-4. 双 Runtime 同 Workspace 的真实并发和故障 E2E 未执行。
+1. 固化 Runtime Task / Workspace Lease 协议。
+2. 真实任务启动、结束、取消、超时和崩溃事件必须由 Main 强制协调。
+3. 任务必须显式声明 `read` / `write` 访问级别。
+4. 先形成类型、状态机、事件、错误语义和契约测试；完成前不并行启动 PID 接入或双 Runtime E2E。
+
+### 后继工程技术债务
+
+- Workspace Lease 尚未绑定真实 Runtime task/PID 生命周期。
+- 心跳、超时、进程树退出、Runtime 重启和异常回收尚未闭环。
+- 双 Runtime 同 Workspace 的真实并发和故障 E2E 未执行。
 
 ### 外部阻断项
 
@@ -130,16 +141,15 @@ PR 验证可以取消，但正式 `workflow_dispatch + publish=true` 必须串�
 ## 6. 下一执行顺序
 
 ```text
-1. 修复 Electron release workflow concurrency
-2. 固化 Runtime Task / Workspace Lease 协议
-3. 将租约绑定真实 task/PID 生命周期
-4. 双 Runtime 同 Workspace 并发与故障 E2E
-5. 轮换凭据、确认旧凭据失效
-6. 清理 Git 历史并重扫全部 refs
-7. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
-8. 正式模型任务和真实用户 Preview 测试
-9. 清零 P0/P1
-10. 按 Go/No-Go 提升 Alpha、Beta、Preview 渠道
+1. 固化 Runtime Task / Workspace Lease 协议
+2. 将租约绑定真实 task/PID 生命周期
+3. 双 Runtime 同 Workspace 并发与故障 E2E
+4. 轮换凭据、确认旧凭据失效
+5. 清理 Git 历史并重扫全部 refs
+6. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
+7. 正式模型任务和真实用户 Preview 测试
+8. 清零 P0/P1
+9. 按 Go/No-Go 提升 Alpha、Beta、Preview 渠道
 ```
 
 每次只启动一个可独立验收的工作单元。
@@ -152,5 +162,5 @@ PR 验证可以取消，但正式 `workflow_dispatch + publish=true` 必须串�
 - 不得把无签名 DMG 描述为已签名、公证或 Stable。
 - 不得把 Main IPC 锁测试描述为 Runtime Lease 闭环。
 - 不得把 Browser E2E 通过描述为 WebUI 迁移、共存和正式渠道完成。
-- 不得忽略 Electron 正式发布 concurrency 风险。
+- 不得把 concurrency 阻断关闭描述为 Electron Preview 已发布或已达到发布门禁。
 - 不得依赖旧容器或未推送文件；GitHub 远程是唯一事实源。
