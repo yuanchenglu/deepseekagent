@@ -108,20 +108,38 @@ jobs:
               print(f'updated locale: {path}')
           PY
 
-      - name: Commit exact migration
+      - name: Submit exact migration through GitHub Contents API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: chatgpt/electron-preview-release-gate
         run: |
-          if git diff --quiet; then
-            echo "No migration changes remain."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only -- \
             webui/packages/client/src/views/hermes/CodingAgentsView.vue \
             webui/packages/client/src/data/changelog.ts \
             webui/packages/client/src/i18n/locales/en.ts \
             webui/packages/client/src/i18n/locales/zh.ts \
             webui/tests/client/app-store.test.ts \
-            webui/tests/server/hermes-web-ui-mcp.test.ts
-          git commit -m "test: align brand and i18n contracts"
-          git push origin HEAD:chatgpt/electron-preview-release-gate
+            webui/tests/server/hermes-web-ui-mcp.test.ts)
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No migration changes remain."
+            exit 0
+          fi
+
+          for path in "${files[@]}"; do
+            sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${TARGET_BRANCH}" --jq .sha)"
+            python3 - "$path" "$sha" "$TARGET_BRANCH" > /tmp/contents-payload.json <<'PY'
+          import base64, json, pathlib, sys
+          path, sha, branch = sys.argv[1:4]
+          payload = {
+              "message": f"test: align brand and i18n contract in {path}",
+              "content": base64.b64encode(pathlib.Path(path).read_bytes()).decode("ascii"),
+              "sha": sha,
+              "branch": branch,
+          }
+          json.dump(payload, sys.stdout)
+          PY
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${path}" --input /tmp/contents-payload.json >/dev/null
+            echo "updated ${path}"
+          done
