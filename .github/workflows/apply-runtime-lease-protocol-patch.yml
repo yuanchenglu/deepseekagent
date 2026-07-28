@@ -1,0 +1,45 @@
+name: Apply Runtime Lease Protocol Refinement
+
+on:
+  push:
+    branches:
+      - chatgpt/runtime-task-lease-protocol
+    paths:
+      - ".github/runtime-task-lease.patch"
+      - ".github/workflows/apply-runtime-lease-protocol-patch.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-runtime-lease-protocol-refinement
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/runtime-task-lease-protocol
+          fetch-depth: 0
+
+      - name: Apply fail-closed protocol refinement
+        run: |
+          set -euo pipefail
+          git apply --check .github/runtime-task-lease.patch
+          git apply .github/runtime-task-lease.patch
+          rm .github/runtime-task-lease.patch
+          rm .github/workflows/apply-runtime-lease-protocol-patch.yml
+
+      - name: Commit refined protocol
+        env:
+          BRANCH: chatgpt/runtime-task-lease-protocol
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(electron): complete process binding lease contract"
+          git push origin "HEAD:${BRANCH}"
