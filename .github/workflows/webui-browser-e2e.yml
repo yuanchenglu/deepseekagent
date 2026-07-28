@@ -6,7 +6,7 @@ on:
     paths:
       - "webui/**"
       - "hermes_cli/webui.py"
-      - "scripts/apply-runtime-task-pid-lifecycle.patch"
+      - "scripts/apply-runtime-*"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -38,45 +38,38 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Validate and apply atomic patch
+      - name: Validate and apply atomic transformations
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          PATCH="scripts/apply-runtime-task-pid-lifecycle.patch"
-          NORMALIZED="$(mktemp)"
-          python3 - "$PATCH" "$NORMALIZED" <<'PY'
-          from pathlib import Path
-          import sys
-
-          source, target = map(Path, sys.argv[1:])
-          normalized = []
-          in_hunk = False
-          for line in source.read_text(encoding='utf-8').splitlines():
-              if line.startswith('diff --git '):
-                  in_hunk = False
-              if line.startswith('@@ '):
-                  in_hunk = True
-              if in_hunk and line == '':
-                  line = ' '
-              normalized.append(line)
-          target.write_text('\n'.join(normalized) + '\n', encoding='utf-8')
-          PY
-          if ! git apply --recount --verbose --check "$NORMALIZED" 2> scripts/runtime-task-patch-error.log; then
+          LOG="$(mktemp)"
+          if ! {
+            python3 scripts/apply-runtime-main.py
+            python3 scripts/apply-runtime-deepagent.py
+            python3 scripts/apply-runtime-deepcode.py
+          } >"$LOG" 2>&1; then
+            git reset --hard HEAD
+            cp "$LOG" scripts/runtime-task-transform-error.log
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -f scripts/runtime-task-patch-error.log
+            git add -f scripts/runtime-task-transform-error.log
             if ! git diff --cached --quiet; then
-              git commit -m "chore(ci): capture Runtime PID patch failure"
+              git commit -m "chore(ci): capture Runtime lifecycle transform failure"
               git push origin "HEAD:${HEAD_REF}"
             fi
-            cat scripts/runtime-task-patch-error.log >&2
+            cat "$LOG" >&2
             exit 1
           fi
-          git apply --recount "$NORMALIZED"
+          cat "$LOG"
           git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
-          git rm "$PATCH"
-          git rm -f scripts/runtime-task-patch-error.log || true
+          git rm -f \
+            scripts/apply-runtime-task-pid-lifecycle.patch \
+            scripts/apply-runtime-main.py \
+            scripts/apply-runtime-deepagent.py \
+            scripts/apply-runtime-deepcode.py \
+            scripts/runtime-task-patch-error.log \
+            scripts/runtime-task-transform-error.log || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A webui hermes_cli/webui.py .github/workflows/webui-browser-e2e.yml scripts
