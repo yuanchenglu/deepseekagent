@@ -40,9 +40,9 @@ export interface HermesDesktopBridge {
   setProviderCredential?: (provider: string, value: string) => Promise<{ ok: boolean }>
   hasProviderCredential?: (provider: string) => Promise<boolean>
   deleteProviderCredential?: (provider: string) => Promise<{ ok: boolean }>
-    acquireWorkspaceLock?: (workspace: string, taskId: string, access: 'read' | 'write') => Promise<boolean>
-    releaseWorkspaceLock?: (workspace: string, taskId: string) => Promise<void>
-    releaseTaskLocks?: (taskId: string) => Promise<void>
+  acquireWorkspaceLock?: (workspace: string, taskId: string, access: 'read' | 'write') => Promise<boolean>
+  releaseWorkspaceLock?: (workspace: string, taskId: string) => Promise<void>
+  releaseTaskLocks?: (taskId: string) => Promise<void>
   platform: string
   isDesktop: boolean
   windowKind?: 'main' | 'pet'

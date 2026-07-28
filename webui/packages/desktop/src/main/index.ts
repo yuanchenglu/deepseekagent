@@ -11,7 +11,7 @@ import { ModeManager, type AppMode, type SharedConfig, type StartCodeModeResult 
 import { CredentialVault } from './credential-vault'
 import { createDesktopLoginUrl } from './login-ticket'
 import { runPhase3Migration } from './migration'
-import { WorkspaceLockManager, type WorkspaceAccess } from './workspace-lock'
+import { registerWorkspaceLockIpc } from './workspace-lock-ipc'
 
 const PORT = Number(process.env.HERMES_DESKTOP_PORT) || 8748
 const START_HIDDEN = process.argv.includes('--hidden')
@@ -29,7 +29,6 @@ let petWindow: BrowserWindow | null = null
 // 双模式管理器（Stage 9）：由 app.whenReady 时实例化
 let modeManager: ModeManager | null = null
 let credentialVault: CredentialVault | null = null
-const workspaceLocks = new WorkspaceLockManager()
 let petWindowLoadPromise: Promise<void> | null = null
 let serverUrl: string | null = null
 let tray: Tray | null = null
@@ -555,17 +554,7 @@ ipcMain.handle('deepagent:credential:delete', (_event, provider?: unknown) => {
   if (credentialVault && typeof provider === 'string') credentialVault.delete(provider)
   return { ok: true }
 })
-ipcMain.handle('deepagent:workspace-lock:acquire', (_event, workspace?: unknown, taskId?: unknown, access?: unknown) => (
-  typeof workspace === 'string' && typeof taskId === 'string' && (access === 'read' || access === 'write')
-    ? workspaceLocks.acquire(workspace, taskId, access as WorkspaceAccess)
-    : false
-))
-ipcMain.handle('deepagent:workspace-lock:release', (_event, workspace?: unknown, taskId?: unknown) => {
-  if (typeof workspace === 'string' && typeof taskId === 'string') workspaceLocks.release(workspace, taskId)
-})
-ipcMain.handle('deepagent:workspace-lock:release-task', (_event, taskId?: unknown) => {
-  if (typeof taskId === 'string') workspaceLocks.releaseTask(taskId)
-})
+registerWorkspaceLockIpc(ipcMain)
 
 function runDesktopApp() {
   const gotLock = app.requestSingleInstanceLock(QUIT_EXISTING ? { quit: true } : undefined)
