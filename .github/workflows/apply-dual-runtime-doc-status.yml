@@ -1,0 +1,42 @@
+name: Apply Dual Runtime Documentation Status
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/apply-dual-runtime-doc-status.yml"
+      - "scripts/patch-dual-runtime-doc-status.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-dual-runtime-doc-status
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "chatgpt/sync-dual-runtime-e2e-status"
+          fetch-depth: 0
+
+      - name: Apply exact documentation synchronization
+        run: python3 scripts/patch-dual-runtime-doc-status.py
+
+      - name: Commit documentation updates only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/open-source-readiness/三阶段执行计划PLAN.md \
+            docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md \
+            docs/open-source-readiness/10-ELECTRON-PREVIEW-STATUS.md \
+            docs/open-source-readiness/HANDOFF_2026-07-28.md \
+            docs/open-source-readiness/00-INDEX.md \
+            docs/TECH_DEBT.md
+          git commit -m "docs(readiness): sync dual Runtime E2E and credential owner gate"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
