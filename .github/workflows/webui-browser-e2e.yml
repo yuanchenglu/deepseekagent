@@ -47,6 +47,45 @@ jobs:
           if ! {
             python3 scripts/apply-runtime-main.py
             python3 scripts/apply-runtime-deepagent.py
+            python3 - <<'PY'
+            from pathlib import Path
+
+            target = Path('scripts/apply-runtime-deepcode.py')
+            lines = target.read_text(encoding='utf-8').splitlines()
+            starts = [index for index, line in enumerate(lines) if line == 'replace_once(path, """    })']
+            if len(starts) != 2:
+                raise RuntimeError(f'expected exactly two DeepCode spawn transform calls, found {len(starts)}')
+
+            def call_end(start: int) -> int:
+                delimiters = 0
+                for index in range(start, len(lines)):
+                    delimiters += lines[index].count('"""')
+                    if delimiters >= 4:
+                        return index
+                raise RuntimeError('unterminated DeepCode spawn transform call')
+
+            first_start, second_start = starts
+            first_end = call_end(first_start)
+            second_end = call_end(second_start)
+            del lines[second_start:second_end + 1]
+            lines[first_start] = lines[first_start].replace('replace_once(', 'replace_exact(', 1)
+            lines[first_end] = lines[first_end].replace('""")', '""", 2)', 1)
+
+            insertion = next(index for index, line in enumerate(lines) if line.startswith('path = '))
+            helper = [
+                '',
+                'def replace_exact(path: str, old: str, new: str, expected: int) -> None:',
+                '    target = Path(path)',
+                '    text = target.read_text(encoding="utf-8")',
+                '    count = text.count(old)',
+                '    if count != expected:',
+                '        raise RuntimeError(f"{path}: expected {expected} matches, found {count}: {old[:100]!r}")',
+                '    target.write_text(text.replace(old, new), encoding="utf-8")',
+                '',
+            ]
+            lines[insertion:insertion] = helper
+            target.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+            PY
             python3 scripts/apply-runtime-deepcode.py
           } >"$LOG" 2>&1; then
             git reset --hard HEAD
