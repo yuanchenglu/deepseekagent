@@ -183,24 +183,36 @@ export interface RuntimeTaskLeaseCoordinatorOptions {
   defaultTtlMs?: number
   minTtlMs?: number
   maxTtlMs?: number
+  maxReplayEntries?: number
   locks?: WorkspaceLockManager
 }
 
+/** Commands accepted from a runtime-scoped connection. */
 export type RuntimeScopedLeaseCommand =
   | Omit<AcquireLeaseCommand, 'identity'> & { identity: Omit<RuntimeTaskLeaseIdentity, 'runtime'> }
-  | Omit<BindProcessLeaseCommand, 'runtime'>
   | Omit<HeartbeatLeaseCommand, 'runtime'>
   | Omit<ReleaseLeaseCommand, 'runtime'>
   | Omit<CancelLeaseCommand, 'runtime'>
-  | Omit<TimeoutLeaseCommand, 'runtime'>
-  | Omit<ProcessExitLeaseCommand, 'runtime'>
-  | Omit<RecoverLeaseCommand, 'runtime'>
-  | Omit<RuntimeCrashLeaseCommand, 'runtime'>
+
+/** Supervisory commands that only trusted Electron Main code may dispatch. */
+export type MainOnlyLeaseCommand =
+  | BindProcessLeaseCommand
+  | TimeoutLeaseCommand
+  | ProcessExitLeaseCommand
+  | RecoverLeaseCommand
+  | RuntimeCrashLeaseCommand
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/
 const DEFAULT_TTL_MS = 30_000
 const MIN_TTL_MS = 1_000
 const MAX_TTL_MS = 5 * 60_000
+const DEFAULT_MAX_REPLAY_ENTRIES = 4_096
+const RUNTIME_SCOPED_EVENT_TYPES = new Set<RuntimeTaskLeaseEventType>([
+  'acquire',
+  'heartbeat',
+  'release',
+  'cancel',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -220,6 +232,29 @@ function validRuntime(value: unknown): value is RuntimeKind {
 
 function validAccess(value: unknown): value is WorkspaceAccess {
   return value === 'read' || value === 'write'
+}
+
+function validEventType(value: unknown): value is RuntimeTaskLeaseEventType {
+  return value === 'acquire'
+    || value === 'bind-process'
+    || value === 'heartbeat'
+    || value === 'release'
+    || value === 'cancel'
+    || value === 'timeout'
+    || value === 'process-exit'
+    || value === 'runtime-crash'
+    || value === 'recover'
+}
+
+function commandRuntime(value: unknown): RuntimeKind | 'invalid' {
+  if (!isRecord(value)) return 'invalid'
+  if (validRuntime(value.runtime)) return value.runtime
+  if (isRecord(value.identity) && validRuntime(value.identity.runtime)) return value.identity.runtime
+  return 'invalid'
+}
+
+function replayKey(value: unknown, eventId: string): string {
+  return `${commandRuntime(value)}\u0000${eventId}`
 }
 
 function validLeaseState(value: RuntimeTaskLeaseState, allowed: RuntimeTaskLeaseState[]): boolean {
@@ -403,6 +438,7 @@ export class RuntimeTaskLeaseCoordinator {
   private readonly defaultTtlMs: number
   private readonly minTtlMs: number
   private readonly maxTtlMs: number
+  private readonly maxReplayEntries: number
   private readonly locks: WorkspaceLockManager
   private readonly leases = new Map<string, RuntimeTaskLeaseSnapshot>()
   private readonly replay = new Map<string, { fingerprint: string; result: RuntimeTaskLeaseResult }>()
@@ -414,6 +450,7 @@ export class RuntimeTaskLeaseCoordinator {
     this.minTtlMs = options.minTtlMs ?? MIN_TTL_MS
     this.maxTtlMs = options.maxTtlMs ?? MAX_TTL_MS
     this.defaultTtlMs = options.defaultTtlMs ?? DEFAULT_TTL_MS
+    this.maxReplayEntries = options.maxReplayEntries ?? DEFAULT_MAX_REPLAY_ENTRIES
     if (
       !Number.isFinite(this.minTtlMs)
       || !Number.isFinite(this.maxTtlMs)
@@ -422,8 +459,10 @@ export class RuntimeTaskLeaseCoordinator {
       || this.maxTtlMs < this.minTtlMs
       || this.defaultTtlMs < this.minTtlMs
       || this.defaultTtlMs > this.maxTtlMs
+      || !Number.isSafeInteger(this.maxReplayEntries)
+      || this.maxReplayEntries <= 0
     ) {
-      throw new Error('Invalid RuntimeTaskLeaseCoordinator TTL configuration')
+      throw new Error('Invalid RuntimeTaskLeaseCoordinator configuration')
     }
     this.locks = options.locks ?? new WorkspaceLockManager()
   }
@@ -431,7 +470,8 @@ export class RuntimeTaskLeaseCoordinator {
   dispatch(input: unknown): RuntimeTaskLeaseResult {
     const rawEventId = isRecord(input) && typeof input.eventId === 'string' ? input.eventId : ''
     const rawFingerprint = fingerprint(input)
-    const replayed = rawEventId ? this.replay.get(rawEventId) : undefined
+    const scopedReplayKey = rawEventId ? replayKey(input, rawEventId) : ''
+    const replayed = scopedReplayKey ? this.replay.get(scopedReplayKey) : undefined
     if (replayed) {
       if (replayed.fingerprint === rawFingerprint) return cloneResult(replayed.result)
       return {
@@ -456,10 +496,23 @@ export class RuntimeTaskLeaseCoordinator {
           message: 'Runtime Task / Workspace Lease command failed validation',
         }
 
-    if (rawEventId && validIdentifier(rawEventId)) {
-      this.replay.set(rawEventId, { fingerprint: rawFingerprint, result: cloneResult(result) })
+    if (scopedReplayKey && validIdentifier(rawEventId)) {
+      this.rememberReplay(scopedReplayKey, rawFingerprint, result)
     }
     return cloneResult(result)
+  }
+
+  replayEntryCount(): number {
+    return this.replay.size
+  }
+
+  private rememberReplay(key: string, commandFingerprint: string, result: RuntimeTaskLeaseResult): void {
+    this.replay.set(key, { fingerprint: commandFingerprint, result: cloneResult(result) })
+    while (this.replay.size > this.maxReplayEntries) {
+      const oldest = this.replay.keys().next().value as string | undefined
+      if (oldest === undefined) break
+      this.replay.delete(oldest)
+    }
   }
 
   snapshot(runtime: RuntimeKind, taskId: string): RuntimeTaskLeaseSnapshot | undefined {
@@ -816,6 +869,16 @@ export class RuntimeTaskLeaseAdapter {
   ) {}
 
   dispatch(command: RuntimeScopedLeaseCommand): RuntimeTaskLeaseResult {
+    const payload = command as unknown
+    if (!isRecord(payload) || !RUNTIME_SCOPED_EVENT_TYPES.has(payload.type as RuntimeTaskLeaseEventType)) {
+      return {
+        ok: false,
+        eventId: isRecord(payload) && typeof payload.eventId === 'string' ? payload.eventId : '',
+        type: isRecord(payload) && validEventType(payload.type) ? payload.type : 'invalid',
+        code: 'invalid-request',
+        message: 'The command is reserved for trusted Electron Main supervision',
+      }
+    }
     if (command.type === 'acquire') {
       return this.coordinator.dispatch({
         ...command,

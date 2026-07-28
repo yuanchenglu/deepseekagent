@@ -11,7 +11,8 @@
 协议以 Electron Main 为唯一权威租约协调器：
 
 - DeepAgent Runtime 与 DeepCode Runtime 必须显式声明任务身份和 `read` / `write` 访问级别。
-- Runtime 只能通过固定 Runtime 身份适配器发送事件，不能冒充另一 Runtime。
+- Runtime 只能通过固定 Runtime 身份适配器发送 `acquire`、`heartbeat`、`release`、`cancel`，不能冒充另一 Runtime。
+- `bind-process`、`timeout`、`process-exit`、`runtime-crash`、`recover` 只能由可信 Electron Main 监督路径发送。
 - Renderer 不直接改变权威租约状态。
 - 底层 `WorkspaceLockManager` 只负责多读单写资源互斥；任务状态、租约 TTL、幂等和故障恢复由 `RuntimeTaskLeaseCoordinator` 负责。
 
@@ -123,11 +124,13 @@ exit after crash:   orphaned → recovered(process-exit)
 
 ## 7. 幂等与重放
 
-- 相同 `eventId` 和完全相同的命令载荷返回第一次结果，不重复改变状态。
+- 幂等键为 `(runtime, eventId)`；DeepAgent 与 DeepCode 可独立使用相同 eventId。
+- 相同 Runtime、相同 `eventId` 和完全相同的命令载荷返回第一次结果，不重复改变状态。
 - 相同 `eventId` 携带不同载荷返回 `replay-conflict`。
 - 对同一 active 身份重复 `acquire` 返回 `already-acquired` 和原 leaseId。
 - 重复 `release` / `cancel` / `timeout` / `recover` 对已到达相应终态的租约返回稳定终态结果，不重复释放底层锁。
 - 同一 Runtime/taskId 尝试修改 Workspace、访问级别或进程身份返回 `owner-mismatch`。
+- Main 只保留最近 4,096 条重放结果（可配置正整数上限）；超出后按插入顺序淘汰最旧条目，避免心跳导致进程生命周期内存无限增长。
 
 ## 8. TTL 与心跳
 
@@ -173,8 +176,8 @@ Runtime 崩溃采用失败关闭策略：
 `RuntimeTaskLeaseAdapter` 在构造时固定 `deepagent` 或 `deepcode`：
 
 - 调用方提交的 acquire 身份不包含 runtime。
-- 其他命令也不接受调用方自填 runtime。
-- Adapter 在进入 Main 协调器前强制写入自身 Runtime 身份。
+- Runtime Adapter 只接受 acquire、heartbeat、release、cancel；监督事件即使通过动态对象注入也返回 `invalid-request`。
+- 允许的其他命令不接受调用方自填 runtime；Adapter 在进入 Main 协调器前强制写入自身 Runtime 身份。
 - 即使不可信调用方通过动态对象夹带 runtime，适配器也会覆盖它。
 
 下一工作单元应分别把 DeepAgent Runtime 和 DeepCode Runtime 的真实任务事件连接到各自 Adapter，不得让 Runtime 直接持有或修改 `WorkspaceLockManager`。
@@ -185,7 +188,9 @@ Runtime 崩溃采用失败关闭策略：
 
 - 非法 Runtime、访问级别、PID 和 TTL 失败关闭。
 - reader-reader、reader-writer、writer-writer。
-- acquire 幂等、eventId 重放与冲突重放。
+- acquire 幂等、Runtime 作用域 eventId 重放与冲突重放。
+- 重放缓存上限和最旧记录淘汰。
+- Runtime Adapter 拒绝 Main-only 监督事件。
 - 心跳续租、迟到心跳过期和不可复活。
 - 未知任务、leaseId 所有者不匹配和提前 timeout。
 - cancel/release 终态幂等。
