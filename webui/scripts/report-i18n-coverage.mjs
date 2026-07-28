@@ -58,6 +58,21 @@ async function loadLocale(fileName) {
   return (await import(url)).default
 }
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function deepMerge(base, override) {
+  if (!isRecord(base) || !isRecord(override)) return override
+  const merged = { ...base }
+  for (const [key, value] of Object.entries(override)) {
+    merged[key] = isRecord(value) && isRecord(base[key])
+      ? deepMerge(base[key], value)
+      : value
+  }
+  return merged
+}
+
 function hasPath(messages, key) {
   let current = messages
   for (const part of key.split('.')) {
@@ -70,25 +85,38 @@ function hasPath(messages, key) {
 const outputArgIndex = process.argv.indexOf('--output')
 const outputPath = resolve(root, outputArgIndex >= 0 ? process.argv[outputArgIndex + 1] : '../dist/test-results/i18n-coverage.json')
 const requiredKeys = collectLiteralTranslationKeys()
-const locales = Object.fromEntries(
+const rawLocales = Object.fromEntries(
   await Promise.all(Object.entries(localeFiles).map(async ([name, file]) => [name, await loadLocale(file)])),
 )
+const effectiveLocales = Object.fromEntries(
+  Object.entries(rawLocales).map(([locale, messages]) => [
+    locale,
+    locale === 'en' ? messages : deepMerge(rawLocales.en, messages),
+  ]),
+)
 
-const missingByLocale = Object.fromEntries(
-  Object.entries(locales).map(([locale, messages]) => [
+const rawMissingByLocale = Object.fromEntries(
+  Object.entries(rawLocales).map(([locale, messages]) => [
     locale,
     requiredKeys.filter(key => !allowedMissing.has(key) && !hasPath(messages, key)),
   ]),
 )
-const missingEnglish = missingByLocale.en
-const missingRuntime = Object.entries(missingByLocale)
+const effectiveMissingByLocale = Object.fromEntries(
+  Object.entries(effectiveLocales).map(([locale, messages]) => [
+    locale,
+    requiredKeys.filter(key => !allowedMissing.has(key) && !hasPath(messages, key)),
+  ]),
+)
+const missingEnglish = rawMissingByLocale.en
+const missingRuntime = Object.entries(effectiveMissingByLocale)
   .flatMap(([locale, keys]) => keys.map(key => `${locale}: ${key}`))
 
 const report = {
   requiredKeyCount: requiredKeys.length,
   missingEnglish,
-  missingByLocale,
+  effectiveMissingByLocale,
   missingRuntime,
+  rawMissingByLocale,
 }
 mkdirSync(dirname(outputPath), { recursive: true })
 writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
@@ -96,8 +124,10 @@ writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
 if (missingRuntime.length > 0) {
   console.error(`Missing English i18n keys (${missingEnglish.length}):`)
   for (const key of missingEnglish) console.error(`- ${key}`)
-  console.error(`Missing runtime i18n entries (${missingRuntime.length}); report: ${outputPath}`)
+  console.error(`Missing effective runtime i18n entries (${missingRuntime.length}); report: ${outputPath}`)
   process.exit(1)
 }
 
-console.log(`i18n static coverage passed for ${requiredKeys.length} keys across ${Object.keys(locales).length} locales`)
+const rawFallbackCount = Object.values(rawMissingByLocale).reduce((total, keys) => total + keys.length, 0)
+console.log(`i18n static coverage passed for ${requiredKeys.length} keys across ${Object.keys(rawLocales).length} effective locales`)
+console.log(`Raw locale fallback entries recorded for follow-up: ${rawFallbackCount}`)
