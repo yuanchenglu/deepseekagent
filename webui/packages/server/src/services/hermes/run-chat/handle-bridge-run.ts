@@ -9,6 +9,7 @@ import { getSession, getSessionDetail, createSession, addMessage, updateSession,
 import { updateUsage } from '../../../db/hermes/usage-store'
 import { logger, bridgeLogger } from '../../logger'
 import { AgentBridgeClient, type AgentBridgeContextEstimate, type AgentBridgeMessage, type AgentBridgeOutput } from '../agent-bridge'
+import { getAgentBridgeManager } from '../agent-bridge/manager'
 import { contentBlocksToString, convertContentBlocksForAgent, extractTextForPreview, isContentBlockArray } from './content-blocks'
 import { buildCompressedHistory, buildDbHistory, buildSnapshotAwareHistory, forceCompressBridgeHistory, pushState, replaceState } from './compression'
 import {
@@ -36,11 +37,47 @@ import { writeModelRunProfileToken } from './model-run-prompt'
 import type { AuthenticatedUser } from '../../../middleware/user-auth'
 import { ensureHermesRunWorkspace } from './workspace'
 import { observeRunChatPetEvent } from '../pet-state-socket'
+import { acquireRuntimeTaskLease, runtimeTaskId, type RuntimeTaskOutcome } from '../../runtime-task-supervisor-client'
 
 const BRIDGE_USAGE_FLUSH_DELAY_MS = 200
 const BRIDGE_TITLE_EVENT_POLL_INTERVAL_MS = 500
 const BRIDGE_TITLE_EVENT_POLL_TIMEOUT_MS = 45_000
 const BRIDGE_GOAL_EVALUATE_TIMEOUT_MS = 120_000
+
+async function acquireBridgeTaskLease(state: SessionState, sessionId: string, workspace: string): Promise<void> {
+  if (state.runtimeTaskLease) return
+  const processPid = getAgentBridgeManager().getTaskProcessPid()
+  state.runtimeTaskLease = await acquireRuntimeTaskLease({
+    runtime: 'deepagent',
+    taskId: runtimeTaskId('deepagent', sessionId),
+    workspace,
+    access: 'write',
+    processPid: processPid || undefined,
+    requireProcess: true,
+  })
+}
+
+async function finishBridgeTaskLease(state: SessionState, outcome: RuntimeTaskOutcome): Promise<void> {
+  const lease = state.runtimeTaskLease
+  state.runtimeTaskLease = undefined
+  if (!lease) return
+  try {
+    await lease.finish(outcome)
+  } catch (err) {
+    lease.abandon()
+    bridgeLogger.warn({
+      err: err instanceof Error ? { message: err.message, name: err.name } : err,
+      runtime: lease.runtime,
+      taskId: lease.taskId,
+      outcome,
+    }, '[chat-run-socket] failed to finish DeepAgent Runtime task lease')
+  }
+}
+
+function bridgeTaskOutcome(chunk: AgentBridgeOutput): RuntimeTaskOutcome {
+  if (chunk.status === 'interrupted') return 'cancelled'
+  return bridgeTerminalError(chunk) ? 'failed' : 'completed'
+}
 
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -489,6 +526,7 @@ export async function handleBridgeRun(
   const bridgeHistory = history
 
   try {
+    await acquireBridgeTaskLease(state, session_id, workspace)
     const bridgeInput = isContentBlockArray(input)
       ? await convertContentBlocksForAgent(input)
       : input
@@ -563,6 +601,7 @@ export async function handleBridgeRun(
       )
       if (chunk.done) {
         sawTerminalChunk = true
+        await finishBridgeTaskLease(state, bridgeTaskOutcome(chunk))
         void pollBridgeGeneratedTitleAfterRun(bridge, session_id, profile, emit)
         break
       }
@@ -605,8 +644,10 @@ export async function handleBridgeRun(
         shouldPersistUserMessage && displayRole === 'user',
         data.model_groups,
       )
+      await finishBridgeTaskLease(state, bridgeTaskOutcome(terminalChunk))
     }
   } catch (err: any) {
+    await finishBridgeTaskLease(state, 'failed')
     if (state.activeRunMarker !== runMarker) return
     if (!state.isWorking) return
     const queueLen = state.queue?.length ?? 0
@@ -696,6 +737,10 @@ export async function resumeBridgeRun(
   state.bridgePendingTools = state.bridgePendingTools || []
   state.bridgeToolCounter = state.bridgeToolCounter || 0
 
+  const resumeWorkspace = String(args.workspace || getSession(sessionId)?.workspace || '').trim()
+  if (!resumeWorkspace) throw new Error('workspace is required to resume a DeepAgent Runtime task')
+  await acquireBridgeTaskLease(state, sessionId, resumeWorkspace)
+
   const emit = (event: string, payload: any) => {
     const tagged = { ...payload, session_id: sessionId }
     observePetEvent(profile, event, tagged)
@@ -776,10 +821,14 @@ export async function resumeBridgeRun(
           args.workspace,
         )
       }
-      if (chunk.done) return
+      if (chunk.done) {
+        await finishBridgeTaskLease(state, bridgeTaskOutcome(chunk))
+        return
+      }
       await delay(100)
     }
   } catch (err) {
+    await finishBridgeTaskLease(state, 'failed')
     if (state.activeRunMarker !== runMarker) return
     state.isWorking = false
     state.isAborting = false

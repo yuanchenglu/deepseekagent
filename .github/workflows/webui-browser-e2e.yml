@@ -5,9 +5,6 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
-      - "hermes_cli/webui.py"
-      - "scripts/apply-runtime-*"
-      - "scripts/prepare-runtime-*"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -21,68 +18,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: webui-browser-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-runtime-task-patch:
-    name: Apply Runtime task PID lifecycle patch
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Validate and apply atomic transformations
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          LOG="$(mktemp)"
-          if ! {
-            python3 scripts/apply-runtime-main.py
-            python3 scripts/apply-runtime-deepagent.py
-            python3 scripts/prepare-runtime-deepcode-transform.py
-            python3 scripts/apply-runtime-deepcode.py
-          } >"$LOG" 2>&1; then
-            git reset --hard HEAD
-            cp "$LOG" scripts/runtime-task-transform-error.log
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -f scripts/runtime-task-transform-error.log
-            if ! git diff --cached --quiet; then
-              git commit -m "chore(ci): capture Runtime lifecycle transform failure"
-              git push origin "HEAD:${HEAD_REF}"
-            fi
-            cat "$LOG" >&2
-            exit 1
-          fi
-          cat "$LOG"
-          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
-          git rm -f \
-            scripts/apply-runtime-task-pid-lifecycle.patch \
-            scripts/apply-runtime-main.py \
-            scripts/apply-runtime-deepagent.py \
-            scripts/apply-runtime-deepcode.py \
-            scripts/prepare-runtime-deepcode-transform.py \
-            scripts/runtime-task-patch-error.log \
-            scripts/runtime-task-transform-error.log || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A webui hermes_cli/webui.py .github/workflows/webui-browser-e2e.yml scripts
-          git commit -m "feat(runtime): connect real task and PID lifecycles"
-
-      - name: Push finalized branch
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: git push origin "HEAD:${HEAD_REF}"
-
   browser-e2e:
     name: Chromium authentication and navigation E2E
     runs-on: ubuntu-latest

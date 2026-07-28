@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Server, Socket } from 'socket.io'
 import { codingAgentRunManager } from '../../agent-runner/coding-agent-run-manager'
 import {
@@ -12,6 +13,7 @@ import { writeModelRunProfileToken } from './model-run-prompt'
 import type { AuthenticatedUser } from '../../../middleware/user-auth'
 import { getSystemPrompt } from '../../../lib/llm-prompt'
 import { getSession } from '../../../db/hermes/session-store'
+import { acquireRuntimeTaskLease, runtimeTaskId, type RuntimeTaskLeaseHandle } from '../../runtime-task-supervisor-client'
 
 export interface CodingAgentRunSocketData {
   input: string | ContentBlock[]
@@ -90,7 +92,16 @@ export async function handleCodingAgentRun(
   state.isWorking = true
   state.runId = runId
 
+  let taskLease: RuntimeTaskLeaseHandle | undefined
   try {
+    const taskWorkspace = String(getSession(sessionId)?.workspace || data.workspace || '').trim()
+    if (!taskWorkspace) throw new Error('workspace is required for a DeepCode Runtime task')
+    taskLease = await acquireRuntimeTaskLease({
+      runtime: 'deepcode',
+      taskId: runtimeTaskId('deepcode', `${sessionId}:${randomUUID()}`),
+      workspace: taskWorkspace,
+      access: 'write',
+    })
     const inputText = contentBlocksToString(data.input)
     const socketUser = socket.data?.user as AuthenticatedUser | undefined
     await writeModelRunProfileToken(socketUser, profile)
@@ -98,8 +109,11 @@ export async function handleCodingAgentRun(
     const runPrompt = [
       includeBaseSystemPrompt ? getSystemPrompt(undefined, { source: data.session_source || data.source }) : '',
     ].filter(Boolean).join('\n')
-    await sendCodingAgentRunInput(sessionId, inputText, runPrompt)
+    await sendCodingAgentRunInput(sessionId, inputText, runPrompt, taskLease)
   } catch (err) {
+    if (taskLease && !codingAgentRunManager.isSessionProcessing(sessionId)) {
+      try { await taskLease.finish('failed') } catch { taskLease.abandon() }
+    }
     if (!codingAgentRunManager.isSessionProcessing(sessionId)) {
       state.isWorking = false
       state.isAborting = false

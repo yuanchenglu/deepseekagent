@@ -102,9 +102,16 @@ export interface RuntimeTaskSupervisorTask {
   createdAt: number
 }
 
+interface PersistedTaskGeneration {
+  runtime: RuntimeKind
+  taskId: string
+  generation: number
+}
+
 interface PersistedSupervisorState {
   schemaVersion: number
   tasks: RuntimeTaskSupervisorTask[]
+  generations: PersistedTaskGeneration[]
 }
 
 interface SupervisorRecord extends RuntimeTaskSupervisorTask {
@@ -218,6 +225,7 @@ export class RuntimeTaskSupervisor {
   private readonly processProbe: RuntimeTaskProcessProbe
   private readonly now: () => number
   private readonly records = new Map<string, SupervisorRecord>()
+  private readonly generations = new Map<string, number>()
   private server: Server | null = null
   private monitorTimer: NodeJS.Timeout | null = null
   private token = ''
@@ -336,7 +344,7 @@ export class RuntimeTaskSupervisor {
       if (existing.state === 'orphaned') return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(existing) } }
       return { status: 200, body: { ok: true, code: 'already-active', task: cloneTask(existing) } }
     }
-    const generation = 1
+    const generation = (this.generations.get(key) || 0) + 1
     const internalTaskId = safeInternalTaskId(request.runtime, request.taskId, generation)
     const result = this.adapters[request.runtime].dispatch({
       type: 'acquire', eventId: request.eventId, observedAt: this.now(), ttlMs: this.heartbeatTtlMs,
@@ -349,6 +357,7 @@ export class RuntimeTaskSupervisor {
       state: 'active', generation, leaseId: result.lease.leaseId, internalTaskId, lastHeartbeatAt: now, createdAt: now,
     }
     this.records.set(key, record)
+    this.generations.set(key, generation)
     this.persist()
     return { status: 201, body: { ok: true, code: 'acquired', task: cloneTask(record) } }
   }
@@ -462,6 +471,7 @@ export class RuntimeTaskSupervisor {
     record.state = 'active'
     record.process = evidence
     record.lastHeartbeatAt = this.now()
+    this.generations.set(key, generation)
     this.persist()
     return { status: 200, body: { ok: true, code: 'resumed', task: cloneTask(record) } }
   }
@@ -497,12 +507,18 @@ export class RuntimeTaskSupervisor {
   private async restorePersistedTasks(): Promise<void> {
     const persisted = this.readState()
     const activeRuntimes = new Set<RuntimeKind>()
+    for (const item of persisted.generations) {
+      if (!validRuntime(item.runtime) || !validString(item.taskId) || !Number.isSafeInteger(item.generation) || item.generation < 1) continue
+      this.generations.set(stableTaskKey(item.runtime, item.taskId), item.generation)
+    }
     for (const task of persisted.tasks) {
       if (!validRuntime(task.runtime) || !validAccess(task.access) || !validString(task.taskId) || !validString(task.workspace, 4_096)) continue
       if (!task.process || !validPid(task.process.pid) || !validString(task.process.fingerprint, 128)) continue
       const evidence = await this.processProbe.inspect(task.process.pid)
       if (!evidence || evidence.fingerprint !== task.process.fingerprint) continue
-      const generation = Math.max(1, task.generation || 1)
+      const key = stableTaskKey(task.runtime, task.taskId)
+      const generation = Math.max(1, task.generation || 1, this.generations.get(key) || 0)
+      this.generations.set(key, generation)
       const internalTaskId = safeInternalTaskId(task.runtime, task.taskId, generation)
       const acquired = this.adapters[task.runtime].dispatch({
         type: 'acquire', eventId: this.nextEventId('restore-acquire'), observedAt: this.now(), ttlMs: this.heartbeatTtlMs,
@@ -515,7 +531,7 @@ export class RuntimeTaskSupervisor {
         process: { pid: evidence.pid, treeId: evidence.fingerprint.slice(0, 32) },
       })
       if (!bound.ok) continue
-      this.records.set(stableTaskKey(task.runtime, task.taskId), {
+      this.records.set(key, {
         ...task, workspace: resolve(task.workspace), state: 'active', leaseId: acquired.lease.leaseId,
         internalTaskId, process: evidence, lastHeartbeatAt: this.now(), generation,
       })
@@ -536,19 +552,31 @@ export class RuntimeTaskSupervisor {
   }
 
   private readState(): PersistedSupervisorState {
-    if (!existsSync(this.stateFile)) return { schemaVersion: STATE_SCHEMA_VERSION, tasks: [] }
+    if (!existsSync(this.stateFile)) return { schemaVersion: STATE_SCHEMA_VERSION, tasks: [], generations: [] }
     try {
       const parsed = JSON.parse(readFileSync(this.stateFile, 'utf8')) as Partial<PersistedSupervisorState>
       return parsed.schemaVersion === STATE_SCHEMA_VERSION && Array.isArray(parsed.tasks)
-        ? { schemaVersion: STATE_SCHEMA_VERSION, tasks: parsed.tasks as RuntimeTaskSupervisorTask[] }
-        : { schemaVersion: STATE_SCHEMA_VERSION, tasks: [] }
-    } catch { return { schemaVersion: STATE_SCHEMA_VERSION, tasks: [] } }
+        ? {
+            schemaVersion: STATE_SCHEMA_VERSION,
+            tasks: parsed.tasks as RuntimeTaskSupervisorTask[],
+            generations: Array.isArray(parsed.generations) ? parsed.generations as PersistedTaskGeneration[] : [],
+          }
+        : { schemaVersion: STATE_SCHEMA_VERSION, tasks: [], generations: [] }
+    } catch { return { schemaVersion: STATE_SCHEMA_VERSION, tasks: [], generations: [] } }
   }
 
   private persist(): void {
     mkdirSync(dirname(this.stateFile), { recursive: true, mode: 0o700 })
     const temporary = `${this.stateFile}.tmp-${process.pid}-${Date.now()}`
-    const payload: PersistedSupervisorState = { schemaVersion: STATE_SCHEMA_VERSION, tasks: this.listTasks() }
+    const generations = [...this.generations].map(([key, generation]) => {
+      const separator = key.indexOf('\u0000')
+      return { runtime: key.slice(0, separator) as RuntimeKind, taskId: key.slice(separator + 1), generation }
+    }).sort((left, right) => `${left.runtime}:${left.taskId}`.localeCompare(`${right.runtime}:${right.taskId}`))
+    const payload: PersistedSupervisorState = {
+      schemaVersion: STATE_SCHEMA_VERSION,
+      tasks: this.listTasks(),
+      generations,
+    }
     const fd = openSync(temporary, 'w', 0o600)
     try { writeFileSync(fd, `${JSON.stringify(payload, null, 2)}\n`, 'utf8') } finally { closeSync(fd) }
     chmodSync(temporary, 0o600)

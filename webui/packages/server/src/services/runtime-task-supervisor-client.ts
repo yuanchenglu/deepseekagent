@@ -255,7 +255,7 @@ class ManagedRuntimeTaskLeaseHandle implements RuntimeTaskLeaseHandle {
     if (this.boundPid) await this.bindProcess(this.boundPid)
   }
 
-  private async resume(): Promise<void> {
+  async resume(): Promise<void> {
     if (!this.boundPid) {
       throw new RuntimeTaskSupervisorError(
         'Runtime task lease is orphaned and cannot resume without the original PID',
@@ -412,7 +412,7 @@ export async function acquireRuntimeTaskLease(input: AcquireRuntimeTaskLeaseInpu
   )
   try {
     if (started.response.code === 'resume-required') {
-      await (handle as any).resume()
+      await handle.resume()
     } else if (input.processPid) {
       await handle.bindProcess(input.processPid)
     }
