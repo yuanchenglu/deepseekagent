@@ -1,0 +1,45 @@
+name: Apply Runtime Lease Review Fixes
+
+on:
+  push:
+    branches:
+      - chatgpt/runtime-task-lease-protocol
+    paths:
+      - ".github/runtime-task-lease-review.patch"
+      - ".github/workflows/apply-runtime-lease-review-fixes.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-runtime-lease-review-fixes
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/runtime-task-lease-protocol
+          fetch-depth: 0
+
+      - name: Apply review fixes
+        run: |
+          set -euo pipefail
+          git apply --check .github/runtime-task-lease-review.patch
+          git apply .github/runtime-task-lease-review.patch
+          rm .github/runtime-task-lease-review.patch
+          rm .github/workflows/apply-runtime-lease-review-fixes.yml
+
+      - name: Commit review fixes
+        env:
+          BRANCH: chatgpt/runtime-task-lease-protocol
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(electron): enforce Main-only lease supervision"
+          git push origin "HEAD:${BRANCH}"
