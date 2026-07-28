@@ -44,7 +44,25 @@ jobs:
         run: |
           set -euo pipefail
           PATCH="scripts/apply-runtime-task-pid-lifecycle.patch"
-          if ! git apply --recount --verbose --check "$PATCH" 2> scripts/runtime-task-patch-error.log; then
+          NORMALIZED="$(mktemp)"
+          python3 - "$PATCH" "$NORMALIZED" <<'PY'
+          from pathlib import Path
+          import sys
+
+          source, target = map(Path, sys.argv[1:])
+          normalized = []
+          in_hunk = False
+          for line in source.read_text(encoding='utf-8').splitlines():
+              if line.startswith('diff --git '):
+                  in_hunk = False
+              if line.startswith('@@ '):
+                  in_hunk = True
+              if in_hunk and line == '':
+                  line = ' '
+              normalized.append(line)
+          target.write_text('\n'.join(normalized) + '\n', encoding='utf-8')
+          PY
+          if ! git apply --recount --verbose --check "$NORMALIZED" 2> scripts/runtime-task-patch-error.log; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -f scripts/runtime-task-patch-error.log
@@ -55,13 +73,13 @@ jobs:
             cat scripts/runtime-task-patch-error.log >&2
             exit 1
           fi
-          rm -f scripts/runtime-task-patch-error.log
-          git apply --recount "$PATCH"
+          git apply --recount "$NORMALIZED"
           git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
           git rm "$PATCH"
+          git rm -f scripts/runtime-task-patch-error.log || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add webui hermes_cli/webui.py .github/workflows/webui-browser-e2e.yml
+          git add -A webui hermes_cli/webui.py .github/workflows/webui-browser-e2e.yml scripts
           git commit -m "feat(runtime): connect real task and PID lifecycles"
 
       - name: Push finalized branch
