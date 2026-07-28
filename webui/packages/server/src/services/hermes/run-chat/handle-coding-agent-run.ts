@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Server, Socket } from 'socket.io'
 import { codingAgentRunManager } from '../../agent-runner/coding-agent-run-manager'
 import {
@@ -12,6 +13,7 @@ import { writeModelRunProfileToken } from './model-run-prompt'
 import type { AuthenticatedUser } from '../../../middleware/user-auth'
 import { getSystemPrompt } from '../../../lib/llm-prompt'
 import { getSession } from '../../../db/hermes/session-store'
+import { acquireRuntimeTaskLease, runtimeTaskId, type RuntimeTaskLeaseHandle } from '../../runtime-task-supervisor-client'
 
 export interface CodingAgentRunSocketData {
   input: string | ContentBlock[]
@@ -62,6 +64,7 @@ export async function handleCodingAgentRun(
   const storedSession = getSession(sessionId)
   const launchProvider = data.provider || (mode === 'scoped' ? storedSession?.provider || undefined : undefined)
   const launchModel = data.model || (mode === 'scoped' ? storedSession?.model || undefined : undefined)
+  let taskWorkspace = String(storedSession?.workspace || data.workspace || '').trim()
   if (runId && !codingAgentRunManager.isSessionLaunchCompatible(sessionId, {
     agentId,
     mode,
@@ -85,12 +88,20 @@ export async function handleCodingAgentRun(
       sessionSource: data.session_source,
     }, state)
     runId = started.agentSessionId
+    taskWorkspace = String(started.workspaceDir || taskWorkspace).trim()
   }
 
   state.isWorking = true
   state.runId = runId
 
+  let taskLease: RuntimeTaskLeaseHandle | undefined
   try {
+    taskLease = await acquireRuntimeTaskLease({
+      runtime: 'deepcode',
+      taskId: runtimeTaskId('deepcode', `${sessionId}:${randomUUID()}`),
+      workspace: taskWorkspace,
+      access: 'write',
+    })
     const inputText = contentBlocksToString(data.input)
     const socketUser = socket.data?.user as AuthenticatedUser | undefined
     await writeModelRunProfileToken(socketUser, profile)
@@ -98,8 +109,15 @@ export async function handleCodingAgentRun(
     const runPrompt = [
       includeBaseSystemPrompt ? getSystemPrompt(undefined, { source: data.session_source || data.source }) : '',
     ].filter(Boolean).join('\n')
-    await sendCodingAgentRunInput(sessionId, inputText, runPrompt)
+    if (taskLease.enabled) {
+      await sendCodingAgentRunInput(sessionId, inputText, runPrompt, taskLease)
+    } else {
+      await sendCodingAgentRunInput(sessionId, inputText, runPrompt)
+    }
   } catch (err) {
+    if (taskLease && !codingAgentRunManager.isSessionProcessing(sessionId)) {
+      try { await taskLease.finish('failed') } catch { taskLease.abandon() }
+    }
     if (!codingAgentRunManager.isSessionProcessing(sessionId)) {
       state.isWorking = false
       state.isAborting = false
