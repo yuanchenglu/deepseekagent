@@ -12,12 +12,12 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| `develop` 基线 | `96c1d47ea03d06bcb4c342bcc7f33d506dd2499b`，PR #5 已合入 |
+| `develop` 基线 | `7e57d8e5661b3e367a623f704c0799ce8a0b82ec`，PR #7 已合入 |
 | 当前代码工作分支 | `chatgpt/electron-preview-release-gate` |
 | 当前代码 PR | PR #6：`ci: establish automated Electron Preview DMG gate` |
-| PR #6 当前 Head | `4125b418772822e6bf8d6c3ea457b74bbb3cb22d` |
-| PR #6 规模 | 15 commits，9 changed files |
-| 本次文档分支 | `chatgpt/update-three-phase-progress-2026-07-28` |
+| PR #6 当前 Head | `c4bbfb17bfa2b5b8611993b67e8cf36609996a26` |
+| PR #6 规模 | 23 commits，11 changed files |
+| 进度/交接文档 | 已通过 PR #7 合入 `develop` |
 | 本地未推送代码 | **无**；当前工作均已存在于 GitHub 远程分支 |
 
 PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本文中的瞬时状态当作最终结论。
@@ -29,7 +29,7 @@ PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本�
 | 阶段 | 代码/工程实施进度 | 发布就绪状态 | 结论 |
 |---|---:|---|---|
 | 第一阶段：CLI Alpha | 约 90%–95% | **No-Go** | 主体代码完成，外部凭据、历史清理、干净机和真实模型门禁未完成 |
-| 第二阶段：WebUI Beta | 约 90% | **No-Go** | 核心功能和 Browser E2E 已完成，仍需清理 CI、升级/共存/迁移和真实环境门禁 |
+| 第二阶段：WebUI Beta | 约 90% | **No-Go** | 核心功能、Browser E2E 和静态 i18n 门禁已完成，仍需升级/共存/迁移和真实环境门禁 |
 | 第三阶段：Electron Preview | 约 80% | **No-Go** | 双模式架构、工作区锁、无签名 DMG 构建链路已形成，PR #6 尚未全绿并合入 |
 
 **整体判断：**三阶段的主体工程已经完成大半，当前工作重心已从“继续堆功能”转为“关闭发布契约、CI、真实环境与外部安全门禁”。不能把代码完成度等同于可发布程度；当前三个阶段均仍是 **No-Go**。
@@ -71,15 +71,13 @@ PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本�
 - `deepagent webui start/open/status/stop` 生命周期主体。
 - 默认 loopback、本地数据目录和端口共存逻辑。
 - WebUI 与 CLI 共用 DeepAgent Runtime 的主路径。
-- WebUI Browser E2E 已在 PR #5 真实通过；PR #6 当前 Head 的 Browser E2E 也已通过。
+- WebUI Browser E2E 已在 PR #5 真实通过。
+- PR #6 当前 Head 的 `WebUI i18n Coverage` 已通过。
 - NPM 许可证审计和 Beta 发布 workflow 已建立。
 
 ### 4.2 当前阻断项
 
-- PR #6 的独立 i18n 门禁仍失败；报告确认只缺英文源 locale 的 3 个 changelog key：
-  - `changelog.initial`
-  - `changelog.auth`
-  - `changelog.electron`
+- PR #6 当前 Head 的 Browser E2E 和 Electron DMG workflow 在本文快照时仍在运行，必须重新读取最终结论。
 - 仍需验证 Alpha → Beta 数据升级、失败回滚和干净机生命周期。
 - 仍需执行 CLI/WebUI/Hermes/OpenCode 共存的真实环境测试。
 - LAN/公网访问继续保持非 Beta 承诺，不应为赶进度扩大范围。
@@ -87,7 +85,7 @@ PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本�
 
 ### 4.3 阶段结论
 
-Browser E2E 的核心阻断已解除；剩余工作主要是 CI 契约、迁移、共存和真实环境门禁。WebUI Beta 代码层接近完成，但仍是 No-Go。
+Browser E2E 的核心能力和静态 i18n 门禁已经建立；剩余工作主要是完整 CI、迁移、共存和真实环境门禁。WebUI Beta 代码层接近完成，但仍是 No-Go。
 
 ---
 
@@ -103,15 +101,16 @@ Browser E2E 的核心阻断已解除；剩余工作主要是 CI 契约、迁移�
 - DMG 内保留拖拽安装和可选 `Install DeepAgent.command`。
 - Desktop CLI 使用独立 `deepagent-desktop`，不覆盖第一阶段 `deepagent`。
 - PR #6 已把手动 DMG workflow 改造成 PR 自动验证 + 显式正式发布两种模式。
-- PR #6 已通过全 refs Gitleaks 扫描、版本契约、依赖安装和 Browser E2E 的阶段性验证。
+- PR #6 已通过全 refs Gitleaks、版本契约、依赖安装和静态 i18n 门禁的阶段性验证。
 
 ### 5.2 PR #6 当前状态
 
-- PR：#6，目标分支 `develop`，当前可合并但**不应在 CI 全绿前合入**。
-- 当前 Head：`4125b418772822e6bf8d6c3ea457b74bbb3cb22d`。
-- Browser E2E：成功。
-- WebUI i18n Coverage：失败，根因为 3 个英文 changelog key 缺失。
-- Electron Preview DMG：本文快照时仍在执行 WebUI tests，必须重新读取最终结论。
+- PR：#6，目标分支 `develop`；当前 Head 与新 `develop` 基线需重新计算 mergeability。
+- 当前 Head：`c4bbfb17bfa2b5b8611993b67e8cf36609996a26`。
+- PR 规模：23 commits，11 changed files。
+- WebUI i18n Coverage：成功。
+- Browser E2E：本文快照时正在执行。
+- Electron Preview DMG：本文快照时正在执行 WebUI 安装/测试链路。
 - 未解决 review：发布运行不应被新的运行取消；`cancel-in-progress` 应只用于 PR 验证，正式 `publish=true` 运行应串行且不可被取消。
 
 ### 5.3 合入后仍需完成
@@ -132,11 +131,11 @@ Electron Preview 已从架构开发进入发布门禁阶段，但 PR #6 尚未�
 ## 6. 下一执行顺序
 
 ```text
-1. 重新读取 PR #6 最新 Head、CI 和 review threads
-2. 补齐 3 个英文 changelog i18n key
-3. 修复正式发布运行的 concurrency/cancel-in-progress 规则
-4. 等待 Browser E2E、i18n、Electron DMG 全部通过
-5. 解决 review thread，squash 合入 develop
+1. 重新读取 PR #6 最新 Head、CI、Artifacts 和 review threads
+2. 修复正式发布运行的 concurrency/cancel-in-progress 规则
+3. 等待 Browser E2E、i18n、Electron DMG 全部通过
+4. 解决 review thread，并处理 PR #6 与最新 develop 的同步/冲突
+5. squash 合入 develop
 6. 更新本文、10-ELECTRON-PREVIEW-STATUS.md 和交接文档
 7. 执行 CLI Alpha 外部凭据轮换与 Git 历史清理
 8. 执行干净 Mac 的 CLI/WebUI/Electron 生命周期和共存验收
@@ -152,5 +151,5 @@ Electron Preview 已从架构开发进入发布门禁阶段，但 PR #6 尚未�
 - 不得把 Browser E2E 通过写成整个 WebUI Beta 已发布。
 - 不得把无签名 DMG 写成已签名、公证或 Stable。
 - 不得把旧交接文档中的工作区锁缺陷继续当作当前缺陷。
-- 不得因 PR 显示 mergeable 就绕过失败 CI 或未解决 review。
+- 不得因 PR 显示 mergeable 就绕过失败/运行中 CI 或未解决 review。
 - 不得依赖当前容器、旧工作区或未推送文件；GitHub 远程仓库是唯一事实源。
