@@ -39,18 +39,19 @@ describe.sequential('runtime task supervisor client', () => {
     expect(input.DEEPAGENT_RUNTIME_LEASE_TOKEN).toBe('secret-token')
   })
 
-  it('is a no-op outside Electron Desktop when Main supervision is absent', async () => {
+  it('allows an empty workspace only when supervision is disabled outside Electron Desktop', async () => {
     delete process.env.HERMES_DESKTOP
     for (const name of RUNTIME_TASK_SUPERVISOR_ENV_NAMES) delete process.env[name]
 
     const lease = await acquireRuntimeTaskLease({
       runtime: 'deepagent',
       taskId: runtimeTaskId('deepagent', 'browser-session'),
-      workspace: '/tmp/workspace',
+      workspace: '',
       access: 'write',
     })
 
     expect(lease.enabled).toBe(false)
+    expect(lease.workspace).toBe('')
     await expect(lease.heartbeat()).resolves.toBeUndefined()
     await expect(lease.finish('completed')).resolves.toBeUndefined()
   })
@@ -67,6 +68,24 @@ describe.sequential('runtime task supervisor client', () => {
       runtime: 'deepagent',
       taskId: runtimeTaskId('deepagent', 'desktop-session'),
       workspace: '/tmp/workspace',
+      access: 'write',
+    })).rejects.toMatchObject(expected)
+  })
+
+  it('rejects an empty workspace when Main supervision is configured', async () => {
+    process.env.HERMES_DESKTOP = 'true'
+    process.env.DEEPAGENT_RUNTIME_LEASE_SOCKET = '/tmp/runtime-task-supervisor.sock'
+    process.env.DEEPAGENT_RUNTIME_LEASE_TOKEN = 'a'.repeat(64)
+    process.env.DEEPAGENT_RUNTIME_LEASE_TTL_MS = '30000'
+
+    const expected: Partial<RuntimeTaskSupervisorError> = {
+      code: 'workspace-required',
+      status: 400,
+    }
+    await expect(acquireRuntimeTaskLease({
+      runtime: 'deepagent',
+      taskId: runtimeTaskId('deepagent', 'desktop-session-without-workspace'),
+      workspace: '',
       access: 'write',
     })).rejects.toMatchObject(expected)
   })
