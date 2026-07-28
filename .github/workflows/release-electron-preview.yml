@@ -1,6 +1,14 @@
 name: Release Electron Preview
 
 on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/release-electron-preview.yml"
+      - "VERSION"
+      - "webui/package.json"
+      - "webui/package-lock.json"
+      - "webui/packages/desktop/**"
   workflow_dispatch:
     inputs:
       version:
@@ -14,12 +22,17 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: electron-preview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-unsigned:
     name: Build and verify unsigned Apple Silicon DMG
-    runs-on: macos-14
+    runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,23 +64,28 @@ jobs:
             webui/package-lock.json
             webui/packages/desktop/package-lock.json
 
-      - name: Validate source version, tag, and platform promise
+      - name: Resolve and validate release contract
         env:
-          VERSION: ${{ inputs.version }}
-          PUBLISH: ${{ inputs.publish }}
+          REQUESTED_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+          PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && 'true' || 'false' }}
         run: |
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]] || {
+          set -euo pipefail
+          RUNTIME_VERSION="$(tr -d '[:space:]' < VERSION)"
+          RUNTIME_VERSION="${RUNTIME_VERSION#v}"
+          WEBUI_VERSION="$(node -p "require('./webui/package.json').version")"
+          BASE_VERSION="${RUNTIME_VERSION%%-*}"
+          PREVIEW_VERSION="${REQUESTED_VERSION:-${BASE_VERSION}-preview.0}"
+
+          [[ "$PREVIEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]] || {
             echo "Electron Preview requires X.Y.Z-preview.N" >&2
             exit 1
           }
-          RUNTIME_VERSION="$(tr -d '[:space:]' < VERSION)"
-          RUNTIME_VERSION="${RUNTIME_VERSION#v}"
-          [ "$(node -p "require('./webui/package.json').version")" = "$RUNTIME_VERSION" ] || {
-            echo "VERSION and webui/package.json do not identify the same Phase 2 Runtime" >&2
+          [ "${PREVIEW_VERSION%%-*}" = "$BASE_VERSION" ] || {
+            echo "Desktop Preview and Runtime must share the same X.Y.Z base version" >&2
             exit 1
           }
-          [ "$(node -p "require('./webui/packages/desktop/package.json').version")" = "$VERSION" ] || {
-            echo "Desktop package version mismatch" >&2
+          [ "$WEBUI_VERSION" = "$RUNTIME_VERSION" ] || {
+            echo "VERSION and webui/package.json do not identify the same Phase 2 Runtime" >&2
             exit 1
           }
           [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] || {
@@ -75,11 +93,15 @@ jobs:
             exit 1
           }
           if [ "$PUBLISH" = "true" ]; then
-            [ "$(git rev-list -n 1 "v${VERSION}")" = "$(git rev-parse HEAD)" ] || {
-              echo "Publishing requires tag v${VERSION} at HEAD" >&2
+            [ "$(git rev-list -n 1 "v${PREVIEW_VERSION}")" = "$(git rev-parse HEAD)" ] || {
+              echo "Publishing requires tag v${PREVIEW_VERSION} at HEAD" >&2
               exit 1
             }
           fi
+
+          echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> "$GITHUB_ENV"
+          echo "RUNTIME_VERSION=${RUNTIME_VERSION}" >> "$GITHUB_ENV"
+          echo "Resolved Desktop Preview ${PREVIEW_VERSION} for Runtime ${RUNTIME_VERSION}"
 
       - name: Install, test, and build shared WebUI
         working-directory: webui
@@ -88,11 +110,15 @@ jobs:
           npm test
           npm run build
           npm run licenses:audit -- \
-            --output "../dist/releases/deepagent-electron-npm-licenses-${{ inputs.version }}.json"
+            --output "../dist/releases/deepagent-electron-npm-licenses-${PREVIEW_VERSION}.json"
 
-      - name: Install and test Electron main process
+      - name: Stamp, install, and test Electron main process
         working-directory: webui
         run: |
+          npm --prefix packages/desktop version "$PREVIEW_VERSION" \
+            --no-git-tag-version --allow-same-version
+          [ "$(node -p "require('./packages/desktop/package.json').version")" = "$PREVIEW_VERSION" ]
+          [ "$(node -p "require('./packages/desktop/package-lock.json').version")" = "$PREVIEW_VERSION" ]
           npm run desktop:install
           npx vitest run --config packages/desktop/vitest.config.ts
           npm --prefix packages/desktop run build:main
@@ -115,11 +141,9 @@ jobs:
         run: npm run dist:preview
 
       - name: Verify unsigned DMG, Bundle ID, architecture, and installer
-        env:
-          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          DMG="webui/packages/desktop/release/DeepAgent-${VERSION}-arm64.dmg"
+          DMG="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
           [ -f "$DMG" ] || { echo "Expected DMG missing: $DMG" >&2; exit 1; }
           MOUNT="$(mktemp -d)"
           cleanup() {
@@ -144,21 +168,19 @@ jobs:
             exit 1
           fi
           [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "org.starseas.deepagent" ]
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$PREVIEW_VERSION" ]
           file "$APP/Contents/MacOS/DeepAgent" | grep -q 'Mach-O.*arm64'
 
       - name: Generate immutable Desktop manifest and checksum
-        env:
-          VERSION: ${{ inputs.version }}
         run: |
           mkdir -p dist/releases
-          DMG="webui/packages/desktop/release/DeepAgent-${VERSION}-arm64.dmg"
-          cp "$DMG" "dist/releases/DeepAgent-${VERSION}-arm64.dmg"
+          DMG="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
+          cp "$DMG" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
           cd dist/releases
-          shasum -a 256 "DeepAgent-${VERSION}-arm64.dmg" > "DeepAgent-${VERSION}-arm64.dmg.sha256"
-          python3 - "$VERSION" <<'PY'
+          shasum -a 256 "DeepAgent-${PREVIEW_VERSION}-arm64.dmg" > "DeepAgent-${PREVIEW_VERSION}-arm64.dmg.sha256"
+          python3 - "$PREVIEW_VERSION" "$RUNTIME_VERSION" <<'PY'
           import hashlib, json, pathlib, sys
-          version = sys.argv[1]
-          runtime_version = pathlib.Path("../../VERSION").read_text(encoding="utf-8").strip().removeprefix("v")
+          version, runtime_version = sys.argv[1:3]
           artifact = pathlib.Path(f"DeepAgent-{version}-arm64.dmg")
           digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
           manifest = {
@@ -204,8 +226,10 @@ jobs:
   publish:
     name: Publish verified Electron Preview
     needs: build-unsigned
-    if: ${{ inputs.publish }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
