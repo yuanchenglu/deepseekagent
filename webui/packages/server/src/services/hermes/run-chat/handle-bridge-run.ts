@@ -738,7 +738,6 @@ export async function resumeBridgeRun(
   state.bridgeToolCounter = state.bridgeToolCounter || 0
 
   const resumeWorkspace = String(args.workspace || getSession(sessionId)?.workspace || '').trim()
-  if (!resumeWorkspace) throw new Error('workspace is required to resume a DeepAgent Runtime task')
   await acquireBridgeTaskLease(state, sessionId, resumeWorkspace)
 
   const emit = (event: string, payload: any) => {

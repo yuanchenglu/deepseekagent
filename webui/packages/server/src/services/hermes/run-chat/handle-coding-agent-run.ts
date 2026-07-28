@@ -64,6 +64,7 @@ export async function handleCodingAgentRun(
   const storedSession = getSession(sessionId)
   const launchProvider = data.provider || (mode === 'scoped' ? storedSession?.provider || undefined : undefined)
   const launchModel = data.model || (mode === 'scoped' ? storedSession?.model || undefined : undefined)
+  let taskWorkspace = String(storedSession?.workspace || data.workspace || '').trim()
   if (runId && !codingAgentRunManager.isSessionLaunchCompatible(sessionId, {
     agentId,
     mode,
@@ -87,6 +88,7 @@ export async function handleCodingAgentRun(
       sessionSource: data.session_source,
     }, state)
     runId = started.agentSessionId
+    taskWorkspace = String(started.workspaceDir || taskWorkspace).trim()
   }
 
   state.isWorking = true
@@ -94,8 +96,6 @@ export async function handleCodingAgentRun(
 
   let taskLease: RuntimeTaskLeaseHandle | undefined
   try {
-    const taskWorkspace = String(getSession(sessionId)?.workspace || data.workspace || '').trim()
-    if (!taskWorkspace) throw new Error('workspace is required for a DeepCode Runtime task')
     taskLease = await acquireRuntimeTaskLease({
       runtime: 'deepcode',
       taskId: runtimeTaskId('deepcode', `${sessionId}:${randomUUID()}`),
@@ -109,7 +109,11 @@ export async function handleCodingAgentRun(
     const runPrompt = [
       includeBaseSystemPrompt ? getSystemPrompt(undefined, { source: data.session_source || data.source }) : '',
     ].filter(Boolean).join('\n')
-    await sendCodingAgentRunInput(sessionId, inputText, runPrompt, taskLease)
+    if (taskLease.enabled) {
+      await sendCodingAgentRunInput(sessionId, inputText, runPrompt, taskLease)
+    } else {
+      await sendCodingAgentRunInput(sessionId, inputText, runPrompt)
+    }
   } catch (err) {
     if (taskLease && !codingAgentRunManager.isSessionProcessing(sessionId)) {
       try { await taskLease.finish('failed') } catch { taskLease.abandon() }

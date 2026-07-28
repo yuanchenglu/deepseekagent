@@ -373,13 +373,21 @@ export function stripRuntimeTaskSupervisorEnvironment(env: NodeJS.ProcessEnv): N
 
 export async function acquireRuntimeTaskLease(input: AcquireRuntimeTaskLeaseInput): Promise<RuntimeTaskLeaseHandle> {
   const config = supervisorConfig()
+  const workspace = String(input.workspace || '').trim()
   if (!config) {
     return new NoopRuntimeTaskLeaseHandle(
       input.runtime,
       input.taskId,
-      input.workspace,
+      workspace,
       input.access,
       input.processPid,
+    )
+  }
+  if (!workspace) {
+    throw new RuntimeTaskSupervisorError(
+      `${input.runtime} task workspace is required`,
+      'workspace-required',
+      400,
     )
   }
   if (input.requireProcess && !input.processPid) {
@@ -394,7 +402,7 @@ export async function acquireRuntimeTaskLease(input: AcquireRuntimeTaskLeaseInpu
   const started = await postSupervisor(config, '/v1/tasks/start', {
     runtime: input.runtime,
     taskId: input.taskId,
-    workspace: input.workspace,
+    workspace,
     access: input.access,
     eventId: nextEventId(input.runtime, 'start'),
   })
@@ -406,7 +414,7 @@ export async function acquireRuntimeTaskLease(input: AcquireRuntimeTaskLeaseInpu
     config,
     input.runtime,
     input.taskId,
-    input.workspace,
+    workspace,
     input.access,
     input.processPid,
   )
