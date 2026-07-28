@@ -7,17 +7,12 @@ on:
     paths:
       - ".github/workflows/apply-global-agent-test-wait.yml"
       - "scripts/patch-global-agent-test-wait.py"
-  pull_request:
-    branches: [develop]
-    paths:
-      - ".github/workflows/apply-global-agent-test-wait.yml"
-      - "scripts/patch-global-agent-test-wait.py"
 
 permissions:
   contents: write
 
 concurrency:
-  group: apply-global-agent-test-wait
+  group: apply-global-agent-test-wait-v2
   cancel-in-progress: true
 
 jobs:
@@ -38,8 +33,16 @@ jobs:
 
       - name: Commit deterministic test wait
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add webui/tests/server/global-agent-server.test.ts .github/workflows/release-electron-preview.yml
           git commit -m "test(webui): await second MCU audio enqueue deterministically"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+          done
+          exit 1
