@@ -5,7 +5,7 @@
 > 远程仓库：`https://github.com/yuanchenglu/deepseekagent.git`  
 > 开发分支：`develop`  
 > 发布分支：`master`  
-> 说明：总执行顺序以 `三阶段执行计划PLAN.md` v2.6.0 为准；本文只记录真实完成情况、阻断项和远程证据。
+> 说明：总执行顺序以 `三阶段执行计划PLAN.md` v2.7.0 为准；本文只记录真实完成情况、阻断项和远程证据。
 
 ---
 
@@ -13,17 +13,16 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| 更新前 develop Head | `cb2885ed1a31cf559640ec62d97caa6047a6b1ad` |
-| master Head | `b3943ac43f0f0f6a1f86f5f2cb9a230527389d91` |
-| PR #13 | 已合入；Electron Preview 正式发布 concurrency 风险关闭 |
-| PR #15 Head | `b3c2b07e1c8508af10d217b8d0b3581657617639` |
-| PR #15 merge | 已 squash 合入 `develop`，提交 `cb2885ed1a31cf559640ec62d97caa6047a6b1ad` |
-| Browser E2E | PR #15 真实成功 |
-| Electron workflow | concurrency、Gitleaks、WebUI、许可证、Electron Main、无签名 DMG、Manifest、SHA-256、artifact 全部成功 |
-| review | 4 条建议全部实现、回复并解决 |
+| PR #15 | Main 权威 Runtime Task / Workspace Lease 协议已合入 |
+| PR #17 最终 Head | `aba94fab7b36f9bd140752c455acdd4838bd3835` |
+| PR #17 merge | 已 squash 合入 `develop`，提交 `e0f2f407daa6f273ee4c927934efc2e3b27293a0` |
+| Browser E2E | 最终 Head 真实成功 |
+| Electron workflow | concurrency、全 refs Secret 扫描、WebUI、许可证、Electron Main、无签名 DMG、Manifest、SHA-256、artifact 全部成功 |
+| review | 4 条建议全部实现、回复并解决；最终 unresolved 为 0 |
 | 发布动作 | Publish Job 在 PR 场景跳过；未执行 `publish=true`，未创建 Tag、Release 或公开渠道 |
-| 过期 PR #2 | 已关闭，不合并；分支内容已被后续 PR 替代 |
-| 本地未推送工作 | **无**；本次协议代码和文档均已进入 GitHub 远程 |
+| 本地未推送工作 | **无**；功能代码、测试和本次状态同步均进入 GitHub 远程分支 |
+
+PR #17 的 Electron workflow 首轮只出现一个与本次改动无关的 MCU TTS 异步断言抖动；同一最终 Head 的失败 Job 重跑后全链路成功。该抖动未通过修改业务代码规避。
 
 新会话必须先读取最新远程 Head、开放 PR、Actions 和 review，不得机械沿用本文 SHA。
 
@@ -35,9 +34,9 @@
 |---|---:|---|---|
 | CLI Alpha | 约 90%–95% | **No-Go** | 主体代码接近完成；凭据、历史、干净机、真实模型和 P0/P1 未关闭 |
 | WebUI Beta | 约 90% | **No-Go** | Browser E2E 和核心自动化完成；迁移、共存、正式渠道和外测未关闭 |
-| Electron Preview | 约 92% | **No-Go** | concurrency 与 Runtime Lease 协议完成；真实 task/PID、真实并发和干净机未关闭 |
+| Electron Preview | 约 94% | **No-Go** | Runtime 协议及真实 task/PID 生命周期完成；双 Runtime 真实并发、干净机、共存和外测未关闭 |
 
-**整体判断**：项目处于发布收敛阶段。当前重点是生命周期、安全、迁移、共存、故障恢复和真实用户验收，不增加非必要功能。
+**整体判断**：项目处于发布收敛阶段。当前不增加非必要功能，按顺序关闭真实并发、凭据、迁移、共存、干净机和用户验收。
 
 ---
 
@@ -91,7 +90,7 @@
 
 ## 5. Electron Preview
 
-### 已完成
+### 5.1 已完成：基础与自动门禁
 
 - DeepAgent / DeepCode 双模式架构。
 - Main Process、独立 Runtime、Keychain、环境白名单和状态目录边界。
@@ -100,10 +99,10 @@
 - Renderer 不能释放其他 Renderer 的锁。
 - Renderer 销毁后 Main 自动回收其 Renderer 租约。
 - 无签名、未公证 Apple Silicon DMG 自动门禁。
-- DMG、Bundle ID、版本、arm64、安装脚本、未签名状态、Manifest 和 SHA-256 校验。
-- Browser E2E、i18n、WebUI 测试/构建/许可审计和 Electron Main 测试全绿。
+- DMG、Bundle ID、版本、arm64、安装器、未签名状态、Manifest 和 SHA-256 校验。
+- Browser E2E、WebUI 测试/构建/许可证和 Electron Main 全链路。
 
-### 正式发布 concurrency：已关闭
+### 5.2 已完成：正式发布 concurrency
 
 PR #13 已实现并验证：
 
@@ -112,39 +111,59 @@ PR #13 已实现并验证：
 - `publish=true` 正式运行不会被后续运行取消。
 - GitHub prerelease 与 R2 Preview channel 的 Publish Job 使用固定 group 串行排队。
 - 静态脚本对表达式、分组和事件真值表失败关闭。
-- 未改变无签名定位、版本、Tag、Manifest、SHA-256 和 `publish=true` 边界。
 
-### Runtime Task / Workspace Lease 协议：已完成
+### 5.3 已完成：Runtime Task / Workspace Lease 协议
 
 PR #15 已实现并验证：
 
 - Main 权威类型化任务租约协议和状态机。
 - Runtime、规范化 Workspace、taskId、显式 `read` / `write` 和可选进程身份。
-- acquire 后 Main-only `bind-process`；相同绑定幂等、替换拒绝。
-- Runtime Adapter 只能发送 acquire、heartbeat、release、cancel。
-- timeout、process-exit、runtime-crash、recover 和 bind-process 为 Main-only。
-- eventId 按 Runtime 作用域隔离。
-- 重放缓存默认限制为 4,096 条。
-- orphaned 失败关闭：Runtime 崩溃后继续占锁，只接受 Main 恢复证据。
-- 冲突 acquire 不留下幽灵状态；快照和历史不可由外部修改。
-- 契约测试覆盖并发、取消、超时、重放、进程绑定、权限、崩溃和恢复。
+- acquire 后 Main-only `bind-process`。
+- Runtime Adapter 与 Main-only 监督事件权限隔离。
+- `(runtime, eventId)` 幂等和默认 4,096 条有界重放缓存。
+- orphaned 失败关闭和明确恢复证据。
 
-### 当前唯一第一优先工程任务
+### 5.4 已完成：真实 task/PID 生命周期
 
-1. Electron Main 实例化单一 `RuntimeTaskLeaseCoordinator`。
-2. DeepAgent/DeepCode 分别通过固定 Runtime Adapter 接入真实任务生命周期。
-3. 任务启动前 acquire，spawn 后 Main 绑定真实 PID/进程树。
-4. Runtime 发送 heartbeat，Main 负责 timeout、process-exit、runtime-crash 和 recover。
-5. 正常结束、取消、超时、进程退出、Runtime 重启和异常回收不产生双写窗口。
-6. Main 重启后从持久状态和存活进程失败关闭地重建或清理租约。
-7. 完成真实 task/PID 生命周期接入前，不启动双 Runtime 同 Workspace E2E。
+PR #17 已实现并验证：
 
-### 后继工程技术债务
+- Electron Main 持久化、认证的单一 Runtime Task Supervisor。
+- Unix Socket / Windows Named Pipe + Bearer Token。
+- Supervisor 状态跟随 `webUiHome()`，隔离多 WebUI 实例。
+- DeepAgent 稳定 session taskId 与共享 Agent Bridge PID。
+- DeepCode 每回合 acquire-before-spawn 与独立子进程 PID 绑定。
+- POSIX 与 Windows PID 指纹验证，防止 PID 复用误恢复。
+- heartbeat、finish、cancel、process-exit、runtime-crash 和 Main restart 状态驱动。
+- 同一 Runtime heartbeat 丢失时全部 active 任务进入 orphaned 并继续占锁。
+- Main 重启后只恢复 PID 指纹匹配任务，并要求显式 resume。
+- DeepAgent generation 持久化；DeepCode 一次性 task 不累积历史。
+- Supervisor Token 从 Agent、npm、Tool、Bridge 子进程环境中删除。
+- Supervisor RPC 不复用 stale socket，Main 重启后无 `EPIPE`。
+- 非 Desktop WebUI 保持兼容；Desktop 缺失 Supervisor、Workspace 或 PID 证据时失败关闭。
 
-- 双 Runtime 同 Workspace 的真实并发和故障 E2E 未执行。
-- 干净 Apple Silicon Mac 安装、Gatekeeper、升级和卸载未执行。
-- CLI/Desktop/Hermes/OpenCode 共存未验证。
-- 真实用户 Preview 和 P0/P1 清零未完成。
+### 5.5 当前唯一第一优先工程任务
+
+**双 Runtime 同 Workspace 并发与故障 E2E**：
+
+1. reader-reader 并行。
+2. reader-writer 双向互斥。
+3. writer-writer 互斥。
+4. acquire 被拒绝时不得 spawn 写任务。
+5. 正常完成与已确认取消后释放。
+6. 取消不确定、heartbeat timeout 或 Runtime crash 时继续失败关闭。
+7. DeepAgent Bridge 与 DeepCode 子进程真实崩溃语义。
+8. Main/Runtime 重启后的 PID 验证、resume、清理或阻断。
+9. 一个 Runtime 崩溃不错误释放另一个 Runtime 的租约。
+10. E2E 必须使用真实 Workspace、真实任务进程和 Main 监督器，不能用纯 mock 替代。
+
+在完成该工作单元前，不并行启动干净机、凭据清理或公开发布。
+
+### 5.6 后继技术债务
+
+- 外部凭据轮换、旧凭据失效和 Git 历史清理。
+- 干净 Apple Silicon Mac 安装、Gatekeeper、升级和卸载。
+- CLI/Desktop/Hermes/OpenCode 共存。
+- 真实用户 Preview 和 P0/P1 清零。
 
 结论：**No-Go**。
 
@@ -153,14 +172,13 @@ PR #15 已实现并验证：
 ## 6. 下一执行顺序
 
 ```text
-1. 将租约绑定真实 Runtime task/PID 生命周期
-2. 双 Runtime 同 Workspace 并发与故障 E2E
-3. 轮换凭据、确认旧凭据失效
-4. 清理 Git 历史并重扫全部 refs
-5. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
-6. 正式模型任务和真实用户 Preview 测试
-7. 清零 P0/P1
-8. 按 Go/No-Go 提升 Alpha、Beta、Preview 渠道
+1. 双 Runtime 同 Workspace 并发与故障 E2E
+2. 轮换凭据、确认旧凭据失效
+3. 清理 Git 历史并重扫全部 refs
+4. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
+5. 正式模型任务和真实用户 Preview 测试
+6. 清零 P0/P1
+7. 按 Go/No-Go 提升 Alpha、Beta、Preview 渠道
 ```
 
 每次只启动一个可独立验收的工作单元。
@@ -173,6 +191,7 @@ PR #15 已实现并验证：
 - 不得把无签名 DMG 描述为已签名、公证或 Stable。
 - 不得把 Renderer Workspace Lock 测试描述为 Runtime 生命周期闭环。
 - 不得把 Runtime Lease 协议测试描述为真实 task/PID 生命周期接入完成。
+- 不得把真实 task/PID 生命周期描述为双 Runtime 同 Workspace E2E 已完成。
 - 不得把 Browser E2E 通过描述为 WebUI 迁移、共存和正式渠道完成。
-- 不得把 concurrency 或协议阻断关闭描述为 Electron Preview 已发布。
+- 不得把 concurrency、协议或 PID 生命周期完成描述为 Electron Preview 已发布。
 - 不得依赖旧容器或未推送文件；GitHub 远程是唯一事实源。
