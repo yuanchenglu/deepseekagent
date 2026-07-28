@@ -2335,6 +2335,7 @@ export default {
 
   // Changelog
   changelog: {
+    auth: 'Added local seamless login tickets and HttpOnly sessions.',
     initial: 'DeepAgent 0.9.0 initial open-source release preparation.',
     electron: 'Added the DeepAgent and DeepCode dual-mode Electron Preview.',
     new_0_6_22_1: 'This release covers the PRs merged after 0.6.21, with front-end updates for combination models, session history, proxy settings, slash commands, and mobile layout polish',
