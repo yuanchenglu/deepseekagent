@@ -5,6 +5,8 @@ on:
     branches: [develop]
     paths:
       - ".github/workflows/webui-i18n.yml"
+      - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
       - "webui/packages/client/src/**"
       - "webui/scripts/report-i18n-coverage.mjs"
   workflow_dispatch:
