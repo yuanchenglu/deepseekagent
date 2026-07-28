@@ -2335,6 +2335,8 @@ export default {
 
   // Changelog
   changelog: {
+    initial: 'DeepAgent 0.9.0 initial open-source release preparation.',
+    electron: 'Added the DeepAgent and DeepCode dual-mode Electron Preview.',
     new_0_6_22_1: 'This release covers the PRs merged after 0.6.21, with front-end updates for combination models, session history, proxy settings, slash commands, and mobile layout polish',
     new_0_6_22_2: 'The Models page now includes a Combination Models panel, and chat can show real MoA reference and aggregator progress without the old synthetic placeholder tool',
     new_0_6_22_3: 'Chat sessions can be archived from the session list and restored from History, while local-only Claude Code and Codex sessions now appear correctly in History',
