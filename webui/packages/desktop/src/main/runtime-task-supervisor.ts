@@ -190,9 +190,24 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
 
-export class MacOsRuntimeTaskProcessProbe implements RuntimeTaskProcessProbe {
+function windowsPowerShell(): string {
+  const systemRoot = String(process.env.SystemRoot || '').trim()
+  if (systemRoot) {
+    const candidate = join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    if (existsSync(candidate)) return candidate
+  }
+  return 'powershell.exe'
+}
+
+export class SystemRuntimeTaskProcessProbe implements RuntimeTaskProcessProbe {
   async inspect(pid: number): Promise<RuntimeTaskProcessEvidence | null> {
-    if (!validPid(pid) || process.platform === 'win32') return null
+    if (!validPid(pid)) return null
+    return process.platform === 'win32'
+      ? this.inspectWindows(pid)
+      : this.inspectPosix(pid)
+  }
+
+  private async inspectPosix(pid: number): Promise<RuntimeTaskProcessEvidence | null> {
     try {
       const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'command='], {
         encoding: 'utf8',
@@ -205,6 +220,48 @@ export class MacOsRuntimeTaskProcessProbe implements RuntimeTaskProcessProbe {
         pid,
         fingerprint: createHash('sha256').update(command).digest('hex'),
         command: command.slice(0, 512),
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private async inspectWindows(pid: number): Promise<RuntimeTaskProcessEvidence | null> {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      `$target = Get-CimInstance Win32_Process -Filter \"ProcessId = ${pid}\"`,
+      'if ($null -eq $target) { exit 3 }',
+      "$creation = if ($target.CreationDate -is [DateTime]) { $target.CreationDate.ToUniversalTime().ToString('o') } else { [string]$target.CreationDate }",
+      "[pscustomobject]@{ creation = $creation; executable = [string]$target.ExecutablePath; commandLine = [string]$target.CommandLine } | ConvertTo-Json -Compress",
+    ].join('; ')
+    try {
+      const { stdout } = await execFileAsync(windowsPowerShell(), [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        script,
+      ], {
+        encoding: 'utf8',
+        timeout: 5_000,
+        maxBuffer: 64 * 1024,
+        windowsHide: true,
+      })
+      const parsed = JSON.parse(stdout.trim()) as {
+        creation?: unknown
+        executable?: unknown
+        commandLine?: unknown
+      }
+      const creation = String(parsed.creation || '').trim()
+      const executable = String(parsed.executable || '').trim()
+      const commandLine = String(parsed.commandLine || '').trim()
+      if (!creation && !executable && !commandLine) return null
+      const identity = [creation, executable, commandLine].join('\u0000')
+      return {
+        pid,
+        fingerprint: createHash('sha256').update(identity).digest('hex'),
+        command: (executable || commandLine || `pid ${pid}`).slice(0, 512),
       }
     } catch {
       return null
@@ -250,7 +307,7 @@ export class RuntimeTaskSupervisor {
       deepagent: new RuntimeTaskLeaseAdapter('deepagent', this.coordinator),
       deepcode: new RuntimeTaskLeaseAdapter('deepcode', this.coordinator),
     }
-    this.processProbe = options.processProbe ?? new MacOsRuntimeTaskProcessProbe()
+    this.processProbe = options.processProbe ?? new SystemRuntimeTaskProcessProbe()
     this.now = options.now ?? (() => Date.now())
   }
 
@@ -344,7 +401,9 @@ export class RuntimeTaskSupervisor {
       if (existing.state === 'orphaned') return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(existing) } }
       return { status: 200, body: { ok: true, code: 'already-active', task: cloneTask(existing) } }
     }
-    const generation = (this.generations.get(key) || 0) + 1
+    const generation = request.runtime === 'deepagent'
+      ? (this.generations.get(key) || 0) + 1
+      : 1
     const internalTaskId = safeInternalTaskId(request.runtime, request.taskId, generation)
     const result = this.adapters[request.runtime].dispatch({
       type: 'acquire', eventId: request.eventId, observedAt: this.now(), ttlMs: this.heartbeatTtlMs,
@@ -357,7 +416,7 @@ export class RuntimeTaskSupervisor {
       state: 'active', generation, leaseId: result.lease.leaseId, internalTaskId, lastHeartbeatAt: now, createdAt: now,
     }
     this.records.set(key, record)
-    this.generations.set(key, generation)
+    if (request.runtime === 'deepagent') this.generations.set(key, generation)
     this.persist()
     return { status: 201, body: { ok: true, code: 'acquired', task: cloneTask(record) } }
   }
@@ -471,7 +530,7 @@ export class RuntimeTaskSupervisor {
     record.state = 'active'
     record.process = evidence
     record.lastHeartbeatAt = this.now()
-    this.generations.set(key, generation)
+    if (record.runtime === 'deepagent') this.generations.set(key, generation)
     this.persist()
     return { status: 200, body: { ok: true, code: 'resumed', task: cloneTask(record) } }
   }
@@ -508,7 +567,7 @@ export class RuntimeTaskSupervisor {
     const persisted = this.readState()
     const activeRuntimes = new Set<RuntimeKind>()
     for (const item of persisted.generations) {
-      if (!validRuntime(item.runtime) || !validString(item.taskId) || !Number.isSafeInteger(item.generation) || item.generation < 1) continue
+      if (item.runtime !== 'deepagent' || !validString(item.taskId) || !Number.isSafeInteger(item.generation) || item.generation < 1) continue
       this.generations.set(stableTaskKey(item.runtime, item.taskId), item.generation)
     }
     for (const task of persisted.tasks) {
@@ -517,8 +576,10 @@ export class RuntimeTaskSupervisor {
       const evidence = await this.processProbe.inspect(task.process.pid)
       if (!evidence || evidence.fingerprint !== task.process.fingerprint) continue
       const key = stableTaskKey(task.runtime, task.taskId)
-      const generation = Math.max(1, task.generation || 1, this.generations.get(key) || 0)
-      this.generations.set(key, generation)
+      const generation = task.runtime === 'deepagent'
+        ? Math.max(1, task.generation || 1, this.generations.get(key) || 0)
+        : Math.max(1, task.generation || 1)
+      if (task.runtime === 'deepagent') this.generations.set(key, generation)
       const internalTaskId = safeInternalTaskId(task.runtime, task.taskId, generation)
       const acquired = this.adapters[task.runtime].dispatch({
         type: 'acquire', eventId: this.nextEventId('restore-acquire'), observedAt: this.now(), ttlMs: this.heartbeatTtlMs,

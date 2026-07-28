@@ -5,7 +5,6 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
-      - "scripts/apply-runtime-review-fixes.py"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -19,51 +18,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: webui-browser-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-review-fixes:
-    name: Apply Runtime lifecycle review fixes
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Apply deterministic review fixes
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          LOG="$(mktemp)"
-          if ! python3 scripts/apply-runtime-review-fixes.py >"$LOG" 2>&1; then
-            git reset --hard HEAD
-            cp "$LOG" scripts/runtime-review-fix-error.log
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -f scripts/runtime-review-fix-error.log
-            git commit -m "chore(ci): capture Runtime review fix failure"
-            git push origin "HEAD:${HEAD_REF}"
-            cat "$LOG" >&2
-            exit 1
-          fi
-          cat "$LOG"
-          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
-          git rm scripts/apply-runtime-review-fixes.py
-          git rm -f scripts/runtime-review-fix-error.log || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A webui .github/workflows/webui-browser-e2e.yml scripts
-          git commit -m "fix(runtime): address PID supervisor review findings"
-          git push origin "HEAD:${HEAD_REF}"
-
   browser-e2e:
     name: Chromium authentication and navigation E2E
     runs-on: ubuntu-latest

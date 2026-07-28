@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { startWebUiServer, stopWebUiServer } from './webui-server'
-import { deepAgentHome, desktopIcon, desktopTrayTemplateIcon, desktopWindowsTrayIcon, webuiDir } from './paths'
+import { deepAgentHome, desktopIcon, desktopTrayTemplateIcon, desktopWindowsTrayIcon, webuiDir, webUiHome } from './paths'
 import { checkForDesktopUpdates, initAutoUpdater } from './updater'
 import { t } from './desktop-i18n'
 // 双模式切换管理器（Stage 9 新增）
@@ -423,7 +423,7 @@ function escapeHtml(value: string): string {
 async function ensureRuntimeTaskSupervisor(): Promise<RuntimeTaskSupervisorEnvironment> {
   if (!runtimeTaskSupervisor) {
     runtimeTaskSupervisor = new RuntimeTaskSupervisor({
-      stateDir: join(deepAgentHome(), 'runtime', 'task-supervisor'),
+      stateDir: join(webUiHome(), 'runtime', 'task-supervisor'),
     })
   }
   if (!runtimeTaskSupervisorEnvironment) {
