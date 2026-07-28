@@ -1,0 +1,36 @@
+name: Apply Runtime Supervisor Patch
+
+on:
+  push:
+    branches:
+      - "chatgpt/dual-runtime-workspace-e2e"
+    paths:
+      - ".github/workflows/apply-runtime-supervisor-patch.yml"
+      - "scripts/patch-runtime-task-supervisor-fail-closed.py"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "chatgpt/dual-runtime-workspace-e2e"
+          fetch-depth: 0
+
+      - name: Apply exact source patch
+        run: python3 scripts/patch-runtime-task-supervisor-fail-closed.py
+
+      - name: Remove one-shot patch machinery
+        run: git rm scripts/patch-runtime-task-supervisor-fail-closed.py .github/workflows/apply-runtime-supervisor-patch.yml
+
+      - name: Commit patched supervisor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add webui/packages/desktop/src/main/runtime-task-supervisor.ts
+          git commit -m "fix(runtime): preserve unverifiable restart leases fail closed"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
