@@ -1,0 +1,206 @@
+--- a/webui/packages/desktop/src/main/runtime-task-lease.ts
++++ b/webui/packages/desktop/src/main/runtime-task-lease.ts
+@@ -183,24 +183,36 @@
+   defaultTtlMs?: number
+   minTtlMs?: number
+   maxTtlMs?: number
++  maxReplayEntries?: number
+   locks?: WorkspaceLockManager
+ }
+ 
++/** Commands accepted from a runtime-scoped connection. */
+ export type RuntimeScopedLeaseCommand =
+   | Omit<AcquireLeaseCommand, 'identity'> & { identity: Omit<RuntimeTaskLeaseIdentity, 'runtime'> }
+-  | Omit<BindProcessLeaseCommand, 'runtime'>
+   | Omit<HeartbeatLeaseCommand, 'runtime'>
+   | Omit<ReleaseLeaseCommand, 'runtime'>
+   | Omit<CancelLeaseCommand, 'runtime'>
+-  | Omit<TimeoutLeaseCommand, 'runtime'>
+-  | Omit<ProcessExitLeaseCommand, 'runtime'>
+-  | Omit<RecoverLeaseCommand, 'runtime'>
+-  | Omit<RuntimeCrashLeaseCommand, 'runtime'>
++
++/** Supervisory commands that only trusted Electron Main code may dispatch. */
++export type MainOnlyLeaseCommand =
++  | BindProcessLeaseCommand
++  | TimeoutLeaseCommand
++  | ProcessExitLeaseCommand
++  | RecoverLeaseCommand
++  | RuntimeCrashLeaseCommand
+ 
+ const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/
+ const DEFAULT_TTL_MS = 30_000
+ const MIN_TTL_MS = 1_000
+ const MAX_TTL_MS = 5 * 60_000
++const DEFAULT_MAX_REPLAY_ENTRIES = 4_096
++const RUNTIME_SCOPED_EVENT_TYPES = new Set<RuntimeTaskLeaseEventType>([
++  'acquire',
++  'heartbeat',
++  'release',
++  'cancel',
++])
+ 
+ function isRecord(value: unknown): value is Record<string, unknown> {
+   return typeof value === 'object' && value !== null && !Array.isArray(value)
+@@ -222,6 +234,29 @@
+   return value === 'read' || value === 'write'
+ }
+ 
++function validEventType(value: unknown): value is RuntimeTaskLeaseEventType {
++  return value === 'acquire'
++    || value === 'bind-process'
++    || value === 'heartbeat'
++    || value === 'release'
++    || value === 'cancel'
++    || value === 'timeout'
++    || value === 'process-exit'
++    || value === 'runtime-crash'
++    || value === 'recover'
++}
++
++function commandRuntime(value: unknown): RuntimeKind | 'invalid' {
++  if (!isRecord(value)) return 'invalid'
++  if (validRuntime(value.runtime)) return value.runtime
++  if (isRecord(value.identity) && validRuntime(value.identity.runtime)) return value.identity.runtime
++  return 'invalid'
++}
++
++function replayKey(value: unknown, eventId: string): string {
++  return `${commandRuntime(value)}\u0000${eventId}`
++}
++
+ function validLeaseState(value: RuntimeTaskLeaseState, allowed: RuntimeTaskLeaseState[]): boolean {
+   return allowed.includes(value)
+ }
+@@ -403,6 +438,7 @@
+   private readonly defaultTtlMs: number
+   private readonly minTtlMs: number
+   private readonly maxTtlMs: number
++  private readonly maxReplayEntries: number
+   private readonly locks: WorkspaceLockManager
+   private readonly leases = new Map<string, RuntimeTaskLeaseSnapshot>()
+   private readonly replay = new Map<string, { fingerprint: string; result: RuntimeTaskLeaseResult }>()
+@@ -414,6 +450,7 @@
+     this.minTtlMs = options.minTtlMs ?? MIN_TTL_MS
+     this.maxTtlMs = options.maxTtlMs ?? MAX_TTL_MS
+     this.defaultTtlMs = options.defaultTtlMs ?? DEFAULT_TTL_MS
++    this.maxReplayEntries = options.maxReplayEntries ?? DEFAULT_MAX_REPLAY_ENTRIES
+     if (
+       !Number.isFinite(this.minTtlMs)
+       || !Number.isFinite(this.maxTtlMs)
+@@ -422,8 +459,10 @@
+       || this.maxTtlMs < this.minTtlMs
+       || this.defaultTtlMs < this.minTtlMs
+       || this.defaultTtlMs > this.maxTtlMs
++      || !Number.isSafeInteger(this.maxReplayEntries)
++      || this.maxReplayEntries <= 0
+     ) {
+-      throw new Error('Invalid RuntimeTaskLeaseCoordinator TTL configuration')
++      throw new Error('Invalid RuntimeTaskLeaseCoordinator configuration')
+     }
+     this.locks = options.locks ?? new WorkspaceLockManager()
+   }
+@@ -431,7 +470,8 @@
+   dispatch(input: unknown): RuntimeTaskLeaseResult {
+     const rawEventId = isRecord(input) && typeof input.eventId === 'string' ? input.eventId : ''
+     const rawFingerprint = fingerprint(input)
+-    const replayed = rawEventId ? this.replay.get(rawEventId) : undefined
++    const scopedReplayKey = rawEventId ? replayKey(input, rawEventId) : ''
++    const replayed = scopedReplayKey ? this.replay.get(scopedReplayKey) : undefined
+     if (replayed) {
+       if (replayed.fingerprint === rawFingerprint) return cloneResult(replayed.result)
+       return {
+@@ -456,12 +496,25 @@
+           message: 'Runtime Task / Workspace Lease command failed validation',
+         }
+ 
+-    if (rawEventId && validIdentifier(rawEventId)) {
+-      this.replay.set(rawEventId, { fingerprint: rawFingerprint, result: cloneResult(result) })
++    if (scopedReplayKey && validIdentifier(rawEventId)) {
++      this.rememberReplay(scopedReplayKey, rawFingerprint, result)
+     }
+     return cloneResult(result)
+   }
+ 
++  replayEntryCount(): number {
++    return this.replay.size
++  }
++
++  private rememberReplay(key: string, commandFingerprint: string, result: RuntimeTaskLeaseResult): void {
++    this.replay.set(key, { fingerprint: commandFingerprint, result: cloneResult(result) })
++    while (this.replay.size > this.maxReplayEntries) {
++      const oldest = this.replay.keys().next().value as string | undefined
++      if (oldest === undefined) break
++      this.replay.delete(oldest)
++    }
++  }
++
+   snapshot(runtime: RuntimeKind, taskId: string): RuntimeTaskLeaseSnapshot | undefined {
+     const lease = this.leases.get(taskKey(runtime, taskId))
+     return lease ? cloneSnapshot(lease) : undefined
+@@ -816,6 +869,16 @@
+   ) {}
+ 
+   dispatch(command: RuntimeScopedLeaseCommand): RuntimeTaskLeaseResult {
++    const payload = command as unknown
++    if (!isRecord(payload) || !RUNTIME_SCOPED_EVENT_TYPES.has(payload.type as RuntimeTaskLeaseEventType)) {
++      return {
++        ok: false,
++        eventId: isRecord(payload) && typeof payload.eventId === 'string' ? payload.eventId : '',
++        type: isRecord(payload) && validEventType(payload.type) ? payload.type : 'invalid',
++        code: 'invalid-request',
++        message: 'The command is reserved for trusted Electron Main supervision',
++      }
++    }
+     if (command.type === 'acquire') {
+       return this.coordinator.dispatch({
+         ...command,
+--- a/docs/open-source-readiness/11-RUNTIME-TASK-WORKSPACE-LEASE-PROTOCOL.md
++++ b/docs/open-source-readiness/11-RUNTIME-TASK-WORKSPACE-LEASE-PROTOCOL.md
+@@ -11,7 +11,8 @@
+ 协议以 Electron Main 为唯一权威租约协调器：
+ 
+ - DeepAgent Runtime 与 DeepCode Runtime 必须显式声明任务身份和 `read` / `write` 访问级别。
+-- Runtime 只能通过固定 Runtime 身份适配器发送事件，不能冒充另一 Runtime。
++- Runtime 只能通过固定 Runtime 身份适配器发送 `acquire`、`heartbeat`、`release`、`cancel`，不能冒充另一 Runtime。
++- `bind-process`、`timeout`、`process-exit`、`runtime-crash`、`recover` 只能由可信 Electron Main 监督路径发送。
+ - Renderer 不直接改变权威租约状态。
+ - 底层 `WorkspaceLockManager` 只负责多读单写资源互斥；任务状态、租约 TTL、幂等和故障恢复由 `RuntimeTaskLeaseCoordinator` 负责。
+ 
+@@ -123,11 +124,13 @@
+ 
+ ## 7. 幂等与重放
+ 
+-- 相同 `eventId` 和完全相同的命令载荷返回第一次结果，不重复改变状态。
++- 幂等键为 `(runtime, eventId)`；DeepAgent 与 DeepCode 可独立使用相同 eventId。
++- 相同 Runtime、相同 `eventId` 和完全相同的命令载荷返回第一次结果，不重复改变状态。
+ - 相同 `eventId` 携带不同载荷返回 `replay-conflict`。
+ - 对同一 active 身份重复 `acquire` 返回 `already-acquired` 和原 leaseId。
+ - 重复 `release` / `cancel` / `timeout` / `recover` 对已到达相应终态的租约返回稳定终态结果，不重复释放底层锁。
+ - 同一 Runtime/taskId 尝试修改 Workspace、访问级别或进程身份返回 `owner-mismatch`。
++- Main 只保留最近 4,096 条重放结果（可配置正整数上限）；超出后按插入顺序淘汰最旧条目，避免心跳导致进程生命周期内存无限增长。
+ 
+ ## 8. TTL 与心跳
+ 
+@@ -173,8 +176,8 @@
+ `RuntimeTaskLeaseAdapter` 在构造时固定 `deepagent` 或 `deepcode`：
+ 
+ - 调用方提交的 acquire 身份不包含 runtime。
+-- 其他命令也不接受调用方自填 runtime。
+-- Adapter 在进入 Main 协调器前强制写入自身 Runtime 身份。
++- Runtime Adapter 只接受 acquire、heartbeat、release、cancel；监督事件即使通过动态对象注入也返回 `invalid-request`。
++- 允许的其他命令不接受调用方自填 runtime；Adapter 在进入 Main 协调器前强制写入自身 Runtime 身份。
+ - 即使不可信调用方通过动态对象夹带 runtime，适配器也会覆盖它。
+ 
+ 下一工作单元应分别把 DeepAgent Runtime 和 DeepCode Runtime 的真实任务事件连接到各自 Adapter，不得让 Runtime 直接持有或修改 `WorkspaceLockManager`。
+@@ -185,7 +188,9 @@
+ 
+ - 非法 Runtime、访问级别、PID 和 TTL 失败关闭。
+ - reader-reader、reader-writer、writer-writer。
+-- acquire 幂等、eventId 重放与冲突重放。
++- acquire 幂等、Runtime 作用域 eventId 重放与冲突重放。
++- 重放缓存上限和最旧记录淘汰。
++- Runtime Adapter 拒绝 Main-only 监督事件。
+ - 心跳续租、迟到心跳过期和不可复活。
+ - 未知任务、leaseId 所有者不匹配和提前 timeout。
+ - cancel/release 终态幂等。
