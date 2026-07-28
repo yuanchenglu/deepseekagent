@@ -128,6 +128,7 @@ async function postSupervisor(
     socketPath: config.socketPath,
     path,
     method: 'POST',
+    agent: false,
     headers: {
       authorization: `Bearer ${config.token}`,
       'content-type': 'application/json; charset=utf-8',

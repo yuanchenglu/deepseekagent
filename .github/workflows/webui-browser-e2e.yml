@@ -5,7 +5,6 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
-      - "scripts/apply-runtime-connection-fix.py"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -19,39 +18,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: webui-browser-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-connection-fix:
-    name: Apply Runtime supervisor connection fix
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Apply deterministic connection fix
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          python3 scripts/apply-runtime-connection-fix.py
-          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
-          git rm scripts/apply-runtime-connection-fix.py
-          git rm -f scripts/electron-main-diagnostic.log || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A webui .github/workflows/webui-browser-e2e.yml scripts
-          git commit -m "fix(runtime): avoid stale supervisor socket reuse after restart"
-          git push origin "HEAD:${HEAD_REF}"
-
   browser-e2e:
     name: Chromium authentication and navigation E2E
     runs-on: ubuntu-latest

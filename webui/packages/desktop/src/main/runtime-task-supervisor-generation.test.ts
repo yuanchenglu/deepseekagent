@@ -16,6 +16,7 @@ async function post(
       socketPath: environment.DEEPAGENT_RUNTIME_LEASE_SOCKET,
       path,
       method: 'POST',
+      agent: false,
       headers: {
         authorization: `Bearer ${environment.DEEPAGENT_RUNTIME_LEASE_TOKEN}`,
         'content-type': 'application/json',

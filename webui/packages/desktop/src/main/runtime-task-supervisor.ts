@@ -174,6 +174,7 @@ function sendJson(response: ServerResponse, status: number, body: RuntimeTaskSup
   response.statusCode = status
   response.setHeader('content-type', 'application/json; charset=utf-8')
   response.setHeader('content-length', String(payload.length))
+  response.setHeader('connection', 'close')
   response.end(payload)
 }
 
