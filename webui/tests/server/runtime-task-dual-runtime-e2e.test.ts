@@ -356,6 +356,29 @@ describe.sequential('dual Runtime same-workspace production-client E2E', () => {
     record('main-restart-verified-resume', value)
   })
 
+  it('releases an orphaned acquire-before-bind task only after explicit Runtime terminal confirmation', async () => {
+    const value = await fixture()
+    value.probe.set(8051, 'deepagent-after-unbound-cleanup')
+    const taskId = runtimeTaskId('deepcode', 'main-restart-before-bind')
+    const workspace = join(value.stateDir, 'main-restart-before-bind')
+    const unbound = await deepcode(taskId, workspace)
+    unbound.abandon()
+    await value.supervisor.stop()
+
+    await value.activate(newSupervisor(value))
+    expect(value.supervisor.listTasks()).toMatchObject([
+      { runtime: 'deepcode', taskId, workspace, state: 'orphaned', process: undefined },
+    ])
+    await expect(deepagent(runtimeTaskId('deepagent', 'blocked-by-unbound-orphan'), workspace, 8051))
+      .rejects.toMatchObject({ code: 'conflict', status: 409 })
+
+    await unbound.finish('failed')
+    expect(value.supervisor.listTasks()).toEqual([])
+    const afterConfirmation = await deepagent(runtimeTaskId('deepagent', 'after-unbound-cleanup'), workspace, 8051)
+    await afterConfirmation.finish('completed')
+    record('unbound-orphan-explicit-terminal-cleanup', value)
+  })
+
   it('allows the same Runtime client to resume after heartbeat orphaning while unverifiable Main-restart tasks remain locked', async () => {
     const value = await fixture()
     value.probe.set(8101, 'deepagent-runtime-restart')

@@ -468,7 +468,21 @@ export class RuntimeTaskSupervisor {
     const key = stableTaskKey(request.runtime, request.taskId)
     const record = this.records.get(key)
     if (!record) return { status: 200, body: { ok: true, code: 'already-terminal' } }
-    if (record.state === 'orphaned') return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(record) } }
+    if (record.state === 'orphaned') {
+      // A task restored without process evidence must remain fail-closed: it may
+      // not bind or resume an arbitrary PID. The original Runtime can still
+      // explicitly confirm that the unbound attempt is terminal, which closes
+      // the orphaned coordinator lease through the existing process-exit path.
+      if (record.process) return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(record) } }
+      const terminal = this.coordinator.dispatch({
+        type: 'process-exit', eventId: request.eventId, observedAt: this.now(), runtime: record.runtime,
+        taskId: record.internalTaskId, leaseId: record.leaseId, exitCode: null, signal: null,
+      })
+      if (!terminal.ok) return { status: 409, body: { ok: false, code: terminal.code, message: terminal.message } }
+      this.records.delete(key)
+      this.persist()
+      return { status: 200, body: { ok: true, code: request.outcome } }
+    }
     const result = request.outcome === 'cancelled'
       ? this.adapters[record.runtime].dispatch({ type: 'cancel', eventId: request.eventId, observedAt: this.now(), taskId: record.internalTaskId, leaseId: record.leaseId, reason: 'cancelled-by-runtime' })
       : this.adapters[record.runtime].dispatch({ type: 'release', eventId: request.eventId, observedAt: this.now(), taskId: record.internalTaskId, leaseId: record.leaseId })
