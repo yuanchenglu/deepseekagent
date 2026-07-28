@@ -59,14 +59,15 @@ describe.sequential('runtime task supervisor client', () => {
     process.env.HERMES_DESKTOP = 'true'
     for (const name of RUNTIME_TASK_SUPERVISOR_ENV_NAMES) delete process.env[name]
 
+    const expected: Partial<RuntimeTaskSupervisorError> = {
+      code: 'supervisor-not-configured',
+      status: 503,
+    }
     await expect(acquireRuntimeTaskLease({
       runtime: 'deepagent',
       taskId: runtimeTaskId('deepagent', 'desktop-session'),
       workspace: '/tmp/workspace',
       access: 'write',
-    })).rejects.toMatchObject<Partial<RuntimeTaskSupervisorError>>({
-      code: 'supervisor-not-configured',
-      status: 503,
-    })
+    })).rejects.toMatchObject(expected)
   })
 })
