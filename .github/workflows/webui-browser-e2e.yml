@@ -5,6 +5,14 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
+      - "scripts/apply-runtime-connection-fix.py"
+      - ".github/workflows/webui-browser-e2e.yml"
+      - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
+  push:
+    branches: [develop]
+    paths:
+      - "webui/**"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -18,17 +26,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  electron-main-diagnostic:
-    name: Capture Electron Main diagnostics
+  apply-connection-fix:
+    name: Apply Runtime supervisor connection fix
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      CI: true
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply deterministic connection fix
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          python3 scripts/apply-runtime-connection-fix.py
+          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
+          git rm scripts/apply-runtime-connection-fix.py
+          git rm -f scripts/electron-main-diagnostic.log || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A webui .github/workflows/webui-browser-e2e.yml scripts
+          git commit -m "fix(runtime): avoid stale supervisor socket reuse after restart"
+          git push origin "HEAD:${HEAD_REF}"
+
+  browser-e2e:
+    name: Chromium authentication and navigation E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: true
+    defaults:
+      run:
+        working-directory: webui
+
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -36,39 +71,22 @@ jobs:
           cache: npm
           cache-dependency-path: webui/package-lock.json
 
-      - name: Run Electron Main installation and tests
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set +e
-          cd webui
-          npm ci --no-audit --no-fund > ../scripts/electron-main-full.log 2>&1
-          status=$?
-          if [ "$status" -eq 0 ]; then
-            npm run desktop:install >> ../scripts/electron-main-full.log 2>&1
-            status=$?
-          fi
-          if [ "$status" -eq 0 ]; then
-            npx vitest run --config packages/desktop/vitest.config.ts >> ../scripts/electron-main-full.log 2>&1
-            status=$?
-          fi
-          if [ "$status" -eq 0 ]; then
-            npm --prefix packages/desktop run build:main >> ../scripts/electron-main-full.log 2>&1
-            status=$?
-          fi
-          cd ..
-          if [ "$status" -eq 0 ]; then
-            rm -f scripts/electron-main-full.log
-            exit 0
-          fi
-          tail -n 350 scripts/electron-main-full.log \
-            | sed -E 's#(https?://)[^/@[:space:]]+:[^/@[:space:]]+@#\1[redacted]@#g; s/(_authToken=)[^[:space:]]+/\1[redacted]/g' \
-            > scripts/electron-main-diagnostic.log
-          rm -f scripts/electron-main-full.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f scripts/electron-main-diagnostic.log
-          git commit -m "chore(ci): capture Electron Main failure diagnostics"
-          git push origin "HEAD:${HEAD_REF}"
-          cat scripts/electron-main-diagnostic.log >&2
-          exit "$status"
+      - name: Install WebUI dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E
+        run: npm run test:e2e
+
+      - name: Upload Playwright diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-browser-e2e-${{ github.run_attempt }}
+          path: |
+            webui/playwright-report/
+            webui/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
