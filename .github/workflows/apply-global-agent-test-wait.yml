@@ -7,9 +7,18 @@ on:
     paths:
       - ".github/workflows/apply-global-agent-test-wait.yml"
       - "scripts/patch-global-agent-test-wait.py"
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/apply-global-agent-test-wait.yml"
+      - "scripts/patch-global-agent-test-wait.py"
 
 permissions:
   contents: write
+
+concurrency:
+  group: apply-global-agent-test-wait
+  cancel-in-progress: true
 
 jobs:
   apply:
