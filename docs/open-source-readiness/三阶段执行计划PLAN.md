@@ -1,6 +1,6 @@
 # DeepAgent 三阶段产品与开源发布计划
 
-> **版本**：v2.4.0  
+> **版本**：v2.5.0  
 > **最后更新**：2026-07-28  
 > **唯一事实源**：GitHub 远程仓库 `yuanchenglu/deepseekagent`  
 > **开发分支**：`develop`  
@@ -40,7 +40,7 @@
 
 ## 2. 当前远程基线
 
-截至本版本更新前，以下 PR 已合入 `develop`：
+截至 v2.5.0，以下关键 PR 已合入 `develop`：
 
 | PR | 结果 | 关键产出 |
 |---|---|---|
@@ -51,12 +51,24 @@
 | #6 | 已合入 | Electron Preview 自动 DMG 门禁、i18n、品牌契约和安全扫描 |
 | #10 | 已合入 | Workspace Lock Renderer 所有权隔离和崩溃自动回收 |
 | #11 | 已合入 | Electron Preview 状态文档同步 |
+| #12 | 已合入 | 三阶段计划 v2.4.0 与远程优先交接 |
+| #13 | 已合入 | PR 验证可取消、正式发布不可取消、公开发布事务串行排队 |
 
-更新前的 `develop` 快照为 `1fc31324343c574a9e03bac8e2435f72b474d45a`。新会话必须重新读取远程最新 Head，不得把该 SHA 当作永久基线。
+PR #13：
 
-过期 PR #2 已关闭且不合并，原因是它基于旧基线并包含 171 个已被后续 PR 替代的文件变更。
+- PR Head：`9cbb302d7a5af144c80177548b3d3cfc17e5b639`
+- squash 合并提交：`888696c8fcf86c76003b49d97f48997fccbf4628`
+- WebUI i18n Coverage：成功
+- WebUI Browser E2E：成功
+- Electron concurrency contract：成功
+- WebUI 测试、构建、许可证、Electron Main、无签名 Apple Silicon DMG、Manifest、SHA-256 和 artifact：成功
+- 未执行 `publish=true`，未创建 Tag、Release 或公开 Preview channel
 
-当前不存在仅保存在旧容器或旧工作区中的代码；本次计划和交接更新也必须保存在远程功能分支或 PR 中。
+新会话必须重新读取远程最新 Head，不得把上述 SHA 当作永久基线。
+
+过期 PR #2 已关闭且不合并；其分支基于旧基线并包含被后续 PR 替代的历史变更，不属于待恢复工作。
+
+当前不存在仅保存在旧容器或旧工作区中的代码；所有已完成工作均存在于 GitHub 远程。
 
 ---
 
@@ -66,9 +78,9 @@
 |---|---:|---|---|
 | 第一阶段：CLI Alpha | 约 90%–95% | **No-Go** | 主体代码接近完成，外部安全和干净机门禁未关闭 |
 | 第二阶段：WebUI Beta | 约 90% | **No-Go** | 浏览器 E2E 与核心自动化已通过，迁移、共存和正式渠道验收未关闭 |
-| 第三阶段：Electron Preview | 约 87%–90% | **No-Go** | 自动 DMG 和 Main IPC 锁边界已完成，发布事务、Runtime 租约和真实环境验收未完成 |
+| 第三阶段：Electron Preview | 约 90% | **No-Go** | 发布 concurrency 已关闭；Runtime 租约、真实并发和真实环境验收未完成 |
 
-**整体判断**：工程主体约九成完成，但“功能完成度”不能等同于“可公开发布程度”。现阶段不继续扩张功能，优先关闭安全、发布事务、真实生命周期、共存、迁移、故障恢复和用户验收门禁。
+**整体判断**：工程主体约九成完成，但“功能完成度”不能等同于“可公开发布程度”。现阶段不继续扩张功能，优先关闭安全、真实生命周期、共存、迁移、故障恢复和用户验收门禁。
 
 ---
 
@@ -190,49 +202,66 @@ deepagent webui stop
 
 ### Electron Preview 自动门禁
 
-- PR 修改 Desktop/版本/workflow 时，在 `macos-15` arm64 runner 自动构建无签名 DMG。
+- PR 修改 Desktop、版本或 workflow 时，在 `macos-15` arm64 runner 自动构建无签名 DMG。
 - 正式发布仅允许 `workflow_dispatch`、显式 `X.Y.Z-preview.N` 和 `publish=true`。
 - 全 refs Gitleaks 扫描。
 - WebUI 安装、全量测试、构建、i18n 和许可证审计。
 - Electron Main 测试、TypeScript 构建和 Runtime 复用约束。
 - DMG、Bundle ID、版本、arm64、安装脚本和未签名状态验证。
 - Manifest、SHA-256 和 workflow artifact 生成。
-- Browser E2E 在 PR #5、#6、#10 中真实通过。
+- Browser E2E 真实通过。
+
+### 正式发布 concurrency 已完成
+
+PR #13 建立以下契约：
+
+1. 同一 PR 的新提交继续取消该 PR 的旧验证运行。
+2. PR 验证与正式发布使用清晰分离的 concurrency group。
+3. `publish=true` 的正式运行不被后续运行取消。
+4. 真正修改 GitHub prerelease 与 R2 Preview channel 的 `publish` job 使用固定发布 group 串行排队。
+5. concurrency 表达式和关键事件真值表由静态检查失败关闭。
+6. i18n、Browser E2E 与 Electron Main/DMG 全链路均已真实通过。
+7. 无签名定位、版本、Tag、Manifest、SHA-256 和 `publish=true` 边界未改变。
 
 ## 12. 未完成的发布阻断项
 
-### P0/P1 工程收口
+### 当前唯一第一优先工程任务
 
-1. **修复发布 concurrency**：当前 workflow 使用 `cancel-in-progress: true`；PR 验证可取消，但正式 `publish=true` 发布必须串行且不可被后续运行取消，避免 GitHub prerelease 与 R2 Preview channel 不一致。
-2. **固化 Runtime Task / Workspace Lease 协议**：真实任务启动、结束、取消、超时和崩溃事件必须由 Main 租约协调器强制管理，不依赖 Renderer 自愿调用。
-3. **绑定 task/PID 生命周期**：处理心跳、超时、进程树退出、Runtime 重启和异常回收。
-4. **双 Runtime 真实并发 E2E**：同一 Workspace 验证 reader-reader、reader-writer、writer-writer、取消和崩溃回收。
+1. **固化 Runtime Task / Workspace Lease 协议**：真实任务启动、结束、取消、超时和崩溃事件必须由 Main 租约协调器强制管理，不依赖 Renderer 自愿调用。
+2. 明确任务访问级别 `read` / `write`，由协议声明而不是 UI 猜测。
+3. 为 DeepAgent Runtime 与 DeepCode Runtime 定义统一但隔离的 acquire、heartbeat、release、cancel、timeout、crash 事件与错误语义。
+4. 先完成协议、类型、状态机和契约测试；完成前不得并行启动 PID 接入或双 Runtime E2E。
+
+### 后继工程任务
+
+5. 将租约绑定真实 task/PID 生命周期，处理心跳、超时、进程树退出、Runtime 重启和异常回收。
+6. 在同一 Workspace 执行双 Runtime reader-reader、reader-writer、writer-writer、取消和崩溃 E2E。
 
 ### 外部和真实环境收口
 
-5. 下载 DMG artifact，在干净 Apple Silicon Mac 完成安装和首次启动。
-6. 验证 Gatekeeper 右键打开、升级、卸载和 CLI/Desktop 共存。
-7. 验证两个 Runtime 独立崩溃恢复、后台任务和模式切换。
-8. 完成真实用户 Preview 测试，清零 P0/P1。
-9. 满足全部门禁后创建 `preview.N` Tag，再执行 `workflow_dispatch(publish=true)`。
+7. 下载 DMG artifact，在干净 Apple Silicon Mac 完成安装和首次启动。
+8. 验证 Gatekeeper 右键打开、升级、卸载和 CLI/Desktop 共存。
+9. 验证两个 Runtime 独立崩溃恢复、后台任务和模式切换。
+10. 完成 CLI/Desktop/Hermes/OpenCode 共存与真实用户 Preview 测试。
+11. 清零 P0/P1。
+12. 满足全部门禁后创建 `preview.N` Tag，再执行 `workflow_dispatch(publish=true)`。
 
-**阶段出口**：只允许先发布无签名 Electron Preview；完成真实外测且无 P0/P1 后再评估签名、公证和 Stable。
+**阶段出口**：Runtime 租约、真实并发、干净机、共存和用户验收全部通过后，才允许发布无签名 Electron Preview。
 
 ---
 
 ## 13. 统一执行顺序
 
 ```text
-A. 修复 Electron 发布 workflow concurrency
-→ B. 固化 Runtime Task / Workspace Lease 协议
-→ C. 将租约绑定真实 task/PID 生命周期
-→ D. 双 Runtime 同 Workspace 并发与故障 E2E
-→ E. 轮换外部凭据并确认旧凭据失效
-→ F. 清理 Git 历史并重扫全部 refs
-→ G. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
-→ H. 正式模型任务和真实用户 Preview 测试
-→ I. 清零 P0/P1
-→ J. 按各阶段 Go/No-Go 提升对应发布渠道
+A. 固化 Runtime Task / Workspace Lease 协议
+→ B. 将租约绑定真实 task/PID 生命周期
+→ C. 双 Runtime 同 Workspace 并发与故障 E2E
+→ D. 轮换外部凭据并确认旧凭据失效
+→ E. 清理 Git 历史并重扫全部 refs
+→ F. 干净 Mac 验证 CLI/WebUI/Electron 生命周期与共存
+→ G. 正式模型任务和真实用户 Preview 测试
+→ H. 清零 P0/P1
+→ I. 按各阶段 Go/No-Go 提升对应发布渠道
 ```
 
 每次只锁定一个可验收工作单元，避免同时启动多个跨阶段任务。
@@ -241,13 +270,7 @@ A. 修复 Electron 发布 workflow concurrency
 
 ## 14. 开发流程规范
 
-适用于以下 5 个项目：
-
-- `deepseekagent`
-- `deepcode`
-- `deepseek_runtime`
-- `llm-harness-agent`
-- `oh-my-deepseek-harness`
+适用于：`deepseekagent`、`deepcode`、`deepseek_runtime`、`llm-harness-agent`、`oh-my-deepseek-harness`。
 
 Remote：`https://github.com/yuanchenglu/<项目名>.git`
 
@@ -258,6 +281,7 @@ Remote：`https://github.com/yuanchenglu/<项目名>.git`
 3. 提交标题和描述清晰的 Pull Request。
 4. 等待相关 CI 真实通过。
 5. 处理 review 后合入 `develop`。
+6. 合入后更新计划、状态和交接文档。
 
 ### 第二优先：异常处理与直推
 
@@ -266,28 +290,9 @@ PR 流程持续因 CI 环境、依赖、规则冲突等无法推进时：
 1. 先定位是代码问题还是环境问题。
 2. 代码问题直接修复并重跑。
 3. 无法在当前环境解决时，才允许直推 `develop`，不得默认绕过 PR。
+4. 直推 Commit 必须包含“问题原因”和“技术债务”。
 
-直推 Commit 必须包含：
-
-```text
-<type>(<scope>): <变更说明>
-
-## 问题原因
-[PR/CI 无法通过的根因]
-
-## 技术债务
-- [本次遗留问题]
-```
-
-技术债务也可记录到：
-
-- deepseekagent → `docs/TECH_DEBT.md` 或 `docs/BUG_LIST.md`
-- deepcode → `docs/BUG_LIST.md`
-- deepseek_runtime → `docs/TECH_DEBT.md`
-- oh-my-deepseek-harness → `docs/TECH_DEBT.md`
-- llm-harness-agent → 根目录 `TECH_DEBT.md`
-
-格式：`[日期] 描述 | 遗留原因 | 状态`
+会话结束前，所有工作必须进入 GitHub 远程；无法合入时至少推送远程分支并创建 PR 或记录 Head SHA。
 
 ---
 
@@ -297,8 +302,9 @@ PR 流程持续因 CI 环境、依赖、规则冲突等无法推进时：
 
 - 把“代码已写”描述为“发布门禁已通过”。
 - 把自动 DMG 构建通过描述为 Electron Preview 已发布。
-- 把无签名 DMG描述为已签名、公证或 Stable。
+- 把无签名 DMG 描述为已签名、公证或 Stable。
 - 把 Main IPC 锁测试通过描述为真实 Runtime 租约闭环完成。
-- 把 Browser E2E 通过描述为 WebUI Beta 的迁移、共存和渠道全部完成。
+- 把 Browser E2E 通过描述为 WebUI 迁移、共存和渠道全部完成。
+- 把 concurrency 修复完成描述为 Electron Preview 已达到发布条件。
 - 在凭据轮换和历史清理前公开包含有效秘密的仓库。
 - 依赖旧容器、旧工作区或未推送文件；GitHub 远程始终是唯一事实源。
