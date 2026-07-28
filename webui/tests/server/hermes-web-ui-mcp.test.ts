@@ -189,7 +189,7 @@ describe('hermes-web-ui MCP server', () => {
 
     const initialized = await waitForRpc(responses, 1)
     expect(initialized.result.serverInfo).toMatchObject({
-      name: 'hermes-studio-mcp',
+      name: 'deepagent-webui-mcp',
       version: pkg.version,
     })
     expect(initialized.result.capabilities).toEqual({ tools: {} })
@@ -305,7 +305,7 @@ describe('hermes-web-ui MCP server', () => {
     const code = await new Promise<number | null>(resolve => child.on('close', resolve))
 
     expect(code).toBe(0)
-    expect(stdout.trim()).toBe(`hermes-studio-mcp v${pkg.version}`)
+    expect(stdout.trim()).toBe(`deepagent-webui-mcp v${pkg.version}`)
   })
 
   it('exposes curated Hermes Studio use tools in the use toolset', async () => {
