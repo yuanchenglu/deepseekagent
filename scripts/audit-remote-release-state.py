@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 API_VERSION = "2022-11-28"
-USER_AGENT = "deepagent-remote-release-audit/2"
+USER_AGENT = "deepagent-remote-release-audit/3"
 CHANNELS = {
     "cli-alpha": "https://deepseekagent.starseas.org/releases/channels/alpha.json",
     "webui-beta": "https://deepseekagent.starseas.org/releases/channels/beta.json",
@@ -24,14 +24,14 @@ CHANNELS = {
     "electron-preview": "https://deepseekagent.starseas.org/releases/desktop/channels/preview.json",
     "electron-stable": "https://deepseekagent.starseas.org/releases/desktop/channels/stable.json",
 }
-FAILURE_STATUSES = [
+FAILURE_CONCLUSIONS = {
     "failure",
     "cancelled",
     "timed_out",
     "action_required",
     "startup_failure",
     "stale",
-]
+}
 ACTIVE_STATUSES = ["queued", "in_progress", "waiting", "requested", "pending"]
 
 
@@ -79,6 +79,7 @@ def run_record(run: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_runs(api_base: str, token: str, statuses: list[str]) -> list[dict[str, Any]]:
+    """List active workflow runs using only documented status filters."""
     seen: set[int] = set()
     results: list[dict[str, Any]] = []
     for status in statuses:
@@ -97,6 +98,33 @@ def action_runs(api_base: str, token: str, statuses: list[str]) -> list[dict[str
         else:
             raise RuntimeError(f"Action run pagination exceeded safety limit for status={status}")
     return sorted(results, key=lambda item: item.get("updated_at") or "", reverse=True)
+
+
+def completed_failure_runs(api_base: str, token: str) -> list[dict[str, Any]]:
+    """Query documented status=completed and filter failure conclusions locally.
+
+    GitHub caps a filtered workflow-run search at 1,000 results. The extra page
+    request fails closed if that cap would truncate this audit.
+    """
+    results: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for page in range(1, 12):
+        encoded = urllib.parse.urlencode({"status": "completed", "per_page": 100, "page": page})
+        body = github_request(f"{api_base}/actions/runs?{encoded}", token)
+        values = body.get("workflow_runs", [])
+        if page == 11 and values:
+            raise RuntimeError("Completed workflow-run audit exceeded GitHub's 1,000-result search cap")
+        for run in values:
+            if run.get("conclusion") not in FAILURE_CONCLUSIONS:
+                continue
+            run_id = int(run["id"])
+            if run_id in seen:
+                continue
+            seen.add(run_id)
+            results.append(run_record(run))
+        if len(values) < 100:
+            return sorted(results, key=lambda item: item.get("updated_at") or "", reverse=True)
+    raise RuntimeError("Completed workflow-run audit did not terminate within pagination safety limit")
 
 
 def fetch_channel(name: str, url: str) -> dict[str, Any]:
@@ -334,12 +362,12 @@ def main() -> int:
         item for item in action_runs(api_base, token, ACTIVE_STATUSES)
         if item["id"] != current_run_id
     ]
-    failed_runs = action_runs(api_base, token, FAILURE_STATUSES)
+    failed_runs = completed_failure_runs(api_base, token)
     actionable_failed = [item for item in failed_runs if item.get("head_sha") in current_reference_shas]
     historical_failed = [item for item in failed_runs if item.get("head_sha") not in current_reference_shas]
 
     snapshot = {
-        "schema_version": 2,
+        "schema_version": 3,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "repository": repository,
         "head_sha": head_sha,
