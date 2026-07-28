@@ -24,12 +24,12 @@
 
 原 [07-OPEN-SOURCE-ITERATION-PLAN.md](./07-OPEN-SOURCE-ITERATION-PLAN.md) 仅作历史审计记录，不再是执行依据。
 
-## 当前远程基线
+## 已确认远程基线
 
-- `develop`：`e0f2f407daa6f273ee4c927934efc2e3b27293a0`
-- `master`：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`
-- PR #17 已将真实 Runtime task/PID 生命周期合入 `develop`。
-- 文档同步分支：`chatgpt/sync-plan-handoff-v2-7`。
+- 工程代码基线：PR #17 squash merge `e0f2f407daa6f273ee4c927934efc2e3b27293a0`。
+- 计划同步：PR #18 squash merge `9e26f290c60544fc8a99cff8c31cecfbb8c99fd9`。
+- `master` 快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
+- 当前真实 Head、开放 PR 和 Actions 必须在新会话开始时重新读取，不在文档中递归硬编码“永远最新”的 SHA。
 
 ## 当前唯一优先级
 
