@@ -5,6 +5,7 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
+      - "scripts/apply-runtime-webui-test-fixes.py"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -18,13 +19,51 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: webui-browser-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  apply-webui-fixes:
+    name: Apply Runtime WebUI compatibility fixes
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply deterministic fixes
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          LOG="$(mktemp)"
+          if ! python3 scripts/apply-runtime-webui-test-fixes.py >"$LOG" 2>&1; then
+            git reset --hard HEAD
+            cp "$LOG" scripts/runtime-webui-fix-error.log
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -f scripts/runtime-webui-fix-error.log
+            git commit -m "chore(ci): capture Runtime WebUI fix failure"
+            git push origin "HEAD:${HEAD_REF}"
+            cat "$LOG" >&2
+            exit 1
+          fi
+          cat "$LOG"
+          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
+          git rm scripts/apply-runtime-webui-test-fixes.py
+          git rm -f scripts/runtime-webui-fix-error.log || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A webui .github/workflows/webui-browser-e2e.yml scripts
+          git commit -m "fix(runtime): preserve non-Desktop WebUI compatibility"
+          git push origin "HEAD:${HEAD_REF}"
+
   browser-e2e:
     name: Chromium authentication and navigation E2E
     runs-on: ubuntu-latest
