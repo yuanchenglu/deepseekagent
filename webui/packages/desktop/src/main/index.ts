@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { startWebUiServer, stopWebUiServer } from './webui-server'
-import { deepAgentHome, desktopIcon, desktopTrayTemplateIcon, desktopWindowsTrayIcon, webuiDir } from './paths'
+import { deepAgentHome, desktopIcon, desktopTrayTemplateIcon, desktopWindowsTrayIcon, webuiDir, webUiHome } from './paths'
 import { checkForDesktopUpdates, initAutoUpdater } from './updater'
 import { t } from './desktop-i18n'
 // 双模式切换管理器（Stage 9 新增）
@@ -12,6 +12,7 @@ import { CredentialVault } from './credential-vault'
 import { createDesktopLoginUrl } from './login-ticket'
 import { runPhase3Migration } from './migration'
 import { registerWorkspaceLockIpc } from './workspace-lock-ipc'
+import { RuntimeTaskSupervisor, type RuntimeTaskSupervisorEnvironment } from './runtime-task-supervisor'
 
 const PORT = Number(process.env.HERMES_DESKTOP_PORT) || 8748
 const START_HIDDEN = process.argv.includes('--hidden')
@@ -29,6 +30,8 @@ let petWindow: BrowserWindow | null = null
 // 双模式管理器（Stage 9）：由 app.whenReady 时实例化
 let modeManager: ModeManager | null = null
 let credentialVault: CredentialVault | null = null
+let runtimeTaskSupervisor: RuntimeTaskSupervisor | null = null
+let runtimeTaskSupervisorEnvironment: RuntimeTaskSupervisorEnvironment | null = null
 let petWindowLoadPromise: Promise<void> | null = null
 let serverUrl: string | null = null
 let tray: Tray | null = null
@@ -417,12 +420,25 @@ function escapeHtml(value: string): string {
   }[char] || char))
 }
 
+async function ensureRuntimeTaskSupervisor(): Promise<RuntimeTaskSupervisorEnvironment> {
+  if (!runtimeTaskSupervisor) {
+    runtimeTaskSupervisor = new RuntimeTaskSupervisor({
+      stateDir: join(webUiHome(), 'runtime', 'task-supervisor'),
+    })
+  }
+  if (!runtimeTaskSupervisorEnvironment) {
+    runtimeTaskSupervisorEnvironment = await runtimeTaskSupervisor.start()
+  }
+  return runtimeTaskSupervisorEnvironment
+}
+
 async function bootstrap() {
   if (isBootstrapping) return
   isBootstrapping = true
 
   try {
-    const url = await startWebUiServer(PORT)
+    const supervisorEnvironment = await ensureRuntimeTaskSupervisor()
+    const url = await startWebUiServer(PORT, supervisorEnvironment)
     serverUrl = url
     if (mainWindow) await mainWindow.loadURL(createDesktopLoginUrl(url, deepAgentHome()))
     await loadPetWindowRoute()
@@ -625,6 +641,9 @@ function runDesktopApp() {
     cancelWindowFade()
     await showShutdownSplash()
     await stopWebUiServer().catch(() => undefined)
+    await runtimeTaskSupervisor?.stop().catch(() => undefined)
+    runtimeTaskSupervisor = null
+    runtimeTaskSupervisorEnvironment = null
     app.exit(0)
   })
 }

@@ -19,6 +19,7 @@ import { codingAgentRunManager } from './agent-runner/coding-agent-run-manager'
 import { getSession, updateSession, type HermesSessionRow } from '../db/hermes/session-store'
 import type { SessionState } from './hermes/run-chat/types'
 import { normalizeWindowsCommandPath, windowsCmdShimExecution, windowsCommandNeedsShell, type WindowsCommandExecution } from './windows-command'
+import { stripRuntimeTaskSupervisorEnvironment, type RuntimeTaskLeaseHandle } from './runtime-task-supervisor-client'
 
 const execFileAsync = promisify(execFile)
 const LAUNCH_API_MODES = new Set<ApiMode>(['chat_completions', 'codex_responses', 'anthropic_messages'])
@@ -1115,11 +1116,11 @@ function getScopedConfigFileDefinition(id: string, key: string, scopeInput: Codi
 }
 
 function getCurrentNodeEnv(): NodeJS.ProcessEnv {
-  return {
+  return stripRuntimeTaskSupervisorEnvironment({
     ...process.env,
     PATH: [getNodeBinDir(), getNvmNodeBinPaths(), process.env.PATH].filter(Boolean).join(delimiter),
     npm_node_execpath: process.execPath,
-  }
+  })
 }
 
 async function npmExecution(args: string[], env: NodeJS.ProcessEnv): Promise<CommandExecution> {
@@ -1813,8 +1814,13 @@ export async function startCodingAgentRun(
   }
 }
 
-export function sendCodingAgentRunInput(sessionId: string, input: string, systemPrompt?: string): { runId: string } {
-  return codingAgentRunManager.send(sessionId, input, { systemPrompt })
+export function sendCodingAgentRunInput(
+  sessionId: string,
+  input: string,
+  systemPrompt?: string,
+  taskLease?: RuntimeTaskLeaseHandle,
+): Promise<{ runId: string }> {
+  return codingAgentRunManager.send(sessionId, input, { systemPrompt, taskLease })
 }
 
 export function stopCodingAgentRun(sessionId: string): { stopped: boolean } {

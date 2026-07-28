@@ -10,6 +10,7 @@ import type { SessionState } from '../hermes/run-chat/types'
 import type { CanonicalResponsesEvent } from './adapters/responses-stream'
 import { mapCodingAgentResponseEvent } from './coding-agent-event-mapper'
 import { normalizeWindowsCommandPath, windowsCmdShimExecution, windowsCommandNeedsShell } from '../windows-command'
+import { stripRuntimeTaskSupervisorEnvironment, type RuntimeTaskLeaseHandle, type RuntimeTaskOutcome } from '../runtime-task-supervisor-client'
 
 const DEFAULT_IDLE_MS = 30 * 60 * 1000
 const TERMINAL_OUTPUT_FLUSH_MS = 120
@@ -86,6 +87,7 @@ interface ManagedCodingAgentRun {
   startedAt: number
   exited: boolean
   currentChild?: ChildProcess
+  currentTaskLease?: RuntimeTaskLeaseHandle
   currentChildKillTimer?: ReturnType<typeof setTimeout>
   currentChildStderr?: string
   printResponseId?: string
@@ -108,6 +110,7 @@ interface ManagedCodingAgentRun {
 
 interface CodingAgentRunSendOptions {
   systemPrompt?: string
+  taskLease?: RuntimeTaskLeaseHandle
 }
 
 function nowSeconds(): number {
@@ -258,12 +261,13 @@ function spawnCodingAgentChild(command: string, args: string[], options: {
   cwd: string
   env: NodeJS.ProcessEnv
 }): ChildProcess {
+  const childEnvironment = stripRuntimeTaskSupervisorEnvironment(options.env)
   const normalizedCommand = process.platform === 'win32' ? normalizeWindowsCommandPath(command) : command
   if (process.platform === 'win32' && windowsCommandNeedsShell(command)) {
     const execution = windowsCmdShimExecution(normalizedCommand, args)
     return spawn(execution.command, execution.args, {
       cwd: options.cwd,
-      env: options.env,
+      env: childEnvironment,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsVerbatimArguments: execution.windowsVerbatimArguments,
       windowsHide: true,
@@ -272,7 +276,7 @@ function spawnCodingAgentChild(command: string, args: string[], options: {
 
   return spawn(normalizedCommand, args, {
     cwd: options.cwd,
-    env: options.env,
+    env: childEnvironment,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
     windowsHide: process.platform === 'win32',
@@ -529,7 +533,7 @@ export class CodingAgentRunManager {
     return { runId: run.id, pid: proc.pid }
   }
 
-  send(sessionId: string, input: string, options: CodingAgentRunSendOptions = {}): { runId: string } {
+  async send(sessionId: string, input: string, options: CodingAgentRunSendOptions = {}): Promise<{ runId: string }> {
     const run = this.getBySession(sessionId)
     if (!run) throw new Error('Coding agent session not found')
     const text = String(input || '').trim()
@@ -540,11 +544,11 @@ export class CodingAgentRunManager {
     this.touch(run)
     this.emitTerminalStatus(run, 'Input sent to coding agent.')
     if (run.launch.agentId === 'claude-code') {
-      this.startClaudePrintTurn(run, text, systemPrompt)
+      await this.startClaudePrintTurn(run, text, systemPrompt, options.taskLease)
       return { runId: run.id }
     }
     if (run.launch.agentId === 'codex') {
-      this.startCodexExecTurn(run, text, systemPrompt)
+      await this.startCodexExecTurn(run, text, systemPrompt, options.taskLease)
       return { runId: run.id }
     }
     if (!run.pty) throw new Error('Coding agent terminal is not available')
@@ -741,7 +745,44 @@ export class CodingAgentRunManager {
     }
   }
 
-  private startClaudePrintTurn(run: ManagedCodingAgentRun, input: string, systemPrompt = '') {
+  private async finishTaskLease(run: ManagedCodingAgentRun, outcome: RuntimeTaskOutcome): Promise<void> {
+    const lease = run.currentTaskLease
+    run.currentTaskLease = undefined
+    if (!lease) return
+    try {
+      await lease.finish(outcome)
+    } catch (err) {
+      lease.abandon()
+      logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId, outcome }, '[coding-agent-run] failed to finish DeepCode Runtime task lease')
+    }
+  }
+
+  private async processTaskLeaseExit(run: ManagedCodingAgentRun, code: number | null, signal: NodeJS.Signals | null): Promise<void> {
+    const lease = run.currentTaskLease
+    run.currentTaskLease = undefined
+    if (!lease) return
+    try {
+      await lease.processExit(code, signal)
+    } catch (err) {
+      lease.abandon()
+      logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId, code, signal }, '[coding-agent-run] failed to record DeepCode process exit')
+    }
+  }
+
+  private async bindTaskLease(run: ManagedCodingAgentRun, child: ChildProcess, lease?: RuntimeTaskLeaseHandle): Promise<void> {
+    if (!lease) return
+    run.currentTaskLease = lease
+    if (!child.pid) throw new Error('Coding agent child did not publish a PID')
+    try {
+      await lease.bindProcess(child.pid)
+    } catch (err) {
+      terminateChildProcess(child)
+      await this.finishTaskLease(run, 'failed')
+      throw err
+    }
+  }
+
+  private async startClaudePrintTurn(run: ManagedCodingAgentRun, input: string, systemPrompt = '', taskLease?: RuntimeTaskLeaseHandle): Promise<void> {
     if (childIsRunning(run.currentChild)) {
       throw new Error('Claude Code is still processing the previous input')
     }
@@ -793,6 +834,7 @@ export class CodingAgentRunManager {
       },
     })
     run.currentChild = child
+    run.currentTaskLease = taskLease
 
     let stdoutBuffer = ''
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -810,56 +852,61 @@ export class CodingAgentRunManager {
     })
 
     child.on('error', (err) => {
-      if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
-      run.currentChildKillTimer = undefined
-      run.currentChild = undefined
-      logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId }, '[coding-agent-run] claude print failed to start')
-      this.handleClaudePrintResponseEvent(run, {
-        type: 'response.failed',
-        data: {
+      void this.finishTaskLease(run, 'failed').finally(() => {
+        if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
+        run.currentChildKillTimer = undefined
+        run.currentChild = undefined
+        logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId }, '[coding-agent-run] claude print failed to start')
+        this.handleClaudePrintResponseEvent(run, {
           type: 'response.failed',
-          response: {
-            id: run.printResponseId,
-            object: 'response',
-            status: 'failed',
-            model: run.launch.model,
-            error: { message: childProcessErrorMessage(err) },
-            output: [],
+          data: {
+            type: 'response.failed',
+            response: {
+              id: run.printResponseId,
+              object: 'response',
+              status: 'failed',
+              model: run.launch.model,
+              error: { message: childProcessErrorMessage(err) },
+              output: [],
+            },
           },
-        },
+        })
       })
     })
 
-    child.on('exit', (code) => {
-      if (stdoutBuffer.trim()) this.handleClaudePrintLine(run, stdoutBuffer)
-      if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
-      run.currentChildKillTimer = undefined
-      run.currentChild = undefined
-      logger.info({ runId: run.id, sessionId: run.launch.sessionId, code }, '[coding-agent-run] claude print exited')
-      if (run.stoppedByUser) return
-      if (run.pendingChatCompletionEvent) {
-        this.emitAndMarkPrintChatRunCompleted(run, run.pendingChatCompletionEvent, run.pendingChatCompletionPayload)
-        return
-      }
-      if (code === 0) {
-        this.completeClaudePrintTurn(run)
-        return
-      }
-      this.handleClaudePrintResponseEvent(run, {
-        type: 'response.failed',
-        data: {
+    child.on('exit', (code, signal) => {
+      void this.processTaskLeaseExit(run, code, signal).finally(() => {
+        if (stdoutBuffer.trim()) this.handleClaudePrintLine(run, stdoutBuffer)
+        if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
+        run.currentChildKillTimer = undefined
+        run.currentChild = undefined
+        logger.info({ runId: run.id, sessionId: run.launch.sessionId, code, signal }, '[coding-agent-run] claude print exited')
+        if (run.stoppedByUser) return
+        if (run.pendingChatCompletionEvent) {
+          this.emitAndMarkPrintChatRunCompleted(run, run.pendingChatCompletionEvent, run.pendingChatCompletionPayload)
+          return
+        }
+        if (code === 0) {
+          this.completeClaudePrintTurn(run)
+          return
+        }
+        this.handleClaudePrintResponseEvent(run, {
           type: 'response.failed',
-          response: {
-            id: run.printResponseId,
-            object: 'response',
-            status: 'failed',
-            model: run.launch.model,
-            error: { message: exitErrorMessage('Claude Code', code, run.currentChildStderr) },
-            output: [],
+          data: {
+            type: 'response.failed',
+            response: {
+              id: run.printResponseId,
+              object: 'response',
+              status: 'failed',
+              model: run.launch.model,
+              error: { message: exitErrorMessage('Claude Code', code, run.currentChildStderr) },
+              output: [],
+            },
           },
-        },
+        })
       })
     })
+    await this.bindTaskLease(run, child, taskLease)
   }
 
   private handleClaudePrintResponseEvent(run: ManagedCodingAgentRun, event: CanonicalResponsesEvent) {
@@ -1183,7 +1230,7 @@ export class CodingAgentRunManager {
     })
   }
 
-  private startCodexExecTurn(run: ManagedCodingAgentRun, input: string, systemPrompt = '') {
+  private async startCodexExecTurn(run: ManagedCodingAgentRun, input: string, systemPrompt = '', taskLease?: RuntimeTaskLeaseHandle): Promise<void> {
     if (childIsRunning(run.currentChild)) {
       throw new Error('Codex is still processing the previous input')
     }
@@ -1231,6 +1278,7 @@ export class CodingAgentRunManager {
       },
     })
     run.currentChild = child
+    run.currentTaskLease = taskLease
 
     let stdoutBuffer = ''
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -1248,56 +1296,61 @@ export class CodingAgentRunManager {
     })
 
     child.on('error', (err) => {
-      if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
-      run.currentChildKillTimer = undefined
-      run.currentChild = undefined
-      logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId }, '[coding-agent-run] codex exec failed to start')
-      this.handleClaudePrintResponseEvent(run, {
-        type: 'response.failed',
-        data: {
+      void this.finishTaskLease(run, 'failed').finally(() => {
+        if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
+        run.currentChildKillTimer = undefined
+        run.currentChild = undefined
+        logger.warn({ err, runId: run.id, sessionId: run.launch.sessionId }, '[coding-agent-run] codex exec failed to start')
+        this.handleClaudePrintResponseEvent(run, {
           type: 'response.failed',
-          response: {
-            id: run.printResponseId,
-            object: 'response',
-            status: 'failed',
-            model: run.launch.model,
-            error: { message: childProcessErrorMessage(err) },
-            output: [],
+          data: {
+            type: 'response.failed',
+            response: {
+              id: run.printResponseId,
+              object: 'response',
+              status: 'failed',
+              model: run.launch.model,
+              error: { message: childProcessErrorMessage(err) },
+              output: [],
+            },
           },
-        },
+        })
       })
     })
 
-    child.on('exit', (code) => {
-      if (stdoutBuffer.trim()) this.handleCodexExecLine(run, stdoutBuffer)
-      if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
-      run.currentChildKillTimer = undefined
-      run.currentChild = undefined
-      logger.info({ runId: run.id, sessionId: run.launch.sessionId, code }, '[coding-agent-run] codex exec exited')
-      if (run.stoppedByUser) return
-      if (run.pendingChatCompletionEvent) {
-        this.emitAndMarkPrintChatRunCompleted(run, run.pendingChatCompletionEvent, run.pendingChatCompletionPayload)
-        return
-      }
-      if (code === 0) {
-        this.completeCodexExecTurn(run, run.codexPendingUsage)
-        return
-      }
-      this.handleClaudePrintResponseEvent(run, {
-        type: 'response.failed',
-        data: {
+    child.on('exit', (code, signal) => {
+      void this.processTaskLeaseExit(run, code, signal).finally(() => {
+        if (stdoutBuffer.trim()) this.handleCodexExecLine(run, stdoutBuffer)
+        if (run.currentChildKillTimer) clearTimeout(run.currentChildKillTimer)
+        run.currentChildKillTimer = undefined
+        run.currentChild = undefined
+        logger.info({ runId: run.id, sessionId: run.launch.sessionId, code, signal }, '[coding-agent-run] codex exec exited')
+        if (run.stoppedByUser) return
+        if (run.pendingChatCompletionEvent) {
+          this.emitAndMarkPrintChatRunCompleted(run, run.pendingChatCompletionEvent, run.pendingChatCompletionPayload)
+          return
+        }
+        if (code === 0) {
+          this.completeCodexExecTurn(run, run.codexPendingUsage)
+          return
+        }
+        this.handleClaudePrintResponseEvent(run, {
           type: 'response.failed',
-          response: {
-            id: run.printResponseId,
-            object: 'response',
-            status: 'failed',
-            model: run.launch.model,
-            error: { message: exitErrorMessage('Codex', code, run.currentChildStderr) },
-            output: [],
+          data: {
+            type: 'response.failed',
+            response: {
+              id: run.printResponseId,
+              object: 'response',
+              status: 'failed',
+              model: run.launch.model,
+              error: { message: exitErrorMessage('Codex', code, run.currentChildStderr) },
+              output: [],
+            },
           },
-        },
+        })
       })
     })
+    await this.bindTaskLease(run, child, taskLease)
   }
 
   private handleCodexExecLine(run: ManagedCodingAgentRun, line: string) {
