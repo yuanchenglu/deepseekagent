@@ -42,17 +42,4 @@ if test_source.count(old_helper) != 1:
 if test_source.count(old_assertion) != 1:
     raise SystemExit('MCU assertion contract changed; refusing patch')
 test_path.write_text(test_source.replace(old_helper, new_helper).replace(old_assertion, new_assertion), encoding='utf-8')
-
-workflow_path = Path('.github/workflows/release-electron-preview.yml')
-workflow = workflow_path.read_text(encoding='utf-8')
-old_paths = '''      - "webui/package-lock.json"
-      - "webui/packages/desktop/**"
-'''
-new_paths = '''      - "webui/package-lock.json"
-      - "webui/tests/**"
-      - "webui/packages/desktop/**"
-'''
-if workflow.count(old_paths) != 1:
-    raise SystemExit('Electron Preview path contract changed; refusing patch')
-workflow_path.write_text(workflow.replace(old_paths, new_paths), encoding='utf-8')
-print('patched deterministic MCU wait and Electron test path gate')
+print('patched deterministic MCU audio enqueue wait')
