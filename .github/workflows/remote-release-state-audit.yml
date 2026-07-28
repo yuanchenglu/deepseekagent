@@ -10,6 +10,15 @@ on:
       - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
       - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
       - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
+  push:
+    branches: [develop]
+    paths:
+      - ".github/workflows/remote-release-state-audit.yml"
+      - "scripts/audit-remote-release-state.py"
+      - "docs/open-source-readiness/00-INDEX.md"
+      - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
+      - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
+      - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
   workflow_dispatch:
 
 permissions:
