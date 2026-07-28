@@ -1,10 +1,10 @@
 # GitHub Tag、Release、Actions 与公开渠道远程审计
 
-> 观测时间（UTC）：`2026-07-28T18:09:49.597514+00:00`  
+> 观测时间（UTC）：`2026-07-28T18:19:18.748426+00:00`  
 > 仓库：`yuanchenglu/deepseekagent`  
-> 审计 workflow run：`30386154565`  
-> 审计 artifact：`8699022625`  
-> Artifact digest：`sha256:d2efe8b4b1969e0c2565d1ec3d7b03b0bd427f41559e2bc1320197ec8160cff3`  
+> 审计 workflow run：`30386865073`  
+> 审计 artifact：`8699299635`  
+> Artifact digest：`sha256:6c6b722661f6d25597ee53ef8057505495683df1e0ef2e5bd0fbd743b2492188`  
 > 性质：**只读审计；未创建、修改或删除 Tag、Release、Channel 或 Secret。**
 
 ## 1. 当前事实摘要
@@ -19,7 +19,7 @@
 - 当前引用 Head 上的失败类 Actions：**0**
 - 历史或已被新 Head 取代的失败/取消 Actions：**132**
 
-“当前引用 Head”包括默认分支最新 Head和所有开放 PR 的最新 Head。旧 PR Commit、旧分支 Commit、旧 `develop` Commit 或已被后续提交替代的失败运行保留为历史证据，但不构成当前 Head 阻塞。
+“当前引用 Head”包括默认分支最新 Head 和所有开放 PR 的最新 Head。旧 PR Commit、旧分支 Commit、旧 `develop` Commit 或已被后续提交替代的失败运行保留为历史证据，但不构成当前 Head 阻塞。
 
 ## 2. Tags
 
@@ -75,7 +75,7 @@ GitHub Actions API 完整扫描得到 132 条历史失败类记录：
 - `develop` 历史失败：run `30294872846`，Head `386ca6f0e2a967b8b9c74309becb2e6608e3b760`，已被当前 `develop` 多次推进取代。
 - `master` 历史失败：run `28570812931`，Head `856f910f1a3abd9e06bd0abc5fe9aa166920b9a6`，发生于 2026-07-02 的手工 `Release Build & Publish`，不是当前 `master` Head。
 
-完整 132 条逐项记录保存在 run `30386154565` 的 `remote-release-audit.json` artifact 中。不得删除历史失败来伪造成功；也不得用历史失败覆盖最终 Head 的成功证据。
+完整 132 条逐项记录保存在 run `30386865073` 的 `remote-release-audit.json` artifact 中。不得删除历史失败来伪造成功；也不得用历史失败覆盖最终 Head 的成功证据。
 
 ## 5. 公开发布渠道
 
@@ -91,7 +91,16 @@ GitHub Actions API 完整扫描得到 132 条历史失败类记录：
 
 结论：当前公开渠道均未建立，不存在公开可消费的 Alpha、Beta、Preview 或 Stable channel manifest。
 
-## 6. 与当前 Plan 的关系
+## 6. Review 与 API 契约闭环
+
+PR #23 的两个 actionable review 已处理并解决：
+
+1. 所有 active status 查询均显式分页，超过安全上限时失败关闭；
+2. 失败类运行只使用 GitHub 文档支持的 `status=completed` 查询，再本地过滤 `conclusion`；不依赖未文档化的 `status=startup_failure`。
+
+最终 reviewed Head 的 workflow run `30386865073` 通过，未解决 actionable thread 为 0。
+
+## 7. 与当前 Plan 的关系
 
 本报告关闭了开始前远程审计中的 Tag、Release、Actions 和公开渠道枚举缺口，但不改变 Plan v2.8.0 的依赖顺序。
 
@@ -106,7 +115,7 @@ Gate 关闭前：
 - 不提升 Alpha、Beta、Preview 或 Stable channel；
 - 不把无签名 DMG 称为已发布产品。
 
-## 7. 可重复审计工具
+## 8. 可重复审计工具
 
 PR #23 新增：
 
@@ -118,7 +127,7 @@ Workflow 仅具备：
 - `contents: read`
 - `actions: read`
 
-它可以在后续每个发布 Gate 前重复审计：
+它在 PR 和 `develop` push 后均会运行，可在后续每个发布 Gate 前重复审计：
 
 - Tags
 - Releases
