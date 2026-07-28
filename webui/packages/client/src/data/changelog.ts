@@ -14,9 +14,9 @@ export const changelog: ChangelogEntry[] = [
     version: "0.9.0",
     date: "2026-07-27",
     changes: [
-      "sidebar.changelog.initial",
-      "sidebar.changelog.auth",
-      "sidebar.changelog.electron",
+      "changelog.initial",
+      "changelog.auth",
+      "changelog.electron",
     ],
   },
 ];
