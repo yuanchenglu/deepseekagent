@@ -59,3 +59,48 @@ test('exchanges a one-time ticket without persisting the ticket or JWT', async (
   expect(request?.postData).toBe(JSON.stringify({ ticket }))
   expect(api.unexpectedRequests).toEqual([])
 })
+
+test('rejects an invalid or expired ticket and removes it from the URL', async ({ page }) => {
+  const api = await mockHermesApi(page)
+  const ticket = 'expired-ticket'
+
+  await page.goto(`/#/?ticket=${ticket}`)
+
+  await expect(page).toHaveURL(/#\/$/)
+  await expect(page.getByText('Login ticket is invalid or expired')).toBeVisible()
+  await expect(page.evaluate(() => window.location.href)).resolves.not.toContain(ticket)
+  await expect(page.evaluate(() => window.localStorage.getItem('hermes_api_key'))).resolves.toBeNull()
+  await expect(page.evaluate(() => window.sessionStorage.getItem('deepagent_cookie_session'))).resolves.toBeNull()
+
+  const ticketRequests = api.requests.filter((item) => item.pathname === '/api/auth/ticket')
+  expect(ticketRequests).toHaveLength(1)
+  expect(ticketRequests[0]?.postData).toBe(JSON.stringify({ ticket }))
+  expect(api.unexpectedRequests).toEqual([])
+})
+
+test('rejects replay of a consumed one-time ticket after logout', async ({ page, context }) => {
+  const api = await mockHermesApi(page)
+  const ticket = 'R'.repeat(43)
+
+  await page.goto(`/#/?ticket=${ticket}`)
+  await expect(page).toHaveURL(/#\/hermes\/chat$/)
+
+  await page.evaluate(async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    window.sessionStorage.removeItem('deepagent_cookie_session')
+  })
+  await context.clearCookies()
+
+  await page.goto(`/#/?ticket=${ticket}`)
+
+  await expect(page).toHaveURL(/#\/$/)
+  await expect(page.getByText('Login ticket is invalid or expired')).toBeVisible()
+  await expect(page.evaluate(() => window.location.href)).resolves.not.toContain(ticket)
+  await expect(page.evaluate(() => window.sessionStorage.getItem('deepagent_cookie_session'))).resolves.toBeNull()
+
+  const ticketRequests = api.requests.filter((item) => item.pathname === '/api/auth/ticket')
+  expect(ticketRequests).toHaveLength(2)
+  expect(ticketRequests.every((request) => request.postData === JSON.stringify({ ticket }))).toBe(true)
+  expect(api.requests.some((item) => item.pathname === '/api/auth/logout')).toBe(true)
+  expect(api.unexpectedRequests).toEqual([])
+})
