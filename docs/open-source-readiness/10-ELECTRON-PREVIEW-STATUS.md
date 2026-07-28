@@ -1,9 +1,9 @@
 # Electron Preview 继续开发状态
 
 > 更新日期：2026-07-28  
-> 基线：PR #1、#3、#4、#5、#6、#10、#11 已合入 `develop`  
-> 更新前最新合并提交：`1fc31324343c574a9e03bac8e2435f72b474d45a`  
-> 本文是 Electron Preview 专项事实层；冲突处以本文、`00-THREE-PHASE-DELIVERY-STATUS.md` 和最新远程代码为准。
+> 基线：PR #1、#3、#4、#5、#6、#10、#11、#12、#13 已合入 `develop`  
+> concurrency 合并提交：`888696c8fcf86c76003b49d97f48997fccbf4628`  
+> 本文是 Electron Preview 专项事实层；冲突处以本文、`00-THREE-PHASE-DELIVERY-STATUS.md`、最新 PLAN 和远程代码为准。
 
 ---
 
@@ -21,7 +21,7 @@
 
 基础算法与测试随 PR #1 合入。
 
-### 1.2 Main IPC 所有权与崩溃回收
+### 1.2 Main IPC 所有权与 Renderer 故障回收
 
 PR #10 将锁从仅依赖 `taskId` 的自愿式 IPC 升级为 Main Process 所有权模型：
 
@@ -58,7 +58,7 @@ PR #10 将锁从仅依赖 `taskId` 的自愿式 IPC 升级为 Main Process 所�
 
 ### 1.5 Browser E2E、i18n 与品牌契约
 
-- Browser E2E 在 PR #5、#6、#10 真实通过。
+- Browser E2E 在 PR #5、#6、#10、#13 真实通过。
 - 覆盖首次 Ticket、非法/失效 Ticket、重放、Cookie Session 和 URL 清理。
 - MCP 对外名称统一为 `deepagent-webui-mcp`。
 - 旧 Hermes 日志和 Coding Agent 提示已收敛为 DeepAgent。
@@ -82,37 +82,67 @@ PR #6 建立两种模式：
 - DMG 构建、挂载、Bundle ID、版本、arm64 和安装脚本验证。
 - Manifest、SHA-256 和 artifact 生成。
 
+### 1.7 正式发布 concurrency 已完成
+
+PR #13 关闭了原顶层统一 `cancel-in-progress: true` 的发布事务风险。
+
+当前契约：
+
+- PR 验证使用稳定的 `validation-<PR number>` group。
+- 同一 PR 的新提交可以取消旧验证。
+- `workflow_dispatch + publish=true` 使用独立 `publish-run-<run_id>` group，运行中的正式发布不可被后续运行取消。
+- 真正修改 GitHub prerelease 和 R2 Preview channel 的 `publish` job 使用固定 `electron-preview-publish` group。
+- `queue: max` 使多个正式发布事务串行排队，不互相替换 pending 运行。
+- 发布 Job 未设置 `cancel-in-progress: true`。
+- concurrency 表达式、固定发布队列、旧 group 消除和事件真值表由 `scripts/check-electron-preview-concurrency.py` 失败关闭。
+
+PR #13 真实 CI：
+
+- WebUI i18n Coverage：成功。
+- WebUI Browser E2E：成功。
+- Electron concurrency contract：成功。
+- WebUI 测试、构建、许可证审计：成功。
+- Electron Main、Runtime 约束、无签名 DMG、Bundle ID、arm64、安装器：成功。
+- Manifest、SHA-256、artifact：成功。
+
+本次仅验证 PR 路径，没有执行 `publish=true`，没有创建 Tag、Release 或公开 Preview channel。
+
 ---
 
 ## 2. 尚未完成
 
-### 2.1 正式发布 concurrency
+### 2.1 当前唯一第一优先：Runtime Task / Workspace Lease 协议
 
-当前 `.github/workflows/release-electron-preview.yml` 仍为：
+必须先固化协议，不得并行启动 PID 接入或双 Runtime E2E。
 
-```yaml
-concurrency:
-  group: electron-preview-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-```
+协议至少必须定义：
 
-风险：新的 `workflow_dispatch + publish=true` 运行可能取消正在执行的正式发布。当前发布顺序包含 GitHub prerelease 和 R2 Preview channel 两个公开状态；中途取消可能造成渠道不一致。
+1. **身份**：runtime、workspace、taskId、访问级别、可选 PID/进程树标识。
+2. **访问级别**：任务显式声明 `read` 或 `write`，不得由 Renderer/UI 猜测。
+3. **事件**：acquire、acquired、denied、heartbeat、release、cancel、timeout、process-exit、runtime-crash、recovered。
+4. **状态**：pending、active、releasing、released、expired、orphaned、recovered。
+5. **所有权**：Main 是唯一租约协调器，Renderer 与 Runtime 不能绕过 Main 直接改变权威状态。
+6. **幂等性**：重复 acquire/release/cancel、事件重放和重连后恢复必须有明确结果。
+7. **故障语义**：心跳丢失、超时、进程树退出、Runtime 重启和 Main 重启后的回收规则。
+8. **错误语义**：冲突、非法访问级别、未知任务、过期租约、所有者不匹配和恢复失败。
+9. **契约测试**：先覆盖状态转换和失败关闭，再进入真实进程接入。
 
-正确契约：
+完成证据：
 
-- 同一 PR 的新提交可以取消旧的 PR 验证。
-- 正式发布必须串行。
-- 运行中的正式发布不能被后续运行取消。
-- 修复后必须重新通过完整 Electron workflow。
+- 类型化协议文件。
+- 权威状态机与不变量说明。
+- DeepAgent/DeepCode Runtime 适配边界。
+- 契约测试覆盖正常、取消、超时、重放、断线和崩溃场景。
+- 计划、状态和交接文档更新。
 
-### 2.2 Runtime Task / Workspace Lease 强制接入
+### 2.2 真实 task/PID 生命周期接入
 
-必须继续完成：
+协议完成后继续：
 
 1. DeepAgent Runtime 与 DeepCode Runtime 的真实任务启动、结束、取消、超时和崩溃事件由 Main 协调器强制管理。
 2. 租约绑定真实 task/PID，而不是 Renderer 自愿 acquire/release。
 3. 处理心跳、超时、进程树退出、Runtime 重启和异常回收。
-4. 明确任务访问级别：read 或 write，并由协议而不是 UI 猜测。
+4. Main 重启后从持久状态和存活进程重建或清理租约。
 
 ### 2.3 双 Runtime 真实并发 E2E
 
@@ -124,6 +154,7 @@ concurrency:
 - 取消后释放。
 - Renderer 销毁后释放。
 - Runtime 进程崩溃后释放。
+- Main/Runtime 重启后的过期租约回收。
 - 一个 Runtime 崩溃不影响另一个 Runtime 或 Electron 窗口。
 
 ### 2.4 干净机与外部验收
@@ -143,18 +174,19 @@ concurrency:
 - 不删除 quarantine。
 - 不声称已签名、公证。
 - 不直接提升 Stable。
-- 完成 concurrency、Runtime Lease、真实并发、干净机和用户验收后，才允许创建公开 Preview prerelease。
+- concurrency 关闭不等于发布门禁完成。
+- 完成 Runtime Lease、真实并发、干净机、共存和用户验收后，才允许创建公开 Preview prerelease。
 
 ---
 
 ## 4. 下一执行顺序
 
 ```text
-修复 release workflow concurrency
-→ 固化 Runtime Task / Workspace Lease 协议
+固化 Runtime Task / Workspace Lease 协议
 → Main 绑定真实 task/PID 生命周期
 → 双 Runtime 同 Workspace 并发与故障 E2E
 → 下载 DMG artifact 做干净机验收
+→ 验证 CLI/Desktop/Hermes/OpenCode 共存
 → 修复真实环境问题
 → 清零 P0/P1
 → 创建 preview.N Tag
