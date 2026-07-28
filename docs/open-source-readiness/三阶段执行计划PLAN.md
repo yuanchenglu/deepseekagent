@@ -1,11 +1,11 @@
 # DeepAgent 三阶段产品与开源发布计划
 
-> **版本**：v2.7.0  
+> **版本**：v2.8.0  
 > **最后更新**：2026-07-29  
 > **唯一事实源**：GitHub 远程仓库 `yuanchenglu/deepseekagent`  
 > **开发分支**：`develop`  
 > **发布分支**：`master`  
-> **当前结论**：CLI Alpha、WebUI Beta、Electron Preview 均为 **No-Go**。主体工程已进入发布收敛后半程，当前只关闭真实并发、安全、干净机、共存和用户验收门禁，不扩张非必要功能。
+> **当前结论**：CLI Alpha、WebUI Beta、Electron Preview 均为 **No-Go**。双 Runtime 同 Workspace 并发与故障 E2E 已完成，当前唯一任务是 Owner 外部凭据轮换与旧凭据失效确认；不得并行跳过安全依赖。
 
 ---
 
@@ -51,6 +51,8 @@
 - PR #17 最终 Head：`aba94fab7b36f9bd140752c455acdd4838bd3835`。
 - PR #17 squash merge：`e0f2f407daa6f273ee4c927934efc2e3b27293a0`。
 - PR #18 squash merge：`9e26f290c60544fc8a99cff8c31cecfbb8c99fd9`，同步 PLAN v2.7.0、状态和交接。
+- PR #19 最终 Head：`26295dda9644df016353bd7fa9c5bac6b0f13c04`。
+- PR #19 squash merge：`f1f9457e0443db74e9aab9ceb0ea28405917db3a`，完成双 Runtime E2E 和失败关闭修复。
 - `master` 快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
 
 PR #17 已真实通过：
@@ -77,7 +79,7 @@ Publish Job 在 PR 场景按预期跳过。未创建 Tag、Release 或公开 Pre
 |---|---:|---|---|
 | CLI Alpha | 约 90%–95% | **No-Go** | 主体工程接近完成；外部凭据、历史、干净机、真实模型和 P0/P1 未关闭 |
 | WebUI Beta | 约 90%–92% | **No-Go** | Browser E2E 和核心生命周期自动化完成；迁移、共存、正式渠道和外测未关闭 |
-| Electron Preview | 约 94%–95% | **No-Go** | 协议和真实 task/PID 生命周期完成；双 Runtime 真实并发、干净机、共存和用户验收未关闭 |
+| Electron Preview | 约 95%–96% | **No-Go** | 双 Runtime 真实并发与故障 E2E 已完成；凭据、历史、干净机、共存和用户验收未关闭 |
 
 **整体判断**：主体工程约九成以上，项目处于发布收敛后半程。
 
@@ -201,45 +203,49 @@ PR #17 已完成：
 13. Main 重启后的 socket RPC 强制新连接，避免 stale keep-alive `EPIPE`。
 14. 非 Desktop WebUI 未配置 Supervisor 时保持 no-op；Desktop 缺少 Supervisor 时失败关闭。
 
-> PR #17 完成真实生命周期接入和监督器集成测试，但不等于两个真实 Runtime 在同一 Workspace 的端到端竞争已验证。
+### 8.6 双 Runtime 同 Workspace 并发与故障 E2E
+
+PR #19 已完成：
+
+1. 使用生产客户端和同一 Main Supervisor 验证 reader-reader、reader-writer 双向互斥和 writer-writer。
+2. acquire 被拒绝时 spawn 计数为 0，Workspace 无写副作用。
+3. 正常完成、取消、heartbeat timeout、Bridge crash 和 DeepCode child crash 终态闭环。
+4. PID 消失、PID 重用、Main/Runtime 重启和跨 Workspace 隔离通过。
+5. 不可验证任务保持 orphaned 和 Workspace 锁，后台 PID 探测不自动释放。
+6. acquire-before-bind 的无 PID orphaned 任务禁止盲目恢复，但允许原 Runtime 显式终止并释放。
+7. 最终专项 E2E 6/6、Browser E2E 和完整 Electron Preview workflow 全部通过。
+8. 唯一 P2 actionable review 已修复并解决，未解决 actionable thread 为 0。
+
+完整证据：`12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md`。
 
 ---
 
-## 9. 当前唯一第一优先工程任务
+## 9. 当前唯一第一优先任务
 
-### 双 Runtime 同 Workspace 并发与故障 E2E
+### Owner Gate：轮换外部凭据并确认旧凭据失效
 
-必须在真实 DeepAgent / DeepCode Runtime 路径验证：
-
-1. reader-reader 可以并行。
-2. reader-writer 双向互斥。
-3. writer-writer 互斥。
-4. acquire 被拒绝时不得启动写任务或产生副作用。
-5. 正常完成后释放租约。
-6. 用户取消后释放或进入明确失败关闭状态。
-7. heartbeat timeout 后，冲突 Runtime 仍不能进入双写窗口。
-8. DeepAgent bridge 崩溃后，其任务统一 orphaned；确认退出或恢复后才释放/重建。
-9. DeepCode 子进程崩溃或 PID 重用时，Main 正确识别和清理。
-10. Main 重启后，存活 PID 可验证恢复；证据不足时保持 orphaned。
-11. 一个 Runtime 崩溃不能破坏另一个 Runtime、窗口或无冲突 Workspace。
-12. 测试保留远程可审计日志、状态快照和失败证据。
+该任务必须由仓库 Owner / 外部平台管理员执行，当前环境不得代替 Owner 创建、查看或撤销真实 Secret。
 
 完成条件：
 
-- 新增真实双 Runtime E2E harness 和用例；
-- Browser E2E 与完整 Electron Preview workflow 在最终 PR Head 真实通过；
-- 所有 actionable review 处理完成；
-- 合入 `develop` 后更新 PLAN、状态、Electron 专项和交接。
+1. 盘点所有曾进入代码、配置、日志、制品或 Git 历史的发布、对象存储和服务凭据。
+2. 创建最小权限的新凭据并更新 GitHub / 外部平台 Secrets。
+3. 使用新凭据完成隔离的最小读写验证，不创建公开 Release 或渠道。
+4. 撤销旧凭据。
+5. 使用旧凭据执行安全的最小只读验证，并确认认证失败或权限拒绝。
+6. 将不含秘密值的脱敏证据提交远程。
 
-完成本任务前，不并行启动后继工程任务。
+Owner 操作清单：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。
+
+在该 Gate 关闭前，不得启动 Git 历史重写，也不得提升 Alpha、Beta、Preview 或 Stable 渠道。
 
 ---
 
 ## 10. 后继执行顺序
 
 ```text
-A. 双 Runtime 同 Workspace 并发与故障 E2E
-→ B. 轮换外部凭据并确认旧凭据失效
+A. ✅ 双 Runtime 同 Workspace 并发与故障 E2E
+→ B. 【当前唯一 Owner Gate】轮换外部凭据并确认旧凭据失效
 → C. 清理 Git 历史并重扫全部 refs
 → D. 干净 Apple Silicon Mac 验证 CLI/WebUI/Electron 生命周期
 → E. CLI/Desktop/Hermes/OpenCode 共存验证
@@ -256,7 +262,7 @@ A. 双 Runtime 同 Workspace 并发与故障 E2E
 
 可以对外说明：
 
-- Runtime Lease 协议和真实 task/PID 生命周期已进入 `develop`；
+- Runtime Lease 协议、真实 task/PID 生命周期和双 Runtime 同 Workspace E2E 已进入 `develop`；
 - Browser E2E、WebUI、Electron Main 和无签名 DMG 自动门禁已通过；
 - 项目处于发布收敛阶段。
 
@@ -265,7 +271,6 @@ A. 双 Runtime 同 Workspace 并发与故障 E2E
 - Electron Preview 已公开发布；
 - 已签名或已公证；
 - CLI Alpha、WebUI Beta 或 Electron Preview 已达到 Go；
-- 双 Runtime 真实并发已经验证；
 - 仓库全部使用 MIT；
 - 已完成凭据轮换、历史清理、干净机或真实用户验收。
 
