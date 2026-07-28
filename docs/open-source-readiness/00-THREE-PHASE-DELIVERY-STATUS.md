@@ -4,7 +4,7 @@
 > 状态：**当前进展事实层**  
 > 远程仓库：`https://github.com/yuanchenglu/deepseekagent.git`  
 > 开发分支：`develop`  
-> 说明：阶段范围、验收契约仍以 `07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md`、`08-PHASE-2-WEBUI-STABLE-BETA.md`、`09-PHASE-3-DUAL-MODE-ELECTRON.md` 为准；本文只记录真实实施进度、当前阻断项和下一执行顺序。
+> 说明：阶段范围与验收契约仍以 `07-PHASE-1-OPEN-SOURCE-CLI-ALPHA.md`、`08-PHASE-2-WEBUI-STABLE-BETA.md`、`09-PHASE-3-DUAL-MODE-ELECTRON.md` 为准；本文记录真实实施进度、当前阻断项和下一执行顺序。
 
 ---
 
@@ -12,33 +12,32 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| `develop` 基线 | `7e57d8e5661b3e367a623f704c0799ce8a0b82ec`，PR #7 已合入 |
-| 当前代码工作分支 | `chatgpt/electron-preview-release-gate` |
-| 当前代码 PR | PR #6：`ci: establish automated Electron Preview DMG gate` |
-| PR #6 当前 Head | `c4bbfb17bfa2b5b8611993b67e8cf36609996a26` |
+| Electron 门禁基线 | PR #6 已 squash 合入 `develop`，提交 `0013ba280f705ec786a200c688e9fa867aa502e9` |
+| PR #6 验证 Head | `c4bbfb17bfa2b5b8611993b67e8cf36609996a26` |
 | PR #6 规模 | 23 commits，11 changed files |
-| 进度/交接文档 | 已通过 PR #7 合入 `develop` |
-| 本地未推送代码 | **无**；当前工作均已存在于 GitHub 远程分支 |
+| 自动化结论 | i18n、Browser E2E、完整无签名 Apple Silicon DMG 门禁全部成功 |
+| 进度与交接文档 | 已保存到 GitHub 远程；最终状态通过 docs-only PR 更新 |
+| 本地未推送代码 | **无**；当前工作均已存在于 GitHub 远程仓库 |
 
-PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本文中的瞬时状态当作最终结论。
+`develop` 在本文之后可能继续产生提交。新会话必须重新读取远程最新 Head，不得将任何 SHA 快照视为永久值。
 
 ---
 
 ## 2. 总体进度结论
 
-| 阶段 | 代码/工程实施进度 | 发布就绪状态 | 结论 |
+| 阶段 | 工程实施进度 | 发布状态 | 当前结论 |
 |---|---:|---|---|
-| 第一阶段：CLI Alpha | 约 90%–95% | **No-Go** | 主体代码完成，外部凭据、历史清理、干净机和真实模型门禁未完成 |
-| 第二阶段：WebUI Beta | 约 90% | **No-Go** | 核心功能、Browser E2E 和静态 i18n 门禁已完成，仍需升级/共存/迁移和真实环境门禁 |
-| 第三阶段：Electron Preview | 约 80% | **No-Go** | 双模式架构、工作区锁、无签名 DMG 构建链路已形成，PR #6 尚未全绿并合入 |
+| 第一阶段：CLI Alpha | 约 90%–95% | **No-Go** | 主体代码完成；外部凭据、历史清理、干净机和真实模型门禁未完成 |
+| 第二阶段：WebUI Beta | 约 90% | **No-Go** | 核心功能与主要自动化门禁完成；迁移、共存和真实环境验收未完成 |
+| 第三阶段：Electron Preview | 约 85% | **No-Go** | 自动无签名 DMG 门禁已合入并全绿；发布并发缺陷与真实环境验收未完成 |
 
-**整体判断：**三阶段的主体工程已经完成大半，当前工作重心已从“继续堆功能”转为“关闭发布契约、CI、真实环境与外部安全门禁”。不能把代码完成度等同于可发布程度；当前三个阶段均仍是 **No-Go**。
+**整体判断：**项目已从主体功能开发进入发布收敛阶段。下一阶段不应继续扩张功能，而应关闭外部安全、发布事务、干净机、共存、迁移、故障恢复和真实用户验收门禁。三个阶段当前仍均为 **No-Go**。
 
 ---
 
 ## 3. 第一阶段：CLI Alpha
 
-### 3.1 已完成
+### 已完成
 
 - `DEEPAGENT_HOME` 产品目录隔离。
 - 安装、更新、回滚和清单驱动卸载主体实现。
@@ -46,100 +45,112 @@ PR #6 的 CI 状态会持续变化，新会话必须重新读取，不得把本�
 - CLI 主入口、`setup`、`doctor`、更新与卸载路径。
 - 开源治理、许可边界和官网安装入口的代码准备。
 
-### 3.2 未完成阻断项
+### 未完成阻断项
 
 1. 轮换对象存储、发布和服务凭据，并确认旧凭据失效。
 2. 在凭据轮换后清理 Git 历史中的有效秘密。
-3. 对全部 Git refs 重新执行密钥扫描并达到零有效秘密。
-4. 在干净 macOS 15.5 Apple Silicon 环境验证：安装、同版本覆盖、升级、故意失败升级、自动回滚、显式回滚、`--keep-data` 卸载和完全卸载。
+3. 对全部 Git refs 重新扫描并达到零有效秘密。
+4. 在干净 macOS 15.5 Apple Silicon 环境验证安装、覆盖、升级、故意失败升级、自动/显式回滚和两种卸载。
 5. 验证 Hermes 与用户 OpenCode 的命令、进程、配置和数据无非预期变化。
 6. 使用至少一个正式支持模型完成真实 Agent 任务。
 7. 发布门禁清零 P0/P1。
 
-### 3.3 阶段结论
-
-代码主体接近完成，但 P1-01、P1-02 和真实 VM/模型验收尚未完成，CLI Alpha 仍不得公开提升渠道。
+**阶段结论：**代码主体接近完成，但外部安全与真实环境门禁未完成，CLI Alpha 不得提升发布渠道。
 
 ---
 
 ## 4. 第二阶段：WebUI Beta
 
-### 4.1 已完成
+### 已完成
 
 - 一次性 Ticket 换取 HttpOnly Session Cookie 的本地认证链路。
 - 非法/失效 Ticket、重放、URL 清理和浏览器持久存储边界测试。
 - `deepagent webui start/open/status/stop` 生命周期主体。
 - 默认 loopback、本地数据目录和端口共存逻辑。
 - WebUI 与 CLI 共用 DeepAgent Runtime 的主路径。
-- WebUI Browser E2E 已在 PR #5 真实通过。
-- PR #6 当前 Head 的 `WebUI i18n Coverage` 已通过。
-- NPM 许可证审计和 Beta 发布 workflow 已建立。
+- Browser E2E 已真实通过。
+- 静态 i18n、WebUI 单元测试、构建和 NPM 许可证审计已通过。
 
-### 4.2 当前阻断项
+### 未完成阻断项
 
-- PR #6 当前 Head 的 Browser E2E 和 Electron DMG workflow 在本文快照时仍在运行，必须重新读取最终结论。
-- 仍需验证 Alpha → Beta 数据升级、失败回滚和干净机生命周期。
-- 仍需执行 CLI/WebUI/Hermes/OpenCode 共存的真实环境测试。
-- LAN/公网访问继续保持非 Beta 承诺，不应为赶进度扩大范围。
-- 官网和正式 Beta 渠道仍需发布级验证。
+- Alpha → Beta 数据升级、失败回滚和干净机生命周期。
+- CLI、WebUI、Hermes 和用户 OpenCode 的真实共存测试。
+- 官网及正式 Beta 渠道的发布级验证。
+- LAN/公网继续保持非 Beta 承诺，不扩大首版范围。
 
-### 4.3 阶段结论
-
-Browser E2E 的核心能力和静态 i18n 门禁已经建立；剩余工作主要是完整 CI、迁移、共存和真实环境门禁。WebUI Beta 代码层接近完成，但仍是 No-Go。
+**阶段结论：**核心自动化门禁已形成，剩余工作集中在迁移、共存与真实环境验收；WebUI Beta 仍是 No-Go。
 
 ---
 
 ## 5. 第三阶段：Electron Preview
 
-### 5.1 已完成
+### 已完成
 
 - DeepAgent / DeepCode 双模式架构和模式切换基础。
 - Main Process、子进程环境白名单和 Keychain 凭据边界。
-- `WorkspaceLockManager` 已修复为多读单写语义，旧交接文档中的“写+读未互斥”已过时。
+- `WorkspaceLockManager` 已修复为多读单写语义；旧交接中的“写+读未互斥”已过时。
 - Apple Silicon Electron 构建配置。
-- 当前明确采用**无签名、未公证 Preview DMG**，不伪装为 Stable。
-- DMG 内保留拖拽安装和可选 `Install DeepAgent.command`。
-- Desktop CLI 使用独立 `deepagent-desktop`，不覆盖第一阶段 `deepagent`。
-- PR #6 已把手动 DMG workflow 改造成 PR 自动验证 + 显式正式发布两种模式。
-- PR #6 已通过全 refs Gitleaks、版本契约、依赖安装和静态 i18n 门禁的阶段性验证。
+- 明确采用**无签名、未公证 Preview DMG**，不伪装为 Stable。
+- DMG 支持拖拽安装和可选 `Install DeepAgent.command`。
+- Desktop CLI 使用独立 `deepagent-desktop`，不覆盖 `deepagent`。
+- PR #6 已合入 `develop`，建立 PR 自动验证与显式正式发布两种 workflow 模式。
 
-### 5.2 PR #6 当前状态
+### 已通过的自动门禁
 
-- PR：#6，目标分支 `develop`；当前 Head 与新 `develop` 基线需重新计算 mergeability。
-- 当前 Head：`c4bbfb17bfa2b5b8611993b67e8cf36609996a26`。
-- PR 规模：23 commits，11 changed files。
-- WebUI i18n Coverage：成功。
-- Browser E2E：本文快照时正在执行。
-- Electron Preview DMG：本文快照时正在执行 WebUI 安装/测试链路。
-- 未解决 review：发布运行不应被新的运行取消；`cancel-in-progress` 应只用于 PR 验证，正式 `publish=true` 运行应串行且不可被取消。
+- 全 refs Gitleaks 扫描。
+- Preview 版本契约。
+- WebUI 依赖安装、单元测试、构建和许可证审计。
+- Electron Main Process 测试与构建。
+- Runtime 复用和无签名目标约束。
+- 无签名 Apple Silicon DMG 构建。
+- DMG、Bundle ID、版本、arm64、安装脚本和未签名状态验证。
+- Manifest、SHA-256 和 workflow artifact 生成。
+- Browser E2E。
+- 静态 i18n Coverage。
 
-### 5.3 合入后仍需完成
+### 已合入但尚未关闭的发布技术债务
 
-1. 下载 DMG workflow artifact，在干净 Apple Silicon Mac 安装并首次启动。
-2. 验证 Bundle ID、arm64、安装脚本、Gatekeeper 行为和卸载边界。
-3. 执行 Electron 多任务真实并发 E2E，验证同 Workspace 多读单写和崩溃后锁回收。
-4. 验证两个 Runtime 独立崩溃恢复、模式切换和后台任务持续运行。
-5. 完成真实用户 Preview 测试并清零 P0/P1。
-6. 创建 `preview.N` Tag 后，才允许显式运行 `workflow_dispatch(publish=true)`。
+`develop` 中 `.github/workflows/release-electron-preview.yml` 当前仍为：
 
-### 5.4 阶段结论
+```yaml
+concurrency:
+  group: electron-preview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
 
-Electron Preview 已从架构开发进入发布门禁阶段，但 PR #6 尚未全绿，干净机与真实并发测试尚未执行，因此仍是 No-Go。
+这会使新的正式发布运行有机会取消正在执行的 `workflow_dispatch + publish=true`。由于发布流程先公开 GitHub prerelease、再提升 R2 Preview channel，被中途取消可能造成两个公开渠道不一致。
+
+正确约束：
+
+- PR 验证可由同一 PR 的新提交取消；
+- 正式发布必须串行；
+- 正在执行的正式发布不可被后续运行取消；
+- 修复必须通过独立功能分支和 PR，并重新运行 Electron workflow。
+
+### 真实环境与发布阻断项
+
+- 下载 DMG artifact，在干净 Apple Silicon Mac 安装并首次启动。
+- 验证 Gatekeeper、安装、卸载和 CLI/Desktop 共存。
+- 执行 Electron 多任务并发、锁回收、双 Runtime 崩溃恢复和后台任务 E2E。
+- 完成真实用户 Preview 测试并清零 P0/P1。
+- 创建 `preview.N` Tag 后，才允许 `workflow_dispatch(publish=true)`。
+
+**阶段结论：**自动 DMG 门禁已合入并全绿，但发布事务技术债务和真实环境验收未完成，Electron Preview 仍是 No-Go。
 
 ---
 
 ## 6. 下一执行顺序
 
 ```text
-1. 重新读取 PR #6 最新 Head、CI、Artifacts 和 review threads
-2. 修复正式发布运行的 concurrency/cancel-in-progress 规则
-3. 等待 Browser E2E、i18n、Electron DMG 全部通过
-4. 解决 review thread，并处理 PR #6 与最新 develop 的同步/冲突
-5. squash 合入 develop
-6. 更新本文、10-ELECTRON-PREVIEW-STATUS.md 和交接文档
-7. 执行 CLI Alpha 外部凭据轮换与 Git 历史清理
-8. 执行干净 Mac 的 CLI/WebUI/Electron 生命周期和共存验收
-9. 执行 Electron 并发/故障 E2E 与真实用户 Preview
+1. 从最新 develop 创建功能分支，修复 Electron workflow 的 concurrency/cancel-in-progress
+2. 提 PR，重新确认 i18n、Browser E2E 和 Electron DMG 门禁全绿
+3. 解决 review 后合入 develop，并更新 10-ELECTRON-PREVIEW-STATUS.md
+4. 执行 CLI Alpha 凭据轮换和 Git 历史清理
+5. 对全部 refs 重新进行有效秘密扫描
+6. 执行干净 Mac 的 CLI/WebUI/Electron 生命周期与共存验收
+7. 执行 Electron 并发、锁回收、双 Runtime 故障恢复 E2E
+8. 完成真实模型任务与真实用户 Preview 测试
+9. 清零 P0/P1
 10. 满足各阶段 Go/No-Go 后再提升对应发布渠道
 ```
 
@@ -148,8 +159,8 @@ Electron Preview 已从架构开发进入发布门禁阶段，但 PR #6 尚未�
 ## 7. 禁止误判
 
 - 不得把“已写代码”写成“已通过发布门禁”。
-- 不得把 Browser E2E 通过写成整个 WebUI Beta 已发布。
+- 不得把 PR #6 自动门禁全绿写成 Electron Preview 已发布。
 - 不得把无签名 DMG 写成已签名、公证或 Stable。
+- 不得忽略已合入的发布并发技术债务。
 - 不得把旧交接文档中的工作区锁缺陷继续当作当前缺陷。
-- 不得因 PR 显示 mergeable 就绕过失败/运行中 CI 或未解决 review。
 - 不得依赖当前容器、旧工作区或未推送文件；GitHub 远程仓库是唯一事实源。
