@@ -23,8 +23,9 @@
 | Runtime 双路径 E2E | 6/6，通过 run `30383776537` |
 | Browser E2E | 最终 Head 通过 run `30383777443` |
 | Electron workflow | 最终 Head 通过 run `30383776723` |
-| review | 唯一 P2 actionable thread 已修复并解决；未解决 actionable thread 为 0 |
-| Remote release audit | run `30386154565`；artifact `8699022625`；digest `sha256:d2efe8b4b1969e0c2565d1ec3d7b03b0bd427f41559e2bc1320197ec8160cff3` |
+| Runtime review | 唯一 P2 actionable thread 已修复并解决；未解决 actionable thread 为 0 |
+| Remote release audit | reviewed run `30386865073`；artifact `8699299635`；digest `sha256:6c6b722661f6d25597ee53ef8057505495683df1e0ef2e5bd0fbd743b2492188` |
+| Audit review | P1 API status 契约与 P2 分页均已修复并解决；最终 Head 通过 |
 | Tag / Release | Tags 0；GitHub Releases 0，包括 Draft 和 Prerelease |
 | 当前 Actions | Active 0；默认分支与开放 PR 最新 Head 上失败类运行 0 |
 | 历史 Actions | 132 条历史或已被新 Head 取代的失败/取消记录；保留为审计证据 |
