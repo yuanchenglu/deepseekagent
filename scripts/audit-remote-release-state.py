@@ -10,12 +10,13 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 API_VERSION = "2022-11-28"
-USER_AGENT = "deepagent-remote-release-audit/1"
+USER_AGENT = "deepagent-remote-release-audit/2"
 CHANNELS = {
     "cli-alpha": "https://deepseekagent.starseas.org/releases/channels/alpha.json",
     "webui-beta": "https://deepseekagent.starseas.org/releases/channels/beta.json",
@@ -34,7 +35,7 @@ FAILURE_STATUSES = [
 ACTIVE_STATUSES = ["queued", "in_progress", "waiting", "requested", "pending"]
 
 
-def github_request(url: str, token: str) -> tuple[Any, dict[str, str]]:
+def github_request(url: str, token: str) -> Any:
     request = urllib.request.Request(
         url,
         headers={
@@ -45,53 +46,56 @@ def github_request(url: str, token: str) -> tuple[Any, dict[str, str]]:
         },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
-        body = json.loads(response.read().decode("utf-8"))
-        headers = {key.lower(): value for key, value in response.headers.items()}
-        return body, headers
+        return json.loads(response.read().decode("utf-8"))
 
 
-def paginate(endpoint: str, token: str) -> list[Any]:
+def paginate_list(endpoint: str, token: str) -> list[Any]:
     values: list[Any] = []
-    page = 1
-    while True:
+    for page in range(1, 101):
         separator = "&" if "?" in endpoint else "?"
-        body, _ = github_request(f"{endpoint}{separator}per_page=100&page={page}", token)
+        body = github_request(f"{endpoint}{separator}per_page=100&page={page}", token)
         if not isinstance(body, list):
             raise RuntimeError(f"Expected list response from {endpoint}")
         values.extend(body)
         if len(body) < 100:
             return values
-        page += 1
-        if page > 100:
-            raise RuntimeError(f"Pagination exceeded safety limit for {endpoint}")
+    raise RuntimeError(f"Pagination exceeded safety limit for {endpoint}")
+
+
+def run_record(run: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": int(run["id"]),
+        "name": run.get("name"),
+        "event": run.get("event"),
+        "status": run.get("status"),
+        "conclusion": run.get("conclusion"),
+        "head_branch": run.get("head_branch"),
+        "head_sha": run.get("head_sha"),
+        "run_number": run.get("run_number"),
+        "created_at": run.get("created_at"),
+        "updated_at": run.get("updated_at"),
+        "html_url": run.get("html_url"),
+    }
 
 
 def action_runs(api_base: str, token: str, statuses: list[str]) -> list[dict[str, Any]]:
     seen: set[int] = set()
     results: list[dict[str, Any]] = []
     for status in statuses:
-        encoded = urllib.parse.urlencode({"status": status, "per_page": 100})
-        body, _ = github_request(f"{api_base}/actions/runs?{encoded}", token)
-        for run in body.get("workflow_runs", []):
-            run_id = int(run["id"])
-            if run_id in seen:
-                continue
-            seen.add(run_id)
-            results.append(
-                {
-                    "id": run_id,
-                    "name": run.get("name"),
-                    "event": run.get("event"),
-                    "status": run.get("status"),
-                    "conclusion": run.get("conclusion"),
-                    "head_branch": run.get("head_branch"),
-                    "head_sha": run.get("head_sha"),
-                    "run_number": run.get("run_number"),
-                    "created_at": run.get("created_at"),
-                    "updated_at": run.get("updated_at"),
-                    "html_url": run.get("html_url"),
-                }
-            )
+        for page in range(1, 101):
+            encoded = urllib.parse.urlencode({"status": status, "per_page": 100, "page": page})
+            body = github_request(f"{api_base}/actions/runs?{encoded}", token)
+            values = body.get("workflow_runs", [])
+            for run in values:
+                run_id = int(run["id"])
+                if run_id in seen:
+                    continue
+                seen.add(run_id)
+                results.append(run_record(run))
+            if len(values) < 100:
+                break
+        else:
+            raise RuntimeError(f"Action run pagination exceeded safety limit for status={status}")
     return sorted(results, key=lambda item: item.get("updated_at") or "", reverse=True)
 
 
@@ -164,12 +168,35 @@ def release_record(release: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def append_runs(lines: list[str], title: str, values: list[dict[str, Any]]) -> None:
+    lines.extend(["", title, ""])
+    if not values:
+        lines.append("无。")
+        return
+    lines.extend(
+        [
+            "| Run | Workflow | Status | Conclusion | Event | Branch | Head | Updated |",
+            "|---:|---|---|---|---|---|---|---|",
+        ]
+    )
+    for item in values:
+        lines.append(
+            f"| {item['id']} | {item['name'] or ''} | {item['status'] or ''} | "
+            f"{item['conclusion'] or ''} | {item['event'] or ''} | {item['head_branch'] or ''} | "
+            f"`{(item['head_sha'] or '')[:12]}` | {item['updated_at'] or ''} |"
+        )
+
+
 def markdown(snapshot: dict[str, Any]) -> str:
-    tags = snapshot["github"]["tags"]
-    releases = snapshot["github"]["releases"]
-    active = snapshot["github"]["active_workflow_runs"]
-    failed = snapshot["github"]["failed_workflow_runs"]
+    github = snapshot["github"]
+    tags = github["tags"]
+    releases = github["releases"]
+    active = github["active_workflow_runs"]
+    actionable_failed = github["actionable_failed_workflow_runs"]
+    historical_failed = github["historical_failed_workflow_runs"]
     channels = snapshot["public_channels"]
+    historical_by_conclusion = Counter(item.get("conclusion") or "unknown" for item in historical_failed)
+    historical_by_branch = Counter(item.get("head_branch") or "<none>" for item in historical_failed)
 
     lines = [
         "# GitHub Tag、Release、Actions 与公开渠道远程审计",
@@ -179,12 +206,17 @@ def markdown(snapshot: dict[str, Any]) -> str:
         f"> 审计 Head：`{snapshot['head_sha']}`  ",
         "> 性质：只读审计；未创建、修改或删除 Tag、Release、Channel 或 Secret。",
         "",
-        "## 1. 摘要",
+        "## 1. 当前事实摘要",
         "",
+        f"- 默认分支：`{github['default_branch']}` @ `{github['default_branch_head']}`",
+        f"- 开放 PR：{len(github['open_pull_requests'])}",
         f"- Tags：{len(tags)}",
         f"- Releases：{len(releases)}",
-        f"- Active Actions（queued/in progress/waiting/requested/pending）：{len(active)}",
-        f"- Recent failed-class Actions：{len(failed)}",
+        f"- 当前 Active Actions（已排除本审计自身）：{len(active)}",
+        f"- 当前引用 Head 上的失败类 Actions：{len(actionable_failed)}",
+        f"- 历史/已被新 Head 取代的失败类 Actions：{len(historical_failed)}",
+        "",
+        "“当前引用 Head”包括默认分支最新 Head 和所有开放 PR 的最新 Head。旧 PR Commit、旧分支 Commit 或已被后续提交替代的失败运行保留为历史证据，不算当前阻塞。",
         "",
         "## 2. Tags",
         "",
@@ -206,23 +238,19 @@ def markdown(snapshot: dict[str, Any]) -> str:
                 f"{item['prerelease']} | {item['published_at'] or ''} | {len(item['assets'])} |"
             )
 
-    def append_runs(title: str, values: list[dict[str, Any]]) -> None:
-        lines.extend(["", title, ""])
-        if not values:
-            lines.append("无。")
-            return
-        lines.extend(["| Run | Workflow | Status | Conclusion | Event | Branch | Updated |", "|---:|---|---|---|---|---|---|"])
-        for item in values:
-            lines.append(
-                f"| {item['id']} | {item['name'] or ''} | {item['status'] or ''} | "
-                f"{item['conclusion'] or ''} | {item['event'] or ''} | {item['head_branch'] or ''} | "
-                f"{item['updated_at'] or ''} |"
-            )
+    append_runs(lines, "## 4. 当前 Active Actions", active)
+    append_runs(lines, "## 5. 当前引用 Head 上的失败类 Actions", actionable_failed)
 
-    append_runs("## 4. 当前 Active Actions", active)
-    append_runs("## 5. 失败类 Actions（API 当前可返回范围）", failed)
+    lines.extend(["", "## 6. 历史失败/取消 Actions 汇总", ""])
+    lines.append(f"完整扫描记录数：**{len(historical_failed)}**。完整逐条记录保存在同一 workflow artifact 的 `remote-release-audit.json`。")
+    lines.extend(["", "### 按 conclusion", "", "| Conclusion | 数量 |", "|---|---:|"])
+    for key, count in sorted(historical_by_conclusion.items(), key=lambda item: (-item[1], item[0])):
+        lines.append(f"| `{key}` | {count} |")
+    lines.extend(["", "### 按分支（前 20）", "", "| Branch | 数量 |", "|---|---:|"])
+    for key, count in historical_by_branch.most_common(20):
+        lines.append(f"| `{key}` | {count} |")
 
-    lines.extend(["", "## 6. 公开渠道", "", "| Channel | HTTP | JSON | SHA-256 |", "|---|---:|---|---|"])
+    lines.extend(["", "## 7. 公开渠道", "", "| Channel | HTTP | JSON | SHA-256 |", "|---|---:|---|---|"])
     for item in channels:
         json_state = "valid" if item["json"] is not None else (item["parse_error"] or "none")
         lines.append(
@@ -233,7 +261,7 @@ def markdown(snapshot: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## 7. 渠道内容（公开 JSON）",
+            "## 8. 渠道内容（公开 JSON）",
             "",
             "以下只记录公开端点返回的 JSON，不包含 GitHub Secret 或私密凭据。",
             "",
@@ -249,10 +277,11 @@ def markdown(snapshot: dict[str, Any]) -> str:
 
     lines.extend(
         [
-            "## 8. 判定纪律",
+            "## 9. 判定纪律",
             "",
             "- 本报告只证明观测时点的远程状态。",
             "- Draft Release、Prerelease、Tag 和公开 Channel 必须分别判断，不能相互替代。",
+            "- 历史失败运行不能覆盖同一 PR 最终 Head 的成功证据，也不能被删除来伪造成功。",
             "- 公开渠道 HTTP 200 也不证明安装、升级、回滚、签名、公证或用户验收通过。",
             "- 凭据 Owner Gate 未关闭前，不得执行历史重写或发布渠道提升。",
             "",
@@ -265,6 +294,7 @@ def main() -> int:
     repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     head_sha = os.environ.get("GITHUB_SHA", "").strip()
+    current_run_id = int(os.environ.get("GITHUB_RUN_ID", "0") or 0)
     output_dir = Path(os.environ.get("AUDIT_OUTPUT_DIR", "dist/remote-release-audit"))
     if not repository or "/" not in repository:
         print("GITHUB_REPOSITORY is required", file=sys.stderr)
@@ -274,16 +304,51 @@ def main() -> int:
         return 2
 
     api_base = f"https://api.github.com/repos/{repository}"
-    tags_raw = paginate(f"{api_base}/tags", token)
-    releases_raw = paginate(f"{api_base}/releases", token)
-    branches_raw = paginate(f"{api_base}/branches", token)
+    repo = github_request(api_base, token)
+    default_branch = repo["default_branch"]
+    default_branch_record = github_request(f"{api_base}/branches/{urllib.parse.quote(default_branch, safe='')}", token)
+    default_branch_head = default_branch_record["commit"]["sha"]
+    tags_raw = paginate_list(f"{api_base}/tags", token)
+    releases_raw = paginate_list(f"{api_base}/releases", token)
+    branches_raw = paginate_list(f"{api_base}/branches", token)
+    pulls_raw = paginate_list(f"{api_base}/pulls?state=open", token)
+
+    open_pull_requests = [
+        {
+            "number": item.get("number"),
+            "title": item.get("title"),
+            "head_branch": item.get("head", {}).get("ref"),
+            "head_sha": item.get("head", {}).get("sha"),
+            "base_branch": item.get("base", {}).get("ref"),
+            "draft": item.get("draft"),
+            "html_url": item.get("html_url"),
+        }
+        for item in pulls_raw
+    ]
+    current_reference_shas = {default_branch_head}
+    current_reference_shas.update(
+        item["head_sha"] for item in open_pull_requests if item.get("head_sha")
+    )
+
+    active_runs = [
+        item for item in action_runs(api_base, token, ACTIVE_STATUSES)
+        if item["id"] != current_run_id
+    ]
+    failed_runs = action_runs(api_base, token, FAILURE_STATUSES)
+    actionable_failed = [item for item in failed_runs if item.get("head_sha") in current_reference_shas]
+    historical_failed = [item for item in failed_runs if item.get("head_sha") not in current_reference_shas]
 
     snapshot = {
-        "schema_version": 1,
+        "schema_version": 2,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "repository": repository,
         "head_sha": head_sha,
+        "audit_run_id": current_run_id,
         "github": {
+            "default_branch": default_branch,
+            "default_branch_head": default_branch_head,
+            "open_pull_requests": open_pull_requests,
+            "current_reference_shas": sorted(current_reference_shas),
             "tags": [
                 {"name": item.get("name"), "commit_sha": item.get("commit", {}).get("sha")}
                 for item in tags_raw
@@ -297,8 +362,9 @@ def main() -> int:
                 }
                 for item in branches_raw
             ],
-            "active_workflow_runs": action_runs(api_base, token, ACTIVE_STATUSES),
-            "failed_workflow_runs": action_runs(api_base, token, FAILURE_STATUSES),
+            "active_workflow_runs": active_runs,
+            "actionable_failed_workflow_runs": actionable_failed,
+            "historical_failed_workflow_runs": historical_failed,
         },
         "public_channels": [fetch_channel(name, url) for name, url in CHANNELS.items()],
     }
@@ -307,9 +373,10 @@ def main() -> int:
     (output_dir / "remote-release-audit.json").write_text(
         json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    (output_dir / "remote-release-audit.md").write_text(markdown(snapshot) + "\n", encoding="utf-8")
-    print(markdown(snapshot))
-    return 0
+    report = markdown(snapshot) + "\n"
+    (output_dir / "remote-release-audit.md").write_text(report, encoding="utf-8")
+    print(report)
+    return 1 if active_runs or actionable_failed else 0
 
 
 if __name__ == "__main__":
