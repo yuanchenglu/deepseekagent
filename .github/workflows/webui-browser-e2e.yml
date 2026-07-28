@@ -39,10 +39,23 @@ jobs:
           fetch-depth: 0
 
       - name: Validate and apply atomic patch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
           PATCH="scripts/apply-runtime-task-pid-lifecycle.patch"
-          git apply --recount --check "$PATCH"
+          if ! git apply --recount --verbose --check "$PATCH" 2> scripts/runtime-task-patch-error.log; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -f scripts/runtime-task-patch-error.log
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(ci): capture Runtime PID patch failure"
+              git push origin "HEAD:${HEAD_REF}"
+            fi
+            cat scripts/runtime-task-patch-error.log >&2
+            exit 1
+          fi
+          rm -f scripts/runtime-task-patch-error.log
           git apply --recount "$PATCH"
           git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
           git rm "$PATCH"
