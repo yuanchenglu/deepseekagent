@@ -5,11 +5,11 @@
 > **唯一事实源**：GitHub 远程仓库 `yuanchenglu/deepseekagent`  
 > **开发分支**：`develop`  
 > **发布分支**：`master`  
-> **当前结论**：三阶段主体工程已基本成形，但 CLI Alpha、WebUI Beta、Electron Preview 均仍为 **No-Go**。当前进入真实并发、外部安全门禁、干净机和用户验收收口阶段。
+> **当前结论**：CLI Alpha、WebUI Beta、Electron Preview 均为 **No-Go**。主体工程已进入发布收敛后半程，当前只关闭真实并发、安全、干净机、共存和用户验收门禁，不扩张非必要功能。
 
 ---
 
-## 1. 计划目标与事实纪律
+## 1. 目标与事实纪律
 
 项目按三个阶段交付：
 
@@ -35,7 +35,7 @@
 - 真实环境验收已经完成；
 - 发布渠道已经开放。
 
-上述四种状态不得相互替代。
+上述状态不得相互替代。
 
 许可口径固定为：
 
@@ -43,26 +43,15 @@
 
 ---
 
-## 2. 当前远程基线
+## 2. 已确认远程基线
 
-截至 v2.7.0：
+以下为稳定合并基线，不代表永久最新 Head：
 
-- `develop`：`e0f2f407daa6f273ee4c927934efc2e3b27293a0`
-- `master`：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`
-- PR #17 最终 Head：`aba94fab7b36f9bd140752c455acdd4838bd3835`
-- PR #17 squash merge：`e0f2f407daa6f273ee4c927934efc2e3b27293a0`
-- 当前文档同步分支：`chatgpt/sync-plan-handoff-v2-7`
-
-关键已合入 PR：
-
-| PR | 关键产出 |
-|---|---|
-| #1 | 三阶段主体实现与 CLI/WebUI/Electron 基础 |
-| #3–#6 | Browser E2E、无签名 Electron Preview 自动构建和发布契约 |
-| #10 | Workspace Lock Renderer 所有权和销毁自动回收 |
-| #13 | PR 验证可取消、正式发布不可取消、发布事务串行排队 |
-| #15 | Main 权威 Runtime Task / Workspace Lease 协议和契约测试 |
-| #17 | 真实 Main/Runtime task、PID、heartbeat、退出、崩溃和重启恢复接入 |
+- PR #15：Main 权威 Runtime Task / Workspace Lease 协议和契约测试。
+- PR #17 最终 Head：`aba94fab7b36f9bd140752c455acdd4838bd3835`。
+- PR #17 squash merge：`e0f2f407daa6f273ee4c927934efc2e3b27293a0`。
+- PR #18 squash merge：`9e26f290c60544fc8a99cff8c31cecfbb8c99fd9`，同步 PLAN v2.7.0、状态和交接。
+- `master` 快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
 
 PR #17 已真实通过：
 
@@ -76,7 +65,9 @@ PR #17 已真实通过：
 - Bundle ID、版本、arm64、安装器、Manifest、SHA-256 和 artifact；
 - 所有 actionable review 已处理，未解决 review thread 为 0。
 
-PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Preview channel。
+Publish Job 在 PR 场景按预期跳过。未创建 Tag、Release 或公开 Preview channel。
+
+> 新会话必须实时读取 `develop`、`master`、开放 PR、Actions 和 review。文档不递归硬编码“永远最新”的 Head。
 
 ---
 
@@ -88,7 +79,7 @@ PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Pre
 | WebUI Beta | 约 90%–92% | **No-Go** | Browser E2E 和核心生命周期自动化完成；迁移、共存、正式渠道和外测未关闭 |
 | Electron Preview | 约 94%–95% | **No-Go** | 协议和真实 task/PID 生命周期完成；双 Runtime 真实并发、干净机、共存和用户验收未关闭 |
 
-**整体判断**：主体工程约九成以上，项目已进入发布收敛后半程。当前不扩张非必要功能，重点关闭真实并发、安全、迁移、共存、干净机和用户验收门禁。
+**整体判断**：主体工程约九成以上，项目处于发布收敛后半程。
 
 ---
 
@@ -103,19 +94,19 @@ PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Pre
 - Manifest、SHA-256、渠道指针和版本一致性契约。
 - 版本目录、原子切换、失败回滚和清单驱动卸载主体。
 - realpath 边界校验和未知文件保护。
-- CLI 命令入口、错误边界、开源治理和许可矩阵。
+- CLI 入口、错误边界、开源治理和许可矩阵。
 
 ## 5. 发布阻断项
 
 1. 轮换所有曾进入代码、配置、日志或 Git 历史的对象存储、发布和服务凭据。
 2. 确认旧凭据失效。
 3. 清理 Git 历史中的有效秘密，并重扫全部 refs。
-4. 在干净 Apple Silicon Mac 验证首次安装、覆盖、升级、故意失败升级、自动/显式回滚和两种卸载。
+4. 在干净 Apple Silicon Mac 验证首次安装、升级、故意失败升级、回滚和卸载。
 5. 验证 DeepAgent 对 Hermes 与用户 OpenCode 的命令、进程、配置和数据无非预期影响。
 6. 使用至少一个正式支持模型完成真实 Agent 任务。
 7. 清零 Alpha 发布范围内 P0/P1。
 
-**阶段出口**：以上条件全部满足后，才允许发布 CLI Alpha 并更新 Alpha 渠道。
+**阶段出口**：以上条件全部满足后，才允许发布 CLI Alpha。
 
 ---
 
@@ -129,7 +120,7 @@ PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Pre
 - Browser E2E 在 GitHub Actions 中真实通过。
 - WebUI 单元测试、构建、静态 i18n 和 NPM 许可证审计。
 - `deepagent webui start/open/status/stop` 生命周期主体。
-- 默认只监听 loopback，独立 PID、日志、端口和数据目录。
+- 默认 loopback，独立 PID、日志、端口和数据目录。
 - WebUI 与 CLI 共用 DeepAgent Runtime 主路径。
 - 无固定默认密码、无默认 LAN 暴露。
 
@@ -157,7 +148,6 @@ PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Pre
 - Renderer 不持有根 Secret。
 - 独立 `deepagent-desktop` 命令，不覆盖 CLI `deepagent`。
 - 无签名、未公证 Apple Silicon DMG 自动构建和验证。
-- Browser E2E、WebUI、Electron Main、许可证和 DMG 全链路门禁。
 
 ### 8.2 Workspace Lock 与 Renderer 所有权
 
@@ -170,7 +160,7 @@ PR 场景的 Publish Job 按预期跳过。未创建 Tag、Release 或公开 Pre
 
 ### 8.3 正式发布 concurrency
 
-PR #13 已关闭：
+PR #13 已完成：
 
 - 同一 PR 新提交取消旧验证；
 - PR 验证和正式发布使用不同 concurrency group；
@@ -197,21 +187,21 @@ PR #15 已完成：
 PR #17 已完成：
 
 1. Electron Main 实例化持久化、认证的 Runtime Task Supervisor。
-2. DeepAgent 与 DeepCode 使用固定 Runtime 身份，不能冒充对方。
-3. DeepAgent 任务绑定共享 Agent Bridge 的真实 PID。
+2. DeepAgent 与 DeepCode 使用固定 Runtime 身份。
+3. DeepAgent 任务绑定共享 Agent Bridge 真实 PID。
 4. DeepCode 每回合在 spawn 前获取写租约，并绑定实际子进程 PID。
 5. Runtime heartbeat 与 Main timeout 监督接入。
 6. 正常结束、取消、进程退出、Runtime crash 和 Main shutdown 驱动权威状态。
-7. Main 重启后先恢复为 orphaned，只有 PID 指纹验证成功并显式 resume 才重建 active 租约。
+7. Main 重启后先恢复为 orphaned，PID 指纹验证成功并显式 resume 后才重建 active。
 8. POSIX 使用进程启动时间和命令证据；Windows 使用 PowerShell/CIM 进程证据。
-9. 一个 Runtime 的 heartbeat 失效时，该 Runtime 的活跃任务统一 orphaned 并继续持锁。
+9. 一个 Runtime 的 heartbeat 失效时，该 Runtime 活跃任务统一 orphaned 并继续持锁。
 10. Supervisor Token 不传播给 Agent、npm、工具或 bridge 子进程。
-11. Supervisor 状态跟随 `webUiHome()`，不同 WebUI Home 相互隔离。
+11. Supervisor 状态跟随 `webUiHome()`。
 12. generation 历史只保留可复用 DeepAgent task，不累计一次性 DeepCode 回合。
 13. Main 重启后的 socket RPC 强制新连接，避免 stale keep-alive `EPIPE`。
-14. 非 Desktop WebUI 在未配置 Supervisor 时保持原有 no-op 兼容；Desktop 缺少 Supervisor 时失败关闭。
+14. 非 Desktop WebUI 未配置 Supervisor 时保持 no-op；Desktop 缺少 Supervisor 时失败关闭。
 
-> PR #17 完成的是“真实生命周期接入和监督器集成测试”，仍不等于两个真实 Runtime 在同一 Workspace 的端到端竞争已经验证。
+> PR #17 完成真实生命周期接入和监督器集成测试，但不等于两个真实 Runtime 在同一 Workspace 的端到端竞争已验证。
 
 ---
 
@@ -219,7 +209,7 @@ PR #17 已完成：
 
 ### 双 Runtime 同 Workspace 并发与故障 E2E
 
-必须在真实 DeepAgent / DeepCode Runtime 路径上验证：
+必须在真实 DeepAgent / DeepCode Runtime 路径验证：
 
 1. reader-reader 可以并行。
 2. reader-writer 双向互斥。
@@ -232,7 +222,7 @@ PR #17 已完成：
 9. DeepCode 子进程崩溃或 PID 重用时，Main 正确识别和清理。
 10. Main 重启后，存活 PID 可验证恢复；证据不足时保持 orphaned。
 11. 一个 Runtime 崩溃不能破坏另一个 Runtime、窗口或无冲突 Workspace。
-12. 测试必须保留远程可审计日志、状态快照和失败证据。
+12. 测试保留远程可审计日志、状态快照和失败证据。
 
 完成条件：
 
@@ -279,8 +269,6 @@ A. 双 Runtime 同 Workspace 并发与故障 E2E
 - 仓库全部使用 MIT；
 - 已完成凭据轮换、历史清理、干净机或真实用户验收。
 
-每篇对外内容应优先链接具体文档、PR 或仓库页面，不使用无法核验的完成度承诺。
-
 ---
 
 ## 12. 开发流程规范
@@ -307,14 +295,7 @@ Remote：`https://github.com/yuanchenglu/<项目名>.git`
 2. 按项目 `docs/` 目录下的计划文档执行任务。
 3. 确保 PR 标题和描述清晰说明变更内容。
 
-PR 描述至少包含：
-
-- 问题根因；
-- 技术方案；
-- 修改范围；
-- 测试结果；
-- 未验证内容；
-- 技术债务。
+PR 描述至少包含：问题根因、技术方案、修改范围、测试结果、未验证内容、技术债务。
 
 ### 12.3 第二优先：异常处理与直推
 
@@ -326,7 +307,7 @@ PR 描述至少包含：
 
 ### 12.4 直推 `develop` 的纪律
 
-直推 Commit 信息必须包含“问题原因”和“技术债务”段落：
+Commit 信息必须包含“问题原因”和“技术债务”段落：
 
 ```text
 <type>(<scope>): <变更说明>
@@ -356,7 +337,6 @@ CI 环境的 Playwright 依赖版本与本地不一致，E2E 测试在 CI 上无
 **方式 A：Commit 信息，推荐**
 
 - 在 Commit 的“技术债务”段落使用短横线列表记录。
-- 后续执行者根据 Commit 信息判断是否需要处理。
 
 **方式 B：项目文档**
 
@@ -376,7 +356,7 @@ CI 环境的 Playwright 依赖版本与本地不一致，E2E 测试在 CI 上无
 
 - 能走 PR 就走 PR，直推是兜底方案，不是默认方案。
 - 直推必须有交代：Commit 信息要说明为什么以及遗留了什么。
-- 技术债务不怕存在，怕无人知晓；必须留下可追踪记录。
+- 技术债务必须留下可追踪记录。
 - 会话结束前，所有关键代码、文档、补丁和诊断结论必须存在于 GitHub 远程。
 - 不得依赖旧容器、旧工作区或未推送文件继续工作。
 
