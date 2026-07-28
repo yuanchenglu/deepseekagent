@@ -61,6 +61,7 @@
 | 命令 | 作用 |
 |---|---|
 | `acquire` | 创建 pending 租约并尝试获取 Workspace 读写锁 |
+| `bind-process` | acquire 成功并创建进程后，一次性绑定 PID/进程树身份 |
 | `heartbeat` | 延长 active 租约 TTL；不得复活过期或 orphaned 租约 |
 | `release` | 正常结束任务并释放租约 |
 | `cancel` | 取消任务并释放租约 |
@@ -89,6 +90,7 @@ recovered
 
 ```text
 acquire accepted:   ∅ → pending → active
+bind process:       active → active(process bound)
 normal release:     active → releasing → released
 cancel:             active → releasing → released(cancelled)
 timeout:            active → expired
@@ -114,9 +116,10 @@ exit after crash:   orphaned → recovered(process-exit)
 2. `read + write` 双向互斥。
 3. `write + write` 互斥。
 4. `access` 在租约生命周期内不可升级或降级；需要不同访问级别时必须创建新 taskId。
-5. 同一 Runtime/taskId 只能对应一个 leaseId 和一个不可变身份。
-6. 只有 Main 协调器可以驱动权威状态转换。
-7. 返回给调用方的快照是副本，外部修改不能改变内部状态。
+5. 进程身份允许在 acquire 后通过 `bind-process` 设置一次；相同身份可幂等重放，不允许替换。
+6. 同一 Runtime/taskId 只能对应一个 leaseId 和一个不可变身份。
+7. 只有 Main 协调器可以驱动权威状态转换。
+8. 返回给调用方的快照是副本，外部修改不能改变内部状态。
 
 ## 7. 幂等与重放
 

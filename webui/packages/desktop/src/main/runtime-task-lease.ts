@@ -23,6 +23,7 @@ export type RuntimeTaskLeaseState =
 
 export type RuntimeTaskLeaseEventType =
   | 'acquire'
+  | 'bind-process'
   | 'heartbeat'
   | 'release'
   | 'cancel'
@@ -44,6 +45,7 @@ export type RuntimeTaskLeaseErrorCode =
 export type RuntimeTaskLeaseSuccessCode =
   | 'acquired'
   | 'already-acquired'
+  | 'process-bound'
   | 'heartbeat-accepted'
   | 'released'
   | 'cancelled'
@@ -96,6 +98,11 @@ interface TaskLeaseCommandBase extends CommandBase {
   leaseId: string
 }
 
+export interface BindProcessLeaseCommand extends TaskLeaseCommandBase {
+  type: 'bind-process'
+  process: RuntimeProcessIdentity
+}
+
 export interface HeartbeatLeaseCommand extends TaskLeaseCommandBase {
   type: 'heartbeat'
   ttlMs?: number
@@ -133,6 +140,7 @@ export interface RuntimeCrashLeaseCommand extends CommandBase {
 
 export type RuntimeTaskLeaseCommand =
   | AcquireLeaseCommand
+  | BindProcessLeaseCommand
   | HeartbeatLeaseCommand
   | ReleaseLeaseCommand
   | CancelLeaseCommand
@@ -180,6 +188,7 @@ export interface RuntimeTaskLeaseCoordinatorOptions {
 
 export type RuntimeScopedLeaseCommand =
   | Omit<AcquireLeaseCommand, 'identity'> & { identity: Omit<RuntimeTaskLeaseIdentity, 'runtime'> }
+  | Omit<BindProcessLeaseCommand, 'runtime'>
   | Omit<HeartbeatLeaseCommand, 'runtime'>
   | Omit<ReleaseLeaseCommand, 'runtime'>
   | Omit<CancelLeaseCommand, 'runtime'>
@@ -264,12 +273,12 @@ function sameProcess(left?: RuntimeProcessIdentity, right?: RuntimeProcessIdenti
   return left?.pid === right?.pid && left?.treeId === right?.treeId
 }
 
-function sameIdentity(left: RuntimeTaskLeaseIdentity, right: RuntimeTaskLeaseIdentity): boolean {
-  return left.runtime === right.runtime
-    && left.workspace === right.workspace
-    && left.taskId === right.taskId
-    && left.access === right.access
-    && sameProcess(left.process, right.process)
+function sameAcquireIdentity(existing: RuntimeTaskLeaseIdentity, requested: RuntimeTaskLeaseIdentity): boolean {
+  return existing.runtime === requested.runtime
+    && existing.workspace === requested.workspace
+    && existing.taskId === requested.taskId
+    && existing.access === requested.access
+    && (requested.process === undefined || sameProcess(existing.process, requested.process))
 }
 
 function taskKey(runtime: RuntimeKind, taskId: string): string {
@@ -343,7 +352,8 @@ function normalizeCommand(value: unknown): RuntimeTaskLeaseCommand | null {
     }
   }
   if (
-    type !== 'heartbeat'
+    type !== 'bind-process'
+    && type !== 'heartbeat'
     && type !== 'release'
     && type !== 'cancel'
     && type !== 'timeout'
@@ -359,6 +369,11 @@ function normalizeCommand(value: unknown): RuntimeTaskLeaseCommand | null {
     runtime: value.runtime,
     taskId: value.taskId,
     leaseId: value.leaseId,
+  }
+  if (type === 'bind-process') {
+    const process = normalizeProcess(value.process)
+    if (!process || (process.pid === undefined && process.treeId === undefined)) return null
+    return { ...base, type, process }
   }
   if (type === 'heartbeat') {
     if (value.ttlMs !== undefined && (!Number.isFinite(value.ttlMs) || (value.ttlMs as number) <= 0)) return null
@@ -466,6 +481,7 @@ export class RuntimeTaskLeaseCoordinator {
   private apply(command: RuntimeTaskLeaseCommand): RuntimeTaskLeaseResult {
     switch (command.type) {
       case 'acquire': return this.acquire(command)
+      case 'bind-process': return this.bindProcess(command)
       case 'heartbeat': return this.heartbeat(command)
       case 'release': return this.release(command)
       case 'cancel': return this.cancel(command)
@@ -489,7 +505,7 @@ export class RuntimeTaskLeaseCoordinator {
     const key = taskKey(command.identity.runtime, command.identity.taskId)
     const existing = this.leases.get(key)
     if (existing) {
-      if (!sameIdentity(existing.identity, command.identity)) {
+      if (!sameAcquireIdentity(existing.identity, command.identity)) {
         return this.error(command, 'owner-mismatch', 'taskId is already bound to a different lease identity', existing)
       }
       if (existing.state === 'active') {
@@ -506,9 +522,6 @@ export class RuntimeTaskLeaseCoordinator {
       revision: 0,
       createdAt: command.observedAt,
     }
-    this.leases.set(key, pending)
-    this.transition(command, pending, undefined, 'pending', 'acquired')
-
     const acquired = this.locks.acquire(
       pending.identity.workspace,
       pending.leaseId,
@@ -532,6 +545,9 @@ export class RuntimeTaskLeaseCoordinator {
       }
     }
 
+    this.leases.set(key, pending)
+    this.transition(command, pending, undefined, 'pending', 'acquired')
+
     const active: RuntimeTaskLeaseSnapshot = {
       ...pending,
       state: 'active',
@@ -543,6 +559,27 @@ export class RuntimeTaskLeaseCoordinator {
     this.leases.set(key, active)
     this.transition(command, active, 'pending', 'active', 'acquired')
     return this.success(command, 'acquired', active)
+  }
+
+  private bindProcess(command: BindProcessLeaseCommand): RuntimeTaskLeaseResult {
+    const lease = this.findTask(command)
+    if ('error' in lease) return lease.error
+    if (lease.state !== 'active') {
+      return this.error(command, 'invalid-state', `Process binding requires active, got ${lease.state}`, lease)
+    }
+    if (lease.identity.process) {
+      return sameProcess(lease.identity.process, command.process)
+        ? this.success(command, 'process-bound', lease)
+        : this.error(command, 'owner-mismatch', 'Lease is already bound to a different process', lease)
+    }
+    const updated: RuntimeTaskLeaseSnapshot = {
+      ...lease,
+      identity: { ...cloneIdentity(lease.identity), process: { ...command.process } },
+      revision: lease.revision + 1,
+    }
+    this.leases.set(taskKey(command.runtime, command.taskId), updated)
+    this.transition(command, updated, 'active', 'active', 'process-bound')
+    return this.success(command, 'process-bound', updated)
   }
 
   private heartbeat(command: HeartbeatLeaseCommand): RuntimeTaskLeaseResult {
