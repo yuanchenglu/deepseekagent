@@ -1,9 +1,8 @@
 name: Apply Global Agent Test Wait Patch
 
 on:
-  push:
-    branches:
-      - "chatgpt/dual-runtime-workspace-e2e"
+  pull_request:
+    branches: [develop]
     paths:
       - ".github/workflows/apply-global-agent-test-wait.yml"
       - "scripts/patch-global-agent-test-wait.py"
@@ -12,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-global-agent-test-wait-v2
+  group: apply-global-agent-test-wait-v3
   cancel-in-progress: true
 
 jobs:
@@ -25,24 +24,14 @@ jobs:
           ref: "chatgpt/dual-runtime-workspace-e2e"
           fetch-depth: 0
 
-      - name: Apply exact test and workflow patch
+      - name: Apply exact test patch
         run: python3 scripts/patch-global-agent-test-wait.py
 
-      - name: Remove one-shot patch machinery
-        run: git rm scripts/patch-global-agent-test-wait.py .github/workflows/apply-global-agent-test-wait.yml
-
-      - name: Commit deterministic test wait
+      - name: Commit deterministic test wait only
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add webui/tests/server/global-agent-server.test.ts .github/workflows/release-electron-preview.yml
+          git add webui/tests/server/global-agent-server.test.ts
           git commit -m "test(webui): await second MCU audio enqueue deterministically"
-          for attempt in 1 2 3; do
-            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
-              exit 0
-            fi
-            git fetch origin "${GITHUB_REF_NAME}"
-            git rebase "origin/${GITHUB_REF_NAME}"
-          done
-          exit 1
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
