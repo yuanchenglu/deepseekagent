@@ -20,9 +20,11 @@
 11. [11-RUNTIME-TASK-WORKSPACE-LEASE-PROTOCOL.md](./11-RUNTIME-TASK-WORKSPACE-LEASE-PROTOCOL.md) — Main 权威 Runtime Task / Workspace Lease 协议。
 12. [12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md](./12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md) — 双 Runtime 并发、故障和恢复的最终远程证据。
 13. [13-OWNER-CREDENTIAL-ROTATION-GATE.md](./13-OWNER-CREDENTIAL-ROTATION-GATE.md) — Owner 凭据轮换、旧凭据失效和脱敏证据清单。
-14. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
-15. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 唯一执行顺序和 Go/No-Go 规则。
-16. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接提示词。
+14. [14-REMOTE-RELEASE-STATE-AUDIT.md](./14-REMOTE-RELEASE-STATE-AUDIT.md) — GitHub Tags、Releases、Actions 和公开渠道的只读远程审计。
+15. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
+16. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 唯一执行顺序和 Go/No-Go 规则。
+17. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接提示词。
+18. [evidence/CREDENTIAL-ROTATION-TEMPLATE.md](./evidence/CREDENTIAL-ROTATION-TEMPLATE.md) — Owner Gate 脱敏证据模板。
 
 原 `07-OPEN-SOURCE-ITERATION-PLAN.md` 仅作历史审计记录，不再是执行依据。
 
@@ -32,16 +34,20 @@
 - PR #18：PLAN v2.7.0 和交接同步。
 - PR #19 Head：`26295dda9644df016353bd7fa9c5bac6b0f13c04`。
 - PR #19 squash merge：`f1f9457e0443db74e9aab9ceb0ea28405917db3a`。
+- PR #20：PLAN v2.8.0、状态、E2E 报告和 Owner Gate 同步。
+- PR #22：凭据轮换脱敏证据模板。
+- Remote release audit run `30386154565`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404。
 - `master` 历史快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
-- 最新 Head、开放 PR、Actions、Tag 和 Release 必须实时读取。
+- 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过 `14-REMOTE-RELEASE-STATE-AUDIT.md` 或等价实时审计重新确认。
 
 ## 当前唯一优先级
 
-双 Runtime E2E 已完成。当前唯一任务：
+双 Runtime E2E 和远程发布状态审计已完成。当前唯一任务：
 
 > **Owner Gate：轮换外部凭据并确认旧凭据失效**
 
-操作清单：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。
+操作清单：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。  
+证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。
 
 完成前不得启动 Git 历史重写或提升任何发布渠道。
 
@@ -51,7 +57,7 @@
 - WebUI Beta：No-Go
 - Electron Preview：No-Go
 
-未创建 Tag、Release 或公开 Preview channel。无签名 DMG 是候选 artifact，不是已发布产品。
+远程审计未发现 Tag 或 GitHub Release；Alpha、Beta、Core Stable、Electron Preview 和 Electron Stable 五个公开渠道均返回 HTTP 404。无签名 DMG 是候选 artifact，不是已发布产品。
 
 ## 决策原则
 
