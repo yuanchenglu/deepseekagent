@@ -1,0 +1,53 @@
+name: Remote Release State Audit
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/remote-release-state-audit.yml"
+      - "scripts/audit-remote-release-state.py"
+      - "docs/open-source-readiness/00-INDEX.md"
+      - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
+      - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
+      - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
+  push:
+    branches: [develop]
+    paths:
+      - ".github/workflows/remote-release-state-audit.yml"
+      - "scripts/audit-remote-release-state.py"
+      - "docs/open-source-readiness/00-INDEX.md"
+      - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
+      - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
+      - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: remote-release-state-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Tags, releases, Actions and public channels
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      AUDIT_OUTPUT_DIR: dist/remote-release-audit
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit remote release state without mutations
+        run: python3 scripts/audit-remote-release-state.py
+
+      - name: Upload redacted audit evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-release-state-audit
+          path: dist/remote-release-audit/
+          if-no-files-found: error
+          retention-days: 30
