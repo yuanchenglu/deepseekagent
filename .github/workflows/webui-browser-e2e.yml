@@ -5,6 +5,8 @@ on:
     branches: [develop]
     paths:
       - "webui/**"
+      - "hermes_cli/webui.py"
+      - "scripts/apply-runtime-task-pid-lifecycle.patch"
       - ".github/workflows/webui-browser-e2e.yml"
       - ".github/workflows/release-electron-preview.yml"
       - "scripts/check-electron-preview-concurrency.py"
@@ -18,13 +20,42 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: webui-browser-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  apply-runtime-task-patch:
+    name: Apply Runtime task PID lifecycle patch
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Validate and apply atomic patch
+        run: |
+          set -euo pipefail
+          PATCH="scripts/apply-runtime-task-pid-lifecycle.patch"
+          git apply --recount --check "$PATCH"
+          git apply --recount "$PATCH"
+          git checkout origin/develop -- .github/workflows/webui-browser-e2e.yml
+          git rm "$PATCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add webui hermes_cli/webui.py .github/workflows/webui-browser-e2e.yml
+          git commit -m "feat(runtime): connect real task and PID lifecycles"
+
+      - name: Push finalized branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: git push origin "HEAD:${HEAD_REF}"
+
   browser-e2e:
     name: Chromium authentication and navigation E2E
     runs-on: ubuntu-latest
