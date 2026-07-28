@@ -6,11 +6,15 @@ on:
     paths:
       - "webui/**"
       - ".github/workflows/webui-browser-e2e.yml"
+      - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
   push:
     branches: [develop]
     paths:
       - "webui/**"
       - ".github/workflows/webui-browser-e2e.yml"
+      - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
   workflow_dispatch:
 
 permissions:
