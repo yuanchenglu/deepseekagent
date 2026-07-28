@@ -1,0 +1,127 @@
+name: PR6 Exact Contract Migration
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/pr6-contract-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ github.head_ref == 'chatgpt/electron-preview-release-gate' && github.repository == 'yuanchenglu/deepseekagent' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/electron-preview-release-gate
+          fetch-depth: 0
+
+      - name: Apply exact brand and i18n contract fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str, expected: int) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count == 0 and new in text:
+                  print(f'already migrated: {path}: {new!r}')
+                  return
+              if count != expected:
+                  raise SystemExit(f'{path}: expected {expected} occurrences of {old!r}, found {count}')
+              file.write_text(text.replace(old, new), encoding='utf-8')
+              print(f'migrated {path}: {count} replacement(s)')
+
+          replace_exact(
+              'webui/packages/client/src/views/hermes/CodingAgentsView.vue',
+              "codingAgents.installFailedHermesHint",
+              "codingAgents.installFailedDeepAgentHint",
+              2,
+          )
+          replace_exact(
+              'webui/tests/client/app-store.test.ts',
+              "Failed to update Hermes Web UI:",
+              "Failed to update DeepAgent WebUI:",
+              1,
+          )
+          replace_exact(
+              'webui/tests/server/hermes-web-ui-mcp.test.ts',
+              "name: 'hermes-studio-mcp',",
+              "name: 'deepagent-webui-mcp',",
+              1,
+          )
+          replace_exact(
+              'webui/tests/server/hermes-web-ui-mcp.test.ts',
+              "`hermes-studio-mcp v${pkg.version}`",
+              "`deepagent-webui-mcp v${pkg.version}`",
+              1,
+          )
+          for suffix in ('initial', 'auth', 'electron'):
+              replace_exact(
+                  'webui/packages/client/src/data/changelog.ts',
+                  f'"sidebar.changelog.{suffix}"',
+                  f'"changelog.{suffix}"',
+                  1,
+              )
+
+          locale_specs = {
+              'en.ts': {
+                  'changelog': (
+                      "  changelog: {\n"
+                      "    initial: 'DeepAgent 0.9.0 initial open-source release preparation.',\n"
+                      "    auth: 'Added local seamless login tickets and HttpOnly sessions.',\n"
+                      "    electron: 'Added the DeepAgent and DeepCode dual-mode Electron Preview.',\n"
+                      "  },\n\n"
+                  ),
+                  'hint': "    installFailedDeepAgentHint: 'The installation did not complete. Check the DeepAgent logs and retry.',\n",
+              },
+              'zh.ts': {
+                  'changelog': (
+                      "  changelog: {\n"
+                      "    initial: 'DeepAgent 0.9.0 首个开源版本准备。',\n"
+                      "    auth: '新增本地无感登录 Ticket 与 HttpOnly Session。',\n"
+                      "    electron: '新增 DeepAgent 与 DeepCode 双模式 Electron Preview。',\n"
+                      "  },\n\n"
+                  ),
+                  'hint': "    installFailedDeepAgentHint: '安装未完成，请检查 DeepAgent 日志后重试。',\n",
+              },
+          }
+
+          for locale, additions in locale_specs.items():
+              path = Path('webui/packages/client/src/i18n/locales') / locale
+              text = path.read_text(encoding='utf-8')
+              if '  changelog: {' not in text:
+                  anchor = '  users: {'
+                  if text.count(anchor) != 1:
+                      raise SystemExit(f'{path}: users anchor mismatch')
+                  text = text.replace(anchor, additions['changelog'] + anchor, 1)
+              if 'installFailedDeepAgentHint:' not in text:
+                  anchor = '  codingAgents: {\n'
+                  if text.count(anchor) != 1:
+                      raise SystemExit(f'{path}: codingAgents anchor mismatch')
+                  text = text.replace(anchor, anchor + additions['hint'], 1)
+              path.write_text(text, encoding='utf-8')
+              print(f'updated locale: {path}')
+          PY
+
+      - name: Commit exact migration
+        run: |
+          if git diff --quiet; then
+            echo "No migration changes remain."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            webui/packages/client/src/views/hermes/CodingAgentsView.vue \
+            webui/packages/client/src/data/changelog.ts \
+            webui/packages/client/src/i18n/locales/en.ts \
+            webui/packages/client/src/i18n/locales/zh.ts \
+            webui/tests/client/app-store.test.ts \
+            webui/tests/server/hermes-web-ui-mcp.test.ts
+          git commit -m "test: align brand and i18n contracts"
+          git push origin HEAD:chatgpt/electron-preview-release-gate
