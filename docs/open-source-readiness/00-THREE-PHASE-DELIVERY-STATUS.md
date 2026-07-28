@@ -5,27 +5,26 @@
 > 远程仓库：`https://github.com/yuanchenglu/deepseekagent.git`  
 > 开发分支：`develop`  
 > 发布分支：`master`  
-> 说明：总执行顺序以 `三阶段执行计划PLAN.md` v2.7.0 为准；本文只记录真实完成情况、阻断项和远程证据。
+> 说明：总执行顺序以 `三阶段执行计划PLAN.md` v2.7.0 为准；本文只记录稳定的工程/计划合并基线、真实完成情况和阻断项。最新 Head、PR、CI 和 review 必须实时读取。
 
 ---
 
-## 1. 远程事实基线
+## 1. 已确认远程基线
 
-| 项目 | 当前事实 |
+| 项目 | 已确认事实 |
 |---|---|
-| develop Head | `e0f2f407daa6f273ee4c927934efc2e3b27293a0` |
-| master Head | `b3943ac43f0f0f6a1f86f5f2cb9a230527389d91` |
 | PR #15 | Runtime Task / Workspace Lease 协议已合入 |
 | PR #17 Head | `aba94fab7b36f9bd140752c455acdd4838bd3835` |
-| PR #17 merge | `e0f2f407daa6f273ee4c927934efc2e3b27293a0` |
+| PR #17 squash merge | `e0f2f407daa6f273ee4c927934efc2e3b27293a0` |
+| PR #18 squash merge | `9e26f290c60544fc8a99cff8c31cecfbb8c99fd9`，同步 PLAN v2.7.0、状态和交接 |
+| master 快照 | `b3943ac43f0f0f6a1f86f5f2cb9a230527389d91` |
 | Browser E2E | PR #17 最终 Head 真实成功 |
 | Electron workflow | concurrency、全 refs 密钥扫描、WebUI、许可证、Electron Main、DMG、Manifest、SHA-256、artifact 全部成功 |
 | review | PR #17 未解决 review thread 为 0 |
 | 发布动作 | Publish Job 在 PR 场景跳过；未创建 Tag、Release 或公开渠道 |
-| 文档同步 | 远程分支 `chatgpt/sync-plan-handoff-v2-7` |
-| 本地未推送关键工作 | 无；本次成果以 GitHub 远程为准 |
+| 本地未推送关键工作 | 无；关键代码和文档均存在 GitHub 远程 |
 
-新会话必须重新读取最新远程 Head、开放 PR、Actions 和 review，不得机械沿用本文 SHA。
+> 不在本文中把某个 SHA 描述为永久“当前 Head”。新会话必须重新读取 `develop`、`master`、开放 PR、Actions 和 review。
 
 ---
 
