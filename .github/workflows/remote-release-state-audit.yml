@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/remote-release-state-audit.yml"
       - "scripts/audit-remote-release-state.py"
+      - "tests/owner-gate/test_remote_release_audit.py"
       - "docs/open-source-readiness/00-INDEX.md"
       - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
       - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
@@ -15,6 +16,7 @@ on:
     paths:
       - ".github/workflows/remote-release-state-audit.yml"
       - "scripts/audit-remote-release-state.py"
+      - "tests/owner-gate/test_remote_release_audit.py"
       - "docs/open-source-readiness/00-INDEX.md"
       - "docs/open-source-readiness/00-THREE-PHASE-DELIVERY-STATUS.md"
       - "docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md"
@@ -39,6 +41,9 @@ jobs:
       AUDIT_OUTPUT_DIR: dist/remote-release-audit
     steps:
       - uses: actions/checkout@v4
+
+      - name: Test audit verdict supersession and active-run semantics
+        run: python3 -m unittest tests/owner-gate/test_remote_release_audit.py -v
 
       - name: Audit remote release state without mutations
         run: python3 scripts/audit-remote-release-state.py
