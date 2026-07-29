@@ -35,6 +35,8 @@ REQUIRED_TASK_FIELDS = {
     "status",
 }
 ID_PATTERN = re.compile(r"^[A-Z]+-[0-9]{3}$")
+EXPECTED_TASK_COUNT = 65
+EXPECTED_RUNBOOK = "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
 
 
 def fail(message: str) -> None:
@@ -63,12 +65,16 @@ def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
         fail("repository must be yuanchenglu/deepseekagent")
     if plan["default_branch"] != "develop" or plan["release_branch"] != "master":
         fail("branch policy must remain develop -> master")
+    if plan["authoritative_runbook"] != EXPECTED_RUNBOOK:
+        fail(f"authoritative_runbook must be {EXPECTED_RUNBOOK}")
     if set(plan["status_values"]) != VALID_STATUSES:
         fail("status_values does not match the allowed state machine")
 
     tasks = plan["tasks"]
     if not isinstance(tasks, list) or not tasks:
         fail("tasks must be a non-empty list")
+    if len(tasks) != EXPECTED_TASK_COUNT:
+        fail(f"expected {EXPECTED_TASK_COUNT} tasks, found {len(tasks)}")
 
     ids: list[str] = []
     orders: list[int] = []
@@ -147,16 +153,22 @@ def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
     return tasks
 
 
-def validate_docs(tasks: list[dict[str, Any]], runbook_path: Path, prompt_path: Path) -> None:
+def validate_docs(
+    tasks: list[dict[str, Any]],
+    runbook_path: Path,
+    catalog_path: Path,
+    prompt_path: Path,
+) -> None:
     try:
         runbook = runbook_path.read_text(encoding="utf-8")
+        catalog = catalog_path.read_text(encoding="utf-8")
         prompt = prompt_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         fail(f"missing documentation file: {exc.filename}")
 
-    missing_in_runbook = [task["id"] for task in tasks if task["id"] not in runbook]
-    if missing_in_runbook:
-        fail(f"runbook does not mention task IDs: {missing_in_runbook}")
+    missing_in_catalog = [task["id"] for task in tasks if task["id"] not in catalog]
+    if missing_in_catalog:
+        fail(f"acceptance catalog does not mention task IDs: {missing_in_catalog}")
 
     required_prompt_fragments = [
         "16-REMAINING-WORK-EXECUTION-RUNBOOK.md",
@@ -164,7 +176,7 @@ def validate_docs(tasks: list[dict[str, Any]], runbook_path: Path, prompt_path: 
         "BOOT-001",
         "AUTHORIZE HIST-006",
         "AUTHORIZE STABLE-PUBLISH",
-        "不得同时实施两个 Work ID",
+        "严禁同时实施两个 Work ID",
         "Tag 触发冲突",
     ]
     missing_fragments = [fragment for fragment in required_prompt_fragments if fragment not in prompt]
@@ -182,6 +194,19 @@ def validate_docs(tasks: list[dict[str, Any]], runbook_path: Path, prompt_path: 
         if required not in runbook:
             fail(f"runbook missing required section or safeguard: {required}")
 
+    for required in [
+        "剩余 65 个 Work ID",
+        "BOOT-001",
+        "SEC-007",
+        "HIST-006",
+        "CLI-013",
+        "WEB-011",
+        "DESK-011",
+        "STB-012",
+    ]:
+        if required not in catalog:
+            fail(f"acceptance catalog missing boundary or gate: {required}")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -196,6 +221,11 @@ def main() -> int:
         default=Path("docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"),
     )
     parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=Path("docs/open-source-readiness/18-WORK-ID-ACCEPTANCE-CATALOG.md"),
+    )
+    parser.add_argument(
         "--prompt",
         type=Path,
         default=Path("docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"),
@@ -205,7 +235,7 @@ def main() -> int:
     try:
         plan = load_json(args.plan)
         tasks = validate_graph(plan)
-        validate_docs(tasks, args.runbook, args.prompt)
+        validate_docs(tasks, args.runbook, args.catalog, args.prompt)
     except ValueError as exc:
         print(f"remaining-work validation failed: {exc}", file=sys.stderr)
         return 1
