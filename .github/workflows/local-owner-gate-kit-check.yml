@@ -10,6 +10,7 @@ on:
       - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
       - "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
       - "docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
+      - "docs/open-source-readiness/18-WORK-ID-ACCEPTANCE-CATALOG.md"
       - "docs/open-source-readiness/remaining-work-plan.json"
       - "docs/TECH_DEBT.md"
       - "docs/open-source-readiness/00-INDEX.md"
@@ -24,6 +25,7 @@ on:
       - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
       - "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
       - "docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
+      - "docs/open-source-readiness/18-WORK-ID-ACCEPTANCE-CATALOG.md"
       - "docs/open-source-readiness/remaining-work-plan.json"
       - "docs/TECH_DEBT.md"
       - "docs/open-source-readiness/00-INDEX.md"
@@ -52,5 +54,5 @@ jobs:
       - name: Run remaining-work validator unit tests
         run: python3 -m unittest tests/owner-gate/test_remaining_work_plan.py
 
-      - name: Validate task graph, dependencies, runbook and weak-AI prompt
+      - name: Validate task graph, dependencies, runbook, acceptance catalog and weak-AI prompt
         run: python3 scripts/validate_remaining_work_plan.py
