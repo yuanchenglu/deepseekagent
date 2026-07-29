@@ -21,10 +21,17 @@
 12. [12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md](./12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md) — 双 Runtime 并发、故障和恢复的最终远程证据。
 13. [13-OWNER-CREDENTIAL-ROTATION-GATE.md](./13-OWNER-CREDENTIAL-ROTATION-GATE.md) — Owner 凭据轮换、旧凭据失效和脱敏证据清单。
 14. [14-REMOTE-RELEASE-STATE-AUDIT.md](./14-REMOTE-RELEASE-STATE-AUDIT.md) — GitHub Tags、Releases、Actions 和公开渠道的只读远程审计。
-15. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
-16. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 唯一执行顺序和 Go/No-Go 规则。
-17. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接提示词。
-18. [evidence/CREDENTIAL-ROTATION-TEMPLATE.md](./evidence/CREDENTIAL-ROTATION-TEMPLATE.md) — Owner Gate 脱敏证据模板。
+15. [15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md](./15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md) — 交给具备本地 GitHub、Cloudflare、Apple、模型和干净 Mac 权限的 AI，一次性完成全部剩余 Plan。
+16. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
+17. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 唯一执行顺序和 Go/No-Go 规则。
+18. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接提示词。
+19. [evidence/CREDENTIAL-ROTATION-TEMPLATE.md](./evidence/CREDENTIAL-ROTATION-TEMPLATE.md) — Owner Gate 脱敏证据模板。
+
+本地工具：
+
+- `scripts/owner-gate/verify-r2-credential-rotation.sh` — 新凭据隔离读写验证和旧凭据只读拒绝验证；
+- `scripts/owner-gate/audit-all-git-refs.sh` — mirror clone + 全 refs 非破坏性 gitleaks 扫描；
+- `tests/owner-gate/test-owner-gate-kit.sh` — 脚本语法、帮助和 Secret 不泄漏烟测。
 
 原 `07-OPEN-SOURCE-ITERATION-PLAN.md` 仅作历史审计记录，不再是执行依据。
 
@@ -36,6 +43,8 @@
 - PR #19 squash merge：`f1f9457e0443db74e9aab9ceb0ea28405917db3a`。
 - PR #20：PLAN v2.8.0、状态、E2E 报告和 Owner Gate 同步。
 - PR #22：凭据轮换脱敏证据模板。
+- PR #23：只读远程发布状态审计工具与静态报告。
+- PR #24：记录 PR #23 合并并再次验证审计 Workflow。
 - Remote release audit run `30386865073`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404；artifact `8699299635`。
 - `master` 历史快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
 - 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过 `14-REMOTE-RELEASE-STATE-AUDIT.md` 或等价实时审计重新确认。
@@ -47,7 +56,8 @@
 > **Owner Gate：轮换外部凭据并确认旧凭据失效**
 
 操作清单：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。  
-证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。
+证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。  
+本地高权限执行入口：`15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`。
 
 完成前不得启动 Git 历史重写或提升任何发布渠道。
 
