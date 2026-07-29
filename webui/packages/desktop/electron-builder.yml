@@ -30,6 +30,7 @@ extraResources:
     filter:
       - "icon.png"
       - "trayTemplate.png"
+      - "post-install.sh"
 
 asarUnpack:
   - "**/*.node"
@@ -39,7 +40,24 @@ mac:
     - target: dmg
       arch: [arm64]
   category: public.app-category.developer-tools
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  notarize: true
+  # Preview builds are intentionally unsigned until an Apple Developer account
+  # is available. Explicitly disable identity discovery so local certificates
+  # cannot make otherwise identical builds differ.
+  identity: null
   artifactName: "DeepAgent-${version}-${arch}.${ext}"
+
+dmg:
+  title: "DeepAgent ${version}"
+  contents:
+    - x: 100
+      y: 200
+      type: file
+    - x: 270
+      y: 200
+      type: file
+      path: "build/post-install.sh"
+      name: "Install DeepAgent.command"
+    - x: 440
+      y: 200
+      type: link
+      path: /Applications

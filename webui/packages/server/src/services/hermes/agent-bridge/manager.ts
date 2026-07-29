@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'path'
 import { logger } from '../../logger'
 import { detectHermesHome, getHermesBin } from '../hermes-path'
 import { AgentBridgeClient, DEFAULT_AGENT_BRIDGE_ENDPOINT } from './client'
+import { stripRuntimeTaskSupervisorEnvironment } from '../../runtime-task-supervisor-client'
 
 const DEFAULT_AGENT_BRIDGE_STARTUP_TIMEOUT_MS = 120000
 const DEFAULT_AGENT_BRIDGE_RESTART_DELAY_MS = 1000
@@ -88,7 +89,7 @@ function isLegacyGlobalDefaultEndpoint(endpoint: string): boolean {
 }
 
 export function buildAgentBridgeProcessEnv(endpoint: string, hermesHome: string | undefined, agentRoot: string | undefined): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
+  const env: NodeJS.ProcessEnv = stripRuntimeTaskSupervisorEnvironment({
     ...process.env,
     HERMES_AGENT_BRIDGE_ENDPOINT: endpoint,
     HERMES_HOME: hermesHome,
@@ -96,7 +97,7 @@ export function buildAgentBridgeProcessEnv(endpoint: string, hermesHome: string 
     HERMES_OPENROUTER_APP_TITLE: process.env.HERMES_OPENROUTER_APP_TITLE || OPENROUTER_WEB_UI_ATTRIBUTION_ENV.HERMES_OPENROUTER_APP_TITLE,
     HERMES_OPENROUTER_APP_CATEGORIES: process.env.HERMES_OPENROUTER_APP_CATEGORIES || OPENROUTER_WEB_UI_ATTRIBUTION_ENV.HERMES_OPENROUTER_APP_CATEGORIES,
     ...(agentRoot ? { HERMES_AGENT_ROOT: agentRoot } : {}),
-  }
+  })
   delete env.ANTHROPIC_AUTH_TOKEN
   return env
 }
@@ -290,6 +291,45 @@ function classifyEndpointKind(endpoint: string): AgentBridgeEndpointKind {
   if (endpoint.startsWith('ipc://')) return 'ipc'
   if (endpoint.startsWith('tcp://')) return 'tcp'
   return 'unknown'
+}
+
+function endpointProcessPid(endpoint: string): number | null {
+  if (process.platform === 'win32') return null
+  let output = ''
+  try {
+    if (endpoint.startsWith('ipc://')) {
+      output = execFileSync('lsof', ['-t', '-U', '--', endpoint.slice('ipc://'.length)], {
+        encoding: 'utf8',
+        timeout: 5_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    } else if (endpoint.startsWith('tcp://')) {
+      const port = Number(new URL(endpoint).port)
+      if (!Number.isSafeInteger(port) || port <= 0) return null
+      output = execFileSync('lsof', [`-tiTCP:${port}`, '-sTCP:LISTEN'], {
+        encoding: 'utf8',
+        timeout: 5_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    } else {
+      return null
+    }
+  } catch {
+    return null
+  }
+  for (const line of output.split(/\r?\n/)) {
+    const pid = Number(line.trim())
+    if (!Number.isSafeInteger(pid) || pid <= 0) continue
+    try {
+      const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+        encoding: 'utf8',
+        timeout: 5_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+      if (command.includes('hermes_bridge.py') && command.includes(endpoint)) return pid
+    } catch {}
+  }
+  return null
 }
 
 function normalizeReadinessError(endpoint: string, err: unknown): string {
@@ -514,6 +554,13 @@ export class AgentBridgeManager {
       restartScheduled: !!this.restartTimer,
       restartAttempts: this.restartAttempts,
     }
+  }
+
+  getTaskProcessPid(): number | null {
+    const childPid = this.child?.pid
+    if (childPid && this.child?.exitCode == null && this.child?.signalCode == null) return childPid
+    if (!this.ready && !this.attached) return null
+    return endpointProcessPid(this.endpoint)
   }
 
   private transientReadiness(status: AgentBridgeReadinessStatus, error?: string): AgentBridgeReadiness {

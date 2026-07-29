@@ -229,7 +229,7 @@ describe('coding agent Windows process launch', () => {
     ;(manager as any).sessionIndex.clear()
   })
 
-  it('emits a readable failed run when a hidden Claude Code process cannot start', () => {
+  it('emits a readable failed run when a hidden Claude Code process cannot start', async () => {
     const manager = new CodingAgentRunManager()
     const emitted: Array<{ event: string; payload: any }> = []
     ;(manager as any).ensureDbSession = () => {}
@@ -256,15 +256,17 @@ describe('coding agent Windows process launch', () => {
       state: { messages: [], isWorking: false, events: [], queue: [] },
     })
 
-    manager.send('chat-session-error-1', 'test')
+    await manager.send('chat-session-error-1', 'test')
     testState.spawnCalls[0].child.emit('error', Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' }))
 
-    expect(emitted).toContainEqual(expect.objectContaining({
-      event: 'run.failed',
-      payload: expect.objectContaining({
-        error: 'spawn claude ENOENT',
-      }),
-    }))
+    await vi.waitFor(() => {
+      expect(emitted).toContainEqual(expect.objectContaining({
+        event: 'run.failed',
+        payload: expect.objectContaining({
+          error: 'spawn claude ENOENT',
+        }),
+      }))
+    })
 
     const run = (manager as any).runs.get('agent-session-error-1')
     if (run?.idleTimer) clearTimeout(run.idleTimer)
@@ -272,7 +274,7 @@ describe('coding agent Windows process launch', () => {
     ;(manager as any).sessionIndex.clear()
   })
 
-  it('includes decoded stderr detail when a hidden Codex process exits non-zero', () => {
+  it('includes decoded stderr detail when a hidden Codex process exits non-zero', async () => {
     const manager = new CodingAgentRunManager()
     const emitted: Array<{ event: string; payload: any }> = []
     ;(manager as any).ensureDbSession = () => {}
@@ -299,16 +301,18 @@ describe('coding agent Windows process launch', () => {
       state: { messages: [], isWorking: false, events: [], queue: [] },
     })
 
-    manager.send('chat-session-codex-error-1', 'test')
+    await manager.send('chat-session-codex-error-1', 'test')
     testState.spawnCalls[0].child.stderr.emit('data', Buffer.from([0xb2, 0xbb, 0xca, 0xc7]))
     testState.spawnCalls[0].child.emit('exit', 1)
 
-    expect(emitted).toContainEqual(expect.objectContaining({
-      event: 'run.failed',
-      payload: expect.objectContaining({
-        error: 'Codex exited with code 1: 不是',
-      }),
-    }))
+    await vi.waitFor(() => {
+      expect(emitted).toContainEqual(expect.objectContaining({
+        event: 'run.failed',
+        payload: expect.objectContaining({
+          error: 'Codex exited with code 1: 不是',
+        }),
+      }))
+    })
 
     const run = (manager as any).runs.get('agent-session-codex-error-1')
     if (run?.idleTimer) clearTimeout(run.idleTimer)

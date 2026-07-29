@@ -387,14 +387,14 @@ async function handleInstall(id: CodingAgentId) {
     } else {
       const errorMessage = codingAgentMessage(result.code, result.message, 'codingAgents.installFailed')
       message.error(errorMessage)
-      installFailureHints.value[id] = t('codingAgents.installFailedHermesHint')
+      installFailureHints.value[id] = t('codingAgents.installFailedDeepAgentHint')
       installFailureDetails.value[id] = errorMessage
     }
   } catch (err: any) {
     const payload = parseErrorPayload(err)
     const errorMessage = codingAgentMessage(payload?.code, payload?.message || err?.message, 'codingAgents.installFailed')
     message.error(errorMessage)
-    installFailureHints.value[id] = t('codingAgents.installFailedHermesHint')
+    installFailureHints.value[id] = t('codingAgents.installFailedDeepAgentHint')
     installFailureDetails.value[id] = errorMessage
   } finally {
     installing.value[id] = false

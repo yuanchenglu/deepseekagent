@@ -2337,6 +2337,9 @@ export default {
 
   // 更新日志
   changelog: {
+    auth: '新增本地无感登录 Ticket 与 HttpOnly Session。',
+    initial: 'DeepAgent 0.9.0 首个开源版本准备。',
+    electron: '新增 DeepAgent 与 DeepCode 双模式 Electron Preview。',
     new_0_6_22_1: '本次版本整理 0.6.21 之后合并的 PR，重点更新组合模型、会话历史、代理设置、斜杠命令和移动端布局细节',
     new_0_6_22_2: '模型页面新增组合模型面板，聊天中可以展示真实的 MoA reference 与 aggregator 进度，不再依赖旧的前端占位工具',
     new_0_6_22_3: '聊天会话支持从会话列表归档，并可在历史记录中恢复；本地-only 的 Claude Code 和 Codex 会话也会正确出现在历史记录中',
