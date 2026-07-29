@@ -21,9 +21,10 @@
 
 - 弱 AI 默认复制提示词：`open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md`；
 - 逐项执行手册：`open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md`；
+- 65 项逐项验收目录：`open-source-readiness/18-WORK-ID-ACCEPTANCE-CATALOG.md`；
 - 机器可读依赖图：`open-source-readiness/remaining-work-plan.json`；
 - 高权限背景提示词：`open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`；
-- R2 新旧凭据验证：`../scripts/owner-gate/verify-r2-credential-rotation.sh`；
+- R2 分阶段验证：`../scripts/owner-gate/verify-r2-credential-rotation.sh --new-only|--old-denial-only`；
 - Git 全 refs 非破坏性扫描：`../scripts/owner-gate/audit-all-git-refs.sh`；
 - 任务图 validator：`../scripts/validate_remaining_work_plan.py`；
 - 自动测试：`../tests/owner-gate/test-owner-gate-kit.sh` 和 `../tests/owner-gate/test_remaining_work_plan.py`；
@@ -43,7 +44,7 @@
 | 2026-07-29 | Tag、Release、Actions 和五个公开渠道缺少可重复远程审计 | PR #23；只读审计 workflow 和 artifact | CLOSED |
 | 2026-07-29 | 本地高权限环境缺少统一安全执行提示词和验证工具 | PR #25 merge `f05077ec72b421a299617754120ad94833f5f363` | CLOSED |
 | 2026-07-29 | 远程发布审计与并发 Check 自锁、旧失败永久阻断 | PR #26 merge `fd75b2864cdd0cafb406ea5e7d137f8691c78849`；8/8 单测 | CLOSED |
-| 2026-07-29 | 剩余计划过度依赖执行 AI 自己判断，容易跳步或误发布 | 固定 Work ID、依赖 JSON、逐项 Runbook、弱 AI 提示词和 CI validator；本 PR 最终证据为准 | IMPLEMENTED / PENDING MERGE |
+| 2026-07-29 | 剩余计划过度依赖执行 AI 自己判断，容易跳步、状态卡死或误发布 | PR #28 merge `9c8ff198e547bc11b849cd7a7415a8b2138b3ee9`；65 Work IDs；17/17 单测；runs `30420533971` / `30420534026`；3 个 P1 resolved | CLOSED |
 
 ## 记录纪律
 
@@ -51,4 +52,5 @@
 - 每项必须有远程证据和明确依赖。
 - 代码完成不能替代真实环境或发布 Gate。
 - 一个 Work ID 未 PASSED，后继任务必须保持 LOCKED。
+- 当前状态只能形成一个执行前沿；不得同时解锁多个任务。
 - 本地 AI 完成每项后必须把脱敏证据、JSON 状态、Plan、状态和交接重新推回 GitHub。
