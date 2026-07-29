@@ -5,8 +5,12 @@ on:
     branches: [develop]
     paths:
       - "scripts/owner-gate/**"
+      - "scripts/validate_remaining_work_plan.py"
       - "tests/owner-gate/**"
       - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
+      - "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
+      - "docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
+      - "docs/open-source-readiness/remaining-work-plan.json"
       - "docs/TECH_DEBT.md"
       - "docs/open-source-readiness/00-INDEX.md"
       - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
@@ -15,8 +19,12 @@ on:
     branches: [develop]
     paths:
       - "scripts/owner-gate/**"
+      - "scripts/validate_remaining_work_plan.py"
       - "tests/owner-gate/**"
       - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
+      - "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
+      - "docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
+      - "docs/open-source-readiness/remaining-work-plan.json"
       - "docs/TECH_DEBT.md"
       - "docs/open-source-readiness/00-INDEX.md"
       - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
@@ -32,11 +40,17 @@ concurrency:
 
 jobs:
   validate:
-    name: Syntax, help and no-secret evidence smoke test
+    name: Security helpers and deterministic remaining-work plan
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate scripts and redaction behavior
+      - name: Validate credential helpers and redaction behavior
         run: bash tests/owner-gate/test-owner-gate-kit.sh
+
+      - name: Run remaining-work validator unit tests
+        run: python3 -m unittest tests/owner-gate/test_remaining_work_plan.py
+
+      - name: Validate task graph, dependencies, runbook and weak-AI prompt
+        run: python3 scripts/validate_remaining_work_plan.py
