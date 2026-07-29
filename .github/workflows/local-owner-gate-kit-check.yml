@@ -1,0 +1,42 @@
+name: Local Owner Gate Execution Kit
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - "scripts/owner-gate/**"
+      - "tests/owner-gate/**"
+      - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
+      - "docs/TECH_DEBT.md"
+      - "docs/open-source-readiness/00-INDEX.md"
+      - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
+      - ".github/workflows/local-owner-gate-kit-check.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "scripts/owner-gate/**"
+      - "tests/owner-gate/**"
+      - "docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md"
+      - "docs/TECH_DEBT.md"
+      - "docs/open-source-readiness/00-INDEX.md"
+      - "docs/open-source-readiness/HANDOFF_2026-07-28.md"
+      - ".github/workflows/local-owner-gate-kit-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-owner-gate-kit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Syntax, help and no-secret evidence smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scripts and redaction behavior
+        run: bash tests/owner-gate/test-owner-gate-kit.sh
