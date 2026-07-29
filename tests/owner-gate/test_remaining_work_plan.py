@@ -20,6 +20,15 @@ CATALOG_PATH = ROOT / "docs" / "open-source-readiness" / "18-WORK-ID-ACCEPTANCE-
 PROMPT_PATH = ROOT / "docs" / "open-source-readiness" / "17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
 
 
+def evidence(number: int = 101) -> dict[str, object]:
+    return {
+        "evidence_file": f"docs/open-source-readiness/evidence/BOOT-001-2026-07-{number % 30 + 1:02d}.md",
+        "pr_number": number,
+        "final_head_sha": "a" * 40,
+        "merge_sha": "b" * 40,
+    }
+
+
 class RemainingWorkPlanTests(unittest.TestCase):
     def setUp(self) -> None:
         self.plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
@@ -30,6 +39,71 @@ class RemainingWorkPlanTests(unittest.TestCase):
         self.assertEqual(len(tasks), 65)
         self.assertEqual(tasks[0]["id"], "BOOT-001")
         self.assertEqual(tasks[-1]["id"], "STB-012")
+
+    def test_valid_ready_progression_is_accepted(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        plan["tasks"][0]["status"] = "PASSED"
+        plan["tasks"][0]["evidence"] = evidence()
+        plan["tasks"][1]["status"] = "READY"
+        MODULE.validate_graph(plan)
+
+    def test_valid_in_progress_frontier_is_accepted(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        plan["tasks"][0]["status"] = "IN_PROGRESS"
+        plan["tasks"][0]["execution"] = {
+            "branch": "work/boot-001-remote-audit",
+            "started_at": "2026-07-29T04:00:00Z",
+        }
+        MODULE.validate_graph(plan)
+
+    def test_valid_blocked_frontier_is_accepted(self) -> None:
+        plan = copy.deepcopy(self.plan)
+        plan["tasks"][0]["status"] = "BLOCKED"
+        plan["tasks"][0]["blocker"] = {
+            "reason": "GitHub authentication unavailable",
+            "required_input": "Repository read access",
+            "owner_action": "Reconnect the GitHub integration",
+        }
+        MODULE.validate_graph(plan)
+
+    def test_passed_without_evidence_is_rejected(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"][0]["status"] = "PASSED"
+        invalid["tasks"][1]["status"] = "READY"
+        with self.assertRaisesRegex(ValueError, "PASSED requires object field evidence"):
+            MODULE.validate_graph(invalid)
+
+    def test_in_progress_without_execution_metadata_is_rejected(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"][0]["status"] = "IN_PROGRESS"
+        with self.assertRaisesRegex(ValueError, "requires object field execution"):
+            MODULE.validate_graph(invalid)
+
+    def test_blocked_without_blocker_metadata_is_rejected(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"][0]["status"] = "BLOCKED"
+        with self.assertRaisesRegex(ValueError, "requires object field blocker"):
+            MODULE.validate_graph(invalid)
+
+    def test_second_task_cannot_unlock_before_frontier_completes(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"][1]["status"] = "READY"
+        with self.assertRaises(ValueError):
+            MODULE.validate_graph(invalid)
+
+    def test_task_after_frontier_must_remain_locked(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"][0]["status"] = "PASSED"
+        invalid["tasks"][0]["evidence"] = evidence()
+        invalid["tasks"][1]["status"] = "READY"
+        invalid["tasks"][2]["status"] = "BLOCKED"
+        invalid["tasks"][2]["blocker"] = {
+            "reason": "test",
+            "required_input": "test",
+            "owner_action": "test",
+        }
+        with self.assertRaisesRegex(ValueError, "task after frontier must remain LOCKED"):
+            MODULE.validate_graph(invalid)
 
     def test_wrong_task_count_is_rejected(self) -> None:
         invalid = copy.deepcopy(self.plan)
@@ -66,18 +140,6 @@ class RemainingWorkPlanTests(unittest.TestCase):
         task = next(item for item in invalid["tasks"] if item["id"] == "HIST-006")
         task["authorization_required"] = False
         with self.assertRaisesRegex(ValueError, "irreversible task must require authorization"):
-            MODULE.validate_graph(invalid)
-
-    def test_only_boot_001_may_start_ready(self) -> None:
-        invalid = copy.deepcopy(self.plan)
-        invalid["tasks"][1]["status"] = "READY"
-        with self.assertRaisesRegex(ValueError, "only BOOT-001 READY"):
-            MODULE.validate_graph(invalid)
-
-    def test_preclaimed_pass_is_rejected(self) -> None:
-        invalid = copy.deepcopy(self.plan)
-        invalid["tasks"][0]["status"] = "PASSED"
-        with self.assertRaises(ValueError):
             MODULE.validate_graph(invalid)
 
     def test_missing_task_reference_in_catalog_is_rejected(self) -> None:
