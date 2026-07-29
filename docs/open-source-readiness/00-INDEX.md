@@ -3,7 +3,8 @@
 > 分支：`develop`  
 > 状态：三阶段执行基线  
 > 当前计划：`三阶段执行计划PLAN.md` v2.8.0  
-> 目标：先交付 CLI Alpha，再交付 WebUI Beta，最终交付 DeepAgent / DeepCode 双模式 Electron Preview。
+> 剩余工作执行规范：机器可读任务图 + 确定性 Runbook  
+> 目标：先交付 CLI Alpha，再交付 WebUI Beta，再交付 Electron Preview，最终完成签名、公证和 Stable 闭环。
 
 ## 文档目录
 
@@ -21,17 +22,41 @@
 12. [12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md](./12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md) — 双 Runtime 并发、故障和恢复的最终远程证据。
 13. [13-OWNER-CREDENTIAL-ROTATION-GATE.md](./13-OWNER-CREDENTIAL-ROTATION-GATE.md) — Owner 凭据轮换、旧凭据失效和脱敏证据清单。
 14. [14-REMOTE-RELEASE-STATE-AUDIT.md](./14-REMOTE-RELEASE-STATE-AUDIT.md) — GitHub Tags、Releases、Actions 和公开渠道的只读远程审计。
-15. [15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md](./15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md) — 交给具备本地 GitHub、Cloudflare、Apple、模型和干净 Mac 权限的 AI，一次性完成全部剩余 Plan。
-16. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
-17. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 唯一执行顺序和 Go/No-Go 规则。
-18. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接提示词。
-19. [evidence/CREDENTIAL-ROTATION-TEMPLATE.md](./evidence/CREDENTIAL-ROTATION-TEMPLATE.md) — Owner Gate 脱敏证据模板。
+15. [15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md](./15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md) — 本地高权限 AI 的完整背景和安全边界。
+16. [16-REMAINING-WORK-EXECUTION-RUNBOOK.md](./16-REMAINING-WORK-EXECUTION-RUNBOOK.md) — 每个剩余 Work ID 的输入、命令、通过条件、失败分支、证据和下一任务。
+17. [17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md](./17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md) — 默认交给较弱执行 AI 的复制即执行提示词，禁止自由跳步。
+18. [remaining-work-plan.json](./remaining-work-plan.json) — 机器可读 Work ID、order、depends_on、executor、不可逆授权和状态图。
+19. [00-THREE-PHASE-DELIVERY-STATUS.md](./00-THREE-PHASE-DELIVERY-STATUS.md) — 三阶段真实进度和阻断项。
+20. [三阶段执行计划PLAN.md](./三阶段执行计划PLAN.md) — 总体依赖和 Go/No-Go 规则。
+21. [HANDOFF_2026-07-28.md](./HANDOFF_2026-07-28.md) — 新会话交接和远程保存状态。
+22. [evidence/CREDENTIAL-ROTATION-TEMPLATE.md](./evidence/CREDENTIAL-ROTATION-TEMPLATE.md) — Owner Gate 脱敏证据模板。
 
-本地工具：
+## 给不同能力 AI 的入口
+
+### 默认入口：能力较弱或上下文易丢失的 AI
+
+完整复制：
+
+`17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md`
+
+该 AI 必须同时使用：
+
+- `16-REMAINING-WORK-EXECUTION-RUNBOOK.md`；
+- `remaining-work-plan.json`；
+- CI validator。
+
+### 能力较强、具备完整本地权限的 AI
+
+可先读 `15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`，但实际任务选择和验收仍必须服从 `16` 和 JSON 任务图。
+
+## 本地工具与自动验证
 
 - `scripts/owner-gate/verify-r2-credential-rotation.sh` — 新凭据隔离读写验证和旧凭据只读拒绝验证；
 - `scripts/owner-gate/audit-all-git-refs.sh` — mirror clone + 全 refs 非破坏性 gitleaks 扫描；
-- `tests/owner-gate/test-owner-gate-kit.sh` — 脚本语法、帮助和 Secret 不泄漏烟测。
+- `scripts/validate_remaining_work_plan.py` — 检查 Work ID、顺序、依赖、状态机、不可逆授权、Runbook 和提示词完整性；
+- `tests/owner-gate/test-owner-gate-kit.sh` — Secret 不泄漏和辅助脚本烟测；
+- `tests/owner-gate/test_remaining_work_plan.py` — 任务图与防跳步规则单元测试；
+- `.github/workflows/local-owner-gate-kit-check.yml` — PR/develop 自动执行全部校验。
 
 原 `07-OPEN-SOURCE-ITERATION-PLAN.md` 仅作历史审计记录，不再是执行依据。
 
@@ -43,39 +68,43 @@
 - PR #19 squash merge：`f1f9457e0443db74e9aab9ceb0ea28405917db3a`。
 - PR #20：PLAN v2.8.0、状态、E2E 报告和 Owner Gate 同步。
 - PR #22：凭据轮换脱敏证据模板。
-- PR #23：只读远程发布状态审计工具与静态报告。
-- PR #24：记录 PR #23 合并并再次验证审计 Workflow。
-- PR #25 squash merge：`f05077ec72b421a299617754120ad94833f5f363`，本地高权限提示词、安全脚本、测试、CI 和技术债务映射。
-- PR #25 kit run `30414594421`：success；remote audit run `30414594416`：success；artifact `8709668997`。
-- Remote release audit run `30386865073`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404；artifact `8699299635`。
+- PR #23/#24：只读远程发布状态审计和合并后复核。
+- PR #25 squash merge：`f05077ec72b421a299617754120ad94833f5f363`，本地高权限提示词、安全脚本、测试和 CI。
+- PR #26 squash merge：`fd75b2864cdd0cafb406ea5e7d137f8691c78849`，修复审计并发自锁和旧失败永久阻断。
+- PR #27 squash merge：`16baa7ab7917e8624f4952fcd05db13a4acc37df`，Owner Gate 和总状态正式公开本地执行入口。
 - `master` 历史快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
-- 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过 `14-REMOTE-RELEASE-STATE-AUDIT.md` 或等价实时审计重新确认。
+- 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过实时远程审计重新确认。
 
 ## 当前唯一优先级
 
-双 Runtime E2E、远程发布状态审计和本地高权限执行包均已完成。当前唯一任务：
+双 Runtime E2E、远程发布状态审计和本地高权限执行准备均已完成。新执行会话先完成 BOOT-001/002/003，然后唯一业务 Gate 是：
 
 > **Owner Gate：轮换外部凭据并确认旧凭据失效**
 
 操作清单：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。  
 证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。  
-本地高权限执行入口：`15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`。
+弱 AI 默认入口：`17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md`。  
+逐项执行手册：`16-REMAINING-WORK-EXECUTION-RUNBOOK.md`。
 
-完成前不得启动 Git 历史重写或提升任何发布渠道。
+凭据 Gate 完成前不得启动 Git 历史重写或提升任何发布渠道。
 
 ## 当前发布结论
 
 - CLI Alpha：No-Go
 - WebUI Beta：No-Go
 - Electron Preview：No-Go
+- Stable：No-Go
 
 远程审计未发现 Tag 或 GitHub Release；Alpha、Beta、Core Stable、Electron Preview 和 Electron Stable 五个公开渠道均返回 HTTP 404。无签名 DMG 是候选 artifact，不是已发布产品。
 
 ## 决策原则
 
-- 代码实现、自动化通过、真实环境验收和公开发布必须严格区分。
-- 不把模型能力当作权限、安全或一致性保证。
-- 发布门禁必须失败关闭。
-- 核心功能必须有状态机、错误边界、可观测性和测试证据。
-- `develop` 是开发分支；`master` 只接收通过发布门禁的版本。
+- 一次只执行一个 Work ID；
+- 依赖没有 PASSED 远程证据就保持 LOCKED；
+- 代码实现、自动化通过、真实环境验收、公开发布和反馈闭环严格区分；
+- 不把模型能力当作权限、安全或一致性保证；
+- 发布门禁必须失败关闭；
+- 不可逆动作必须有固定格式 Owner 授权；
+- 任何 Tag 推送前必须检查跨 Workflow 触发冲突；
+- `develop` 是开发分支；`master` 只接收通过发布门禁的版本；
 - GitHub 远程是唯一事实源。
