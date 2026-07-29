@@ -56,18 +56,62 @@ exit 92
 EOF
 chmod +x "${FAKE_BIN}/aws"
 
+# SEC-006 must not run before SEC-004 evidence exists.
+set +e
+PATH="${FAKE_BIN}:${PATH}" \
+CF_ACCOUNT_ID="account-1234" \
+OLD_CF_R2_ACCESS_KEY_ID="old-access-key-0002" \
+OLD_CF_R2_SECRET_ACCESS_KEY="old-secret-value-must-not-leak" \
+EVIDENCE_PATH="$EVIDENCE_PATH" \
+  bash "$VERIFY_SCRIPT" --old-denial-only >/dev/null 2>&1
+PREMATURE_STATUS=$?
+set -e
+if [[ "$PREMATURE_STATUS" -ne 2 ]]; then
+  echo "Expected premature old-denial check to exit 2, got $PREMATURE_STATUS" >&2
+  exit 1
+fi
+
+# SEC-004: the old credential may still be active; only validate the new credential.
 PATH="${FAKE_BIN}:${PATH}" \
 FAKE_AWS_STORE="$FAKE_STORE" \
 CF_ACCOUNT_ID="account-1234" \
 NEW_CF_R2_ACCESS_KEY_ID="new-access-key-0001" \
 NEW_CF_R2_SECRET_ACCESS_KEY="new-secret-value-must-not-leak" \
+EVIDENCE_PATH="$EVIDENCE_PATH" \
+  bash "$VERIFY_SCRIPT" --new-only >/dev/null
+
+grep -Fq '| 新凭据隔离对象上传 | PASS |' "$EVIDENCE_PATH"
+grep -Fq 'PENDING — 必须先完成 SEC-005' "$EVIDENCE_PATH"
+if grep -Fq 'OLD-CREDENTIAL-DENIAL-PASSED' "$EVIDENCE_PATH"; then
+  echo "SEC-004 evidence must not pre-claim old-credential denial" >&2
+  exit 1
+fi
+
+# SEC-006: after revocation, prove that the old credential is denied.
+PATH="${FAKE_BIN}:${PATH}" \
+CF_ACCOUNT_ID="account-1234" \
 OLD_CF_R2_ACCESS_KEY_ID="old-access-key-0002" \
 OLD_CF_R2_SECRET_ACCESS_KEY="old-secret-value-must-not-leak" \
 EVIDENCE_PATH="$EVIDENCE_PATH" \
-  bash "$VERIFY_SCRIPT" >/dev/null
+  bash "$VERIFY_SCRIPT" --old-denial-only >/dev/null
 
-grep -Fq '| 新凭据隔离对象上传 | PASS |' "$EVIDENCE_PATH"
+grep -Fq 'OLD-CREDENTIAL-DENIAL-PASSED' "$EVIDENCE_PATH"
 grep -Fq '| 旧凭据安全只读请求 | DENIED（退出码 `42`） |' "$EVIDENCE_PATH"
+
+# A duplicate SEC-006 result is rejected instead of appending ambiguous evidence.
+set +e
+PATH="${FAKE_BIN}:${PATH}" \
+CF_ACCOUNT_ID="account-1234" \
+OLD_CF_R2_ACCESS_KEY_ID="old-access-key-0002" \
+OLD_CF_R2_SECRET_ACCESS_KEY="old-secret-value-must-not-leak" \
+EVIDENCE_PATH="$EVIDENCE_PATH" \
+  bash "$VERIFY_SCRIPT" --old-denial-only >/dev/null 2>&1
+DUPLICATE_STATUS=$?
+set -e
+if [[ "$DUPLICATE_STATUS" -ne 2 ]]; then
+  echo "Expected duplicate old-denial evidence to exit 2, got $DUPLICATE_STATUS" >&2
+  exit 1
+fi
 
 for forbidden in \
   'new-access-key-0001' \
