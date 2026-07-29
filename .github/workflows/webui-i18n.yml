@@ -1,0 +1,50 @@
+name: WebUI i18n Coverage
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/webui-i18n.yml"
+      - ".github/workflows/release-electron-preview.yml"
+      - "scripts/check-electron-preview-concurrency.py"
+      - "webui/packages/client/src/**"
+      - "webui/scripts/report-i18n-coverage.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webui-i18n-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Static translation key coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.5.0'
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Install WebUI dependencies
+        working-directory: webui
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit static translation keys
+        working-directory: webui
+        run: node scripts/report-i18n-coverage.mjs --output ../dist/test-results/i18n-coverage.json
+
+      - name: Upload i18n coverage report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-i18n-coverage
+          path: dist/test-results/i18n-coverage.json
+          if-no-files-found: ignore
+          retention-days: 14

@@ -4,6 +4,7 @@ import { join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { safeChildEnvironment } from './child-env'
 import { deepAgentHome } from './paths'
+import type { RuntimeTaskSupervisorEnvironment } from './runtime-task-supervisor'
 
 const execFileAsync = promisify(execFile)
 const READY_TIMEOUT_MS = 120_000
@@ -23,20 +24,22 @@ function managedCli(): string {
   return binary
 }
 
-function runtimeEnvironment(): NodeJS.ProcessEnv {
+function runtimeEnvironment(supervisorEnvironment: RuntimeTaskSupervisorEnvironment | null = null): NodeJS.ProcessEnv {
   const home = resolve(deepAgentHome())
   return safeChildEnvironment({
     DEEPAGENT_HOME: home,
     // Compatibility is scoped to the managed child only.
     HERMES_HOME: home,
+    HERMES_DESKTOP: 'true',
+    ...(supervisorEnvironment || {}),
   })
 }
 
-async function runCli(args: string[]): Promise<void> {
+async function runCli(args: string[], supervisorEnvironment: RuntimeTaskSupervisorEnvironment | null = null): Promise<void> {
   const command = managedCli()
   try {
     await execFileAsync(command, args, {
-      env: runtimeEnvironment(),
+      env: runtimeEnvironment(supervisorEnvironment),
       timeout: READY_TIMEOUT_MS,
       maxBuffer: 1024 * 1024,
     })
@@ -80,8 +83,11 @@ export function getServerUrl(port: number): string {
   return `http://127.0.0.1:${port}`
 }
 
-export async function startWebUiServer(_preferredPort?: number): Promise<string> {
-  await runCli(['webui', 'start'])
+export async function startWebUiServer(
+  _preferredPort: number | undefined,
+  supervisorEnvironment: RuntimeTaskSupervisorEnvironment,
+): Promise<string> {
+  await runCli(['webui', 'start'], supervisorEnvironment)
   const port = runtimePort()
   await waitForReady(port)
   return getServerUrl(port)

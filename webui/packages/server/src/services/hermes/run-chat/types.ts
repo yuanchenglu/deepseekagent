@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../lib/context-compressor'
+import type { RuntimeTaskLeaseHandle } from '../../runtime-task-supervisor-client'
 
 /**
  * Content block types for Anthropic-compatible message format
@@ -65,6 +66,7 @@ export interface SessionState {
   isWorking: boolean
   events: Array<{ event: string; data: any }>
   abortController?: AbortController
+  runtimeTaskLease?: RuntimeTaskLeaseHandle
   runId?: string
   activeRunMarker?: string
   profile?: string
