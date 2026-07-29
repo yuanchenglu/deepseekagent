@@ -20,15 +20,18 @@
 | PR #19 squash merge | `f1f9457e0443db74e9aab9ceb0ea28405917db3a` |
 | PR #20 | PLAN v2.8.0、状态、E2E 报告和 Owner Gate 已同步 |
 | PR #22 | 凭据轮换脱敏证据模板已合入 |
+| PR #23 / #24 | 只读远程发布状态审计和合并后复核已合入 |
+| PR #25 squash merge | `f05077ec72b421a299617754120ad94833f5f363`；本地高权限提示词、安全脚本、测试和 CI 已合入 |
+| PR #26 squash merge | `fd75b2864cdd0cafb406ea5e7d137f8691c78849`；修复审计并发自锁和旧失败永久阻断 |
 | Runtime 双路径 E2E | 6/6，通过 run `30383776537` |
 | Browser E2E | 最终 Head 通过 run `30383777443` |
 | Electron workflow | 最终 Head 通过 run `30383776723` |
 | Runtime review | 唯一 P2 actionable thread 已修复并解决；未解决 actionable thread 为 0 |
-| Remote release audit | reviewed run `30386865073`；artifact `8699299635`；digest `sha256:6c6b722661f6d25597ee53ef8057505495683df1e0ef2e5bd0fbd743b2492188` |
-| Audit review | P1 API status 契约与 P2 分页均已修复并解决；最终 Head 通过 |
+| Local Owner Gate kit | run `30414594421` success；R2 Secret 不泄漏、临时对象删除、全 refs clean/findings 语义通过 |
+| PR #26 final audit | run `30415181958` success；8/8 单元测试；artifact `8709887478`；digest `sha256:d3e1fcb6cead7c48ce6061f6b870ac33f214400decc34849d34168895555f19d` |
 | Tag / Release | Tags 0；GitHub Releases 0，包括 Draft 和 Prerelease |
-| 当前 Actions | Active 0；默认分支与开放 PR 最新 Head 上失败类运行 0 |
-| 历史 Actions | 132 条历史或已被新 Head 取代的失败/取消记录；保留为审计证据 |
+| 审计时点当前 Actions | 当前引用 Head Active 0；最新完成结果为失败 0 |
+| 历史 Actions | 137 条历史、旧 attempt 或已被后续成功取代的失败/取消记录；保留为审计证据 |
 | 公开渠道 | CLI Alpha、WebUI Beta、Core Stable、Electron Preview、Electron Stable 均 HTTP 404 |
 | master 快照 | `b3943ac43f0f0f6a1f86f5f2cb9a230527389d91` |
 | 本地未推送关键工作 | 无；关键成果均存在 GitHub 远程 |
@@ -38,6 +41,8 @@
 - 双 Runtime：`12-DUAL-RUNTIME-WORKSPACE-E2E-REPORT.md`
 - 远程发布状态：`14-REMOTE-RELEASE-STATE-AUDIT.md`
 - Owner Gate：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`
+- 本地高权限一次性执行入口：`15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`
+- 技术债务与本地能力映射：`../TECH_DEBT.md`
 
 ---
 
@@ -49,7 +54,7 @@
 | WebUI Beta | 约 90%–92% | **No-Go** | Browser E2E 和核心自动化完成；迁移、共存、正式渠道和外测未关闭 |
 | Electron Preview | 约 95%–96% | **No-Go** | 双 Runtime E2E 完成；凭据、历史、干净机、共存和用户验收未关闭 |
 
-**整体判断**：主体工程处于发布收敛后半程。当前不新增非必要功能。远程审计确认当前没有 Tag、GitHub Release 或公开可消费渠道。
+**整体判断**：主体工程处于发布收敛后半程。当前不新增非必要功能。远程环境可处理的工程、审计和本地交接准备已经完成；剩余任务需要真实 Owner Secret、不可逆历史操作授权、物理 Mac、模型、用户或 Apple 权限。
 
 ---
 
@@ -62,7 +67,8 @@
 - Manifest、SHA-256、渠道和版本一致性契约；
 - 安装、更新、回滚和清单驱动卸载主体；
 - CLI 入口、错误边界、治理和许可文档；
-- Tag、Release、Actions 和 Alpha channel 只读远程审计工具。
+- Tag、Release、Actions 和 Alpha channel 只读远程审计工具；
+- Owner Gate 本地执行提示词、R2 安全验证脚本和全 refs 非破坏性扫描脚本。
 
 ### 阻断项
 
@@ -88,7 +94,8 @@
 - `deepagent webui start/open/status/stop` 主体；
 - 默认 loopback、独立 PID/日志/端口/数据目录；
 - 无固定默认密码和默认 LAN 暴露；
-- WebUI Beta channel 只读远程审计。
+- WebUI Beta channel 只读远程审计；
+- 本地 AI 提示词已包含数据迁移、失败回滚、干净机和 Beta 反馈闭环。
 
 ### 阻断项
 
@@ -119,14 +126,16 @@
 - acquire 拒绝后零 spawn / 零 Workspace 写副作用；
 - 不可验证 PID 与 acquire-before-bind 重启边界；
 - Browser、WebUI、许可证、Electron Main、DMG 和 artifact 全链路；
-- Electron Preview / Stable channel 只读远程审计。
+- Electron Preview / Stable channel 只读远程审计；
+- 本地 AI 提示词已包含 Gatekeeper、覆盖安装、升级、回滚、卸载、签名、公证和 Stable 更新链。
 
 ### 当前唯一任务
 
 **Owner Gate：外部凭据轮换与旧凭据失效确认**。
 
 操作规范：`13-OWNER-CREDENTIAL-ROTATION-GATE.md`。  
-证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。
+证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`。  
+具备本地权限的 AI 直接执行：`15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`。
 
 ### 后继阻断项
 
@@ -134,7 +143,8 @@
 - 干净 Apple Silicon Mac 安装、Gatekeeper、升级、回滚和卸载；
 - CLI/Desktop/Hermes/OpenCode 共存；
 - 真实模型和真实用户 Preview；
-- P0/P1 清零。
+- P0/P1 清零；
+- Apple 签名、公证、正式更新链和 Stable 发布授权。
 
 结论：**No-Go**。
 
@@ -147,12 +157,13 @@
 2. 清理 Git 历史并重扫全部 refs
 3. 干净 Mac 验证 CLI/WebUI/Electron 生命周期
 4. CLI/Desktop/Hermes/OpenCode 共存
-5. 正式模型任务和真实用户 Preview 测试
+5. 正式模型任务和真实用户 Alpha/Beta/Preview 测试
 6. 清零 P0/P1
-7. 按 Go/No-Go 提升 Alpha、Beta、Preview 渠道
+7. 按 Go/No-Go 和 Owner 授权提升 Alpha、Beta、Preview 渠道
+8. Apple 签名、公证、Stable 候选、Stable 发布和发布后反馈闭环
 ```
 
-每次只启动一个依赖已经满足的工作单元。
+每次只启动一个依赖已经满足的工作单元。完整串行执行规范已经写入 `15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`。
 
 ---
 
@@ -161,12 +172,13 @@
 可以说明：
 
 - 双 Runtime 同 Workspace 并发与故障 E2E 已完成并合入 `develop`；
-- 远程审计时点 Tags 0、GitHub Releases 0、五个公开渠道均 404；
-- 当前最新引用 Head 无 Active 或失败类 Actions。
+- 本地高权限执行包、安全脚本和审计器修复已经合入；
+- 最近可审计时点 Tags 0、GitHub Releases 0、五个公开渠道均 404；
+- 最近可审计时点当前引用 Head 无 Active 或最新失败结果。
 
 不得声称：
 
 - Electron Preview 已发布；
 - DMG 已签名或公证；
 - 任一阶段已达到 Go；
-- 凭据、历史、干净机、共存或用户验收已关闭。
+- 凭据、历史、干净机、共存、真实模型、用户验收或 Stable 发布已经关闭。

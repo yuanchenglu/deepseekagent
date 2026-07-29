@@ -154,3 +154,29 @@ Owner 需要具备：
 完成后唯一下一任务是：
 
 > **清理 Git 历史中的有效秘密，并对全部 Git refs 重新扫描。**
+
+## 7. 本地高权限执行入口
+
+远程 AI 不得接收、查看或操作真实 Secret。Owner 应在安全本地环境把完整剩余计划交给具备相应权限的 AI：
+
+- 完整串行提示词：`15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md`；
+- 脱敏证据模板：`evidence/CREDENTIAL-ROTATION-TEMPLATE.md`；
+- R2 技术验证脚本：`../../scripts/owner-gate/verify-r2-credential-rotation.sh`；
+- 全 refs 非破坏性扫描：`../../scripts/owner-gate/audit-all-git-refs.sh`。
+
+R2 脚本已经通过 fake AWS 烟测，验证以下安全属性：
+
+- 新凭据只用于隔离对象的上传、读回、字节比较和删除；
+- 旧凭据只用于安全只读请求，并要求被拒绝；
+- 完整 Access Key 和 Secret 不进入 evidence；
+- 临时测试对象必须删除。
+
+全 refs 脚本已经通过 clean/findings 双路径烟测：
+
+- 0 findings 返回 0；
+- findings 返回专用退出码 3；
+- 只创建隔离 mirror clone，不执行历史重写、force push、Tag 或 Release 操作。
+
+远程证据：PR #25 squash merge `f05077ec72b421a299617754120ad94833f5f363`，kit run `30414594421`，remote audit run `30414594416`。审计器并发自锁和旧失败永久阻断问题由 PR #26 修复，最终 Head 单元测试与真实审计均通过。
+
+这些工具只降低 Owner Gate 的执行风险，**不能代替真实凭据轮换、旧凭据失效验证和人工权限复核**。
