@@ -45,13 +45,15 @@
 - PR #22：凭据轮换脱敏证据模板。
 - PR #23：只读远程发布状态审计工具与静态报告。
 - PR #24：记录 PR #23 合并并再次验证审计 Workflow。
+- PR #25 squash merge：`f05077ec72b421a299617754120ad94833f5f363`，本地高权限提示词、安全脚本、测试、CI 和技术债务映射。
+- PR #25 kit run `30414594421`：success；remote audit run `30414594416`：success；artifact `8709668997`。
 - Remote release audit run `30386865073`：Tags 0、Releases 0、当前 Active/失败 Actions 0、五个公开渠道均 404；artifact `8699299635`。
 - `master` 历史快照：`b3943ac43f0f0f6a1f86f5f2cb9a230527389d91`。
 - 最新 Head、开放 PR、Actions、Tag、Release 和渠道必须通过 `14-REMOTE-RELEASE-STATE-AUDIT.md` 或等价实时审计重新确认。
 
 ## 当前唯一优先级
 
-双 Runtime E2E 和远程发布状态审计已完成。当前唯一任务：
+双 Runtime E2E、远程发布状态审计和本地高权限执行包均已完成。当前唯一任务：
 
 > **Owner Gate：轮换外部凭据并确认旧凭据失效**
 
