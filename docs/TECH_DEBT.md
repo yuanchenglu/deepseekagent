@@ -38,7 +38,7 @@
 | 2026-07-29 | acquire-before-bind 重启导致无 PID orphaned 永久锁 | PR #19；显式终止清理 E2E；P2 review resolved | CLOSED |
 | 2026-07-29 | MCU TTS 第二次 enqueue 异步断言竞态 | 最终 Electron run `30383776723` 全量通过 | CLOSED |
 | 2026-07-29 | Tag、Release、Actions 和五个公开渠道缺少可重复远程审计 | PR #23；只读审计 workflow 和 artifact | CLOSED |
-| 2026-07-29 | 本地高权限环境缺少统一安全执行提示词和验证工具 | 本地高权限执行包 PR；最终 CI/review 以远程为准 | IMPLEMENTED / PENDING MERGE |
+| 2026-07-29 | 本地高权限环境缺少统一安全执行提示词和验证工具 | PR #25 squash merge `f05077ec72b421a299617754120ad94833f5f363`；kit run `30414594421`; remote audit run `30414594416` | CLOSED |
 
 ## 记录纪律
 

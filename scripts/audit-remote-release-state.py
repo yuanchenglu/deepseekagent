@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 API_VERSION = "2022-11-28"
-USER_AGENT = "deepagent-remote-release-audit/3"
+USER_AGENT = "deepagent-remote-release-audit/4"
 CHANNELS = {
     "cli-alpha": "https://deepseekagent.starseas.org/releases/channels/alpha.json",
     "webui-beta": "https://deepseekagent.starseas.org/releases/channels/beta.json",
@@ -65,6 +65,7 @@ def paginate_list(endpoint: str, token: str) -> list[Any]:
 def run_record(run: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": int(run["id"]),
+        "workflow_id": int(run["workflow_id"]) if run.get("workflow_id") is not None else None,
         "name": run.get("name"),
         "event": run.get("event"),
         "status": run.get("status"),
@@ -72,6 +73,7 @@ def run_record(run: dict[str, Any]) -> dict[str, Any]:
         "head_branch": run.get("head_branch"),
         "head_sha": run.get("head_sha"),
         "run_number": run.get("run_number"),
+        "run_attempt": run.get("run_attempt"),
         "created_at": run.get("created_at"),
         "updated_at": run.get("updated_at"),
         "html_url": run.get("html_url"),
@@ -79,7 +81,7 @@ def run_record(run: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_runs(api_base: str, token: str, statuses: list[str]) -> list[dict[str, Any]]:
-    """List active workflow runs using only documented status filters."""
+    """List workflow runs using only documented status filters."""
     seen: set[int] = set()
     results: list[dict[str, Any]] = []
     for status in statuses:
@@ -100,12 +102,8 @@ def action_runs(api_base: str, token: str, statuses: list[str]) -> list[dict[str
     return sorted(results, key=lambda item: item.get("updated_at") or "", reverse=True)
 
 
-def completed_failure_runs(api_base: str, token: str) -> list[dict[str, Any]]:
-    """Query documented status=completed and filter failure conclusions locally.
-
-    GitHub caps a filtered workflow-run search at 1,000 results. The extra page
-    request fails closed if that cap would truncate this audit.
-    """
+def completed_runs(api_base: str, token: str) -> list[dict[str, Any]]:
+    """Query documented status=completed without silently exceeding GitHub's cap."""
     results: list[dict[str, Any]] = []
     seen: set[int] = set()
     for page in range(1, 12):
@@ -115,8 +113,6 @@ def completed_failure_runs(api_base: str, token: str) -> list[dict[str, Any]]:
         if page == 11 and values:
             raise RuntimeError("Completed workflow-run audit exceeded GitHub's 1,000-result search cap")
         for run in values:
-            if run.get("conclusion") not in FAILURE_CONCLUSIONS:
-                continue
             run_id = int(run["id"])
             if run_id in seen:
                 continue
@@ -125,6 +121,72 @@ def completed_failure_runs(api_base: str, token: str) -> list[dict[str, Any]]:
         if len(values) < 100:
             return sorted(results, key=lambda item: item.get("updated_at") or "", reverse=True)
     raise RuntimeError("Completed workflow-run audit did not terminate within pagination safety limit")
+
+
+def run_order_key(run: dict[str, Any]) -> tuple[int, int, int]:
+    return (
+        int(run.get("run_number") or 0),
+        int(run.get("run_attempt") or 0),
+        int(run.get("id") or 0),
+    )
+
+
+def latest_completed_by_workflow_head(
+    runs: list[dict[str, Any]],
+) -> dict[tuple[str | None, int | str | None, str | None], dict[str, Any]]:
+    """Return the latest completed verdict for each head/workflow/event tuple."""
+    latest: dict[tuple[str | None, int | str | None, str | None], dict[str, Any]] = {}
+    for run in runs:
+        workflow_identity: int | str | None = run.get("workflow_id") or run.get("name")
+        key = (run.get("head_sha"), workflow_identity, run.get("event"))
+        previous = latest.get(key)
+        if previous is None or run_order_key(run) > run_order_key(previous):
+            latest[key] = run
+    return latest
+
+
+def classify_failures(
+    runs: list[dict[str, Any]],
+    current_reference_shas: set[str],
+    current_workflow_id: int | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Classify only latest current-head failures as actionable.
+
+    Previous failed attempts remain historical evidence. Prior runs of the audit
+    workflow itself are also historical because the current audit run is their
+    replacement verdict.
+    """
+    failure_runs = [run for run in runs if run.get("conclusion") in FAILURE_CONCLUSIONS]
+    latest = latest_completed_by_workflow_head(runs)
+    actionable: list[dict[str, Any]] = []
+    actionable_ids: set[int] = set()
+
+    for run in latest.values():
+        if run.get("head_sha") not in current_reference_shas:
+            continue
+        if run.get("conclusion") not in FAILURE_CONCLUSIONS:
+            continue
+        if current_workflow_id is not None and run.get("workflow_id") == current_workflow_id:
+            continue
+        actionable.append(run)
+        actionable_ids.add(int(run["id"]))
+
+    actionable.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+    historical = [run for run in failure_runs if int(run["id"]) not in actionable_ids]
+    historical.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+    return actionable, historical
+
+
+def audit_exit_code(
+    actionable_failed: list[dict[str, Any]],
+    current_reference_active: list[dict[str, Any]],
+    strict_active_gate: bool,
+) -> int:
+    if actionable_failed:
+        return 1
+    if strict_active_gate and current_reference_active:
+        return 1
+    return 0
 
 
 def fetch_channel(name: str, url: str) -> dict[str, Any]:
@@ -220,6 +282,7 @@ def markdown(snapshot: dict[str, Any]) -> str:
     tags = github["tags"]
     releases = github["releases"]
     active = github["active_workflow_runs"]
+    current_active = github["current_reference_active_workflow_runs"]
     actionable_failed = github["actionable_failed_workflow_runs"]
     historical_failed = github["historical_failed_workflow_runs"]
     channels = snapshot["public_channels"]
@@ -232,6 +295,8 @@ def markdown(snapshot: dict[str, Any]) -> str:
         f"> 观测时间（UTC）：`{snapshot['observed_at']}`  ",
         f"> 仓库：`{snapshot['repository']}`  ",
         f"> 审计 Head：`{snapshot['head_sha']}`  ",
+        f"> 触发事件：`{snapshot['event_name']}`  ",
+        f"> Active 严格门禁：`{snapshot['strict_active_gate']}`  ",
         "> 性质：只读审计；未创建、修改或删除 Tag、Release、Channel 或 Secret。",
         "",
         "## 1. 当前事实摘要",
@@ -240,11 +305,14 @@ def markdown(snapshot: dict[str, Any]) -> str:
         f"- 开放 PR：{len(github['open_pull_requests'])}",
         f"- Tags：{len(tags)}",
         f"- Releases：{len(releases)}",
-        f"- 当前 Active Actions（已排除本审计自身）：{len(active)}",
-        f"- 当前引用 Head 上的失败类 Actions：{len(actionable_failed)}",
-        f"- 历史/已被新 Head 取代的失败类 Actions：{len(historical_failed)}",
+        f"- 仓库 Active Actions（已排除本审计自身）：{len(active)}",
+        f"- 当前引用 Head 上的 Active Actions：{len(current_active)}",
+        f"- 当前引用 Head 上最新完成结果为失败的 Actions：{len(actionable_failed)}",
+        f"- 历史、旧 attempt 或已被成功结果取代的失败类 Actions：{len(historical_failed)}",
         "",
-        "“当前引用 Head”包括默认分支最新 Head 和所有开放 PR 的最新 Head。旧 PR Commit、旧分支 Commit 或已被后续提交替代的失败运行保留为历史证据，不算当前阻塞。",
+        "“当前引用 Head”包括默认分支最新 Head 和所有开放 PR 的最新 Head。每个 Head / Workflow / Event 只使用最新完成结果判断；旧 attempt 和当前审计工作流的旧失败保留为历史证据，不形成永久阻断。",
+        "",
+        "自动 `pull_request` / `push` 审计只报告并发 Active Actions，由对应独立 Check 决定最终结果；手工 `workflow_dispatch` 审计启用 Active 严格门禁。",
         "",
         "## 2. Tags",
         "",
@@ -266,8 +334,8 @@ def markdown(snapshot: dict[str, Any]) -> str:
                 f"{item['prerelease']} | {item['published_at'] or ''} | {len(item['assets'])} |"
             )
 
-    append_runs(lines, "## 4. 当前 Active Actions", active)
-    append_runs(lines, "## 5. 当前引用 Head 上的失败类 Actions", actionable_failed)
+    append_runs(lines, "## 4. 当前引用 Head 上的 Active Actions", current_active)
+    append_runs(lines, "## 5. 当前引用 Head 上最新完成结果为失败的 Actions", actionable_failed)
 
     lines.extend(["", "## 6. 历史失败/取消 Actions 汇总", ""])
     lines.append(f"完整扫描记录数：**{len(historical_failed)}**。完整逐条记录保存在同一 workflow artifact 的 `remote-release-audit.json`。")
@@ -309,7 +377,9 @@ def markdown(snapshot: dict[str, Any]) -> str:
             "",
             "- 本报告只证明观测时点的远程状态。",
             "- Draft Release、Prerelease、Tag 和公开 Channel 必须分别判断，不能相互替代。",
-            "- 历史失败运行不能覆盖同一 PR 最终 Head 的成功证据，也不能被删除来伪造成功。",
+            "- 历史失败运行不能覆盖同一 Workflow / Head 的后续成功证据，也不能被删除来伪造成功。",
+            "- 自动审计不因同 Head 的并发 Check 尚在运行而自锁；对应 Check 仍必须独立通过。",
+            "- 手工严格审计在当前 Head 仍有 Active Actions 时返回失败。",
             "- 公开渠道 HTTP 200 也不证明安装、升级、回滚、签名、公证或用户验收通过。",
             "- 凭据 Owner Gate 未关闭前，不得执行历史重写或发布渠道提升。",
             "",
@@ -322,6 +392,7 @@ def main() -> int:
     repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     head_sha = os.environ.get("GITHUB_SHA", "").strip()
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "").strip()
     current_run_id = int(os.environ.get("GITHUB_RUN_ID", "0") or 0)
     output_dir = Path(os.environ.get("AUDIT_OUTPUT_DIR", "dist/remote-release-audit"))
     if not repository or "/" not in repository:
@@ -354,24 +425,39 @@ def main() -> int:
         for item in pulls_raw
     ]
     current_reference_shas = {default_branch_head}
-    current_reference_shas.update(
-        item["head_sha"] for item in open_pull_requests if item.get("head_sha")
-    )
+    current_reference_shas.update(item["head_sha"] for item in open_pull_requests if item.get("head_sha"))
+
+    current_workflow_id: int | None = None
+    if current_run_id:
+        current_run = github_request(f"{api_base}/actions/runs/{current_run_id}", token)
+        if current_run.get("workflow_id") is not None:
+            current_workflow_id = int(current_run["workflow_id"])
 
     active_runs = [
-        item for item in action_runs(api_base, token, ACTIVE_STATUSES)
+        item
+        for item in action_runs(api_base, token, ACTIVE_STATUSES)
         if item["id"] != current_run_id
     ]
-    failed_runs = completed_failure_runs(api_base, token)
-    actionable_failed = [item for item in failed_runs if item.get("head_sha") in current_reference_shas]
-    historical_failed = [item for item in failed_runs if item.get("head_sha") not in current_reference_shas]
+    current_reference_active = [
+        item for item in active_runs if item.get("head_sha") in current_reference_shas
+    ]
+    completed = completed_runs(api_base, token)
+    actionable_failed, historical_failed = classify_failures(
+        completed,
+        current_reference_shas,
+        current_workflow_id,
+    )
+    strict_active_gate = event_name == "workflow_dispatch"
 
     snapshot = {
-        "schema_version": 3,
+        "schema_version": 4,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "repository": repository,
         "head_sha": head_sha,
+        "event_name": event_name,
+        "strict_active_gate": strict_active_gate,
         "audit_run_id": current_run_id,
+        "audit_workflow_id": current_workflow_id,
         "github": {
             "default_branch": default_branch,
             "default_branch_head": default_branch_head,
@@ -391,6 +477,7 @@ def main() -> int:
                 for item in branches_raw
             ],
             "active_workflow_runs": active_runs,
+            "current_reference_active_workflow_runs": current_reference_active,
             "actionable_failed_workflow_runs": actionable_failed,
             "historical_failed_workflow_runs": historical_failed,
         },
@@ -404,7 +491,7 @@ def main() -> int:
     report = markdown(snapshot) + "\n"
     (output_dir / "remote-release-audit.md").write_text(report, encoding="utf-8")
     print(report)
-    return 1 if active_runs or actionable_failed else 0
+    return audit_exit_code(actionable_failed, current_reference_active, strict_active_gate)
 
 
 if __name__ == "__main__":
