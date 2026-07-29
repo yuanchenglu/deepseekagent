@@ -16,6 +16,12 @@ Requirements:
 This script is read-only with respect to the remote repository. It creates a mirror clone,
 scans every reachable Git ref with gitleaks, and writes a redacted JSON report plus a
 Markdown summary. It never rewrites history and never force-pushes.
+
+Exit codes:
+  0  Scan completed with zero findings.
+  2  Usage or missing dependency.
+  3  Scan completed and found potential secrets.
+  other  Git/gitleaks execution failure.
 EOF
 }
 
@@ -47,6 +53,7 @@ REPORT_JSON="${OUTPUT_DIR}/gitleaks-all-refs-redacted.json"
 REFS_TXT="${OUTPUT_DIR}/git-refs.txt"
 FSCK_TXT="${OUTPUT_DIR}/git-fsck.txt"
 SUMMARY_MD="${OUTPUT_DIR}/all-refs-secret-audit.md"
+FINDINGS_COUNT_TXT="${OUTPUT_DIR}/gitleaks-findings-count.txt"
 STARTED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
 cleanup() {
@@ -57,7 +64,9 @@ trap cleanup EXIT INT TERM
 echo "Creating isolated mirror clone..."
 git clone --mirror "$REPOSITORY_URL" "$MIRROR_DIR" >/dev/null
 
+set +e
 (
+  set -euo pipefail
   cd "$MIRROR_DIR"
   git show-ref | sort >"$REFS_TXT"
   git fsck --full --no-reflogs --unreachable >"$FSCK_TXT" 2>&1 || true
@@ -73,7 +82,7 @@ git clone --mirror "$REPOSITORY_URL" "$MIRROR_DIR" >/dev/null
   set -e
 
   python3 - "$REPORT_JSON" "$REFS_TXT" "$FSCK_TXT" "$SUMMARY_MD" \
-    "$REPOSITORY_URL" "$STARTED_AT" "$GITLEAKS_STATUS" <<'PY'
+    "$FINDINGS_COUNT_TXT" "$REPOSITORY_URL" "$STARTED_AT" "$GITLEAKS_STATUS" <<'PY'
 from __future__ import annotations
 
 import json
@@ -86,9 +95,10 @@ report_path = Path(sys.argv[1])
 refs_path = Path(sys.argv[2])
 fsck_path = Path(sys.argv[3])
 summary_path = Path(sys.argv[4])
-repository_url = sys.argv[5]
-started_at = sys.argv[6]
-status = int(sys.argv[7])
+count_path = Path(sys.argv[5])
+repository_url = sys.argv[6]
+started_at = sys.argv[7]
+status = int(sys.argv[8])
 
 try:
     findings = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else []
@@ -98,11 +108,17 @@ except json.JSONDecodeError as exc:
 if not isinstance(findings, list):
     raise SystemExit("Expected gitleaks report to be a JSON list")
 
+if status == 0 and findings:
+    raise SystemExit("Gitleaks returned success but the report contains findings")
+if status == 1 and not findings:
+    raise SystemExit("Gitleaks returned findings status but the report is empty")
+
 rules = Counter(str(item.get("RuleID") or "unknown") for item in findings)
 files = Counter(str(item.get("File") or "unknown") for item in findings)
 refs = [line for line in refs_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 fsck_lines = [line for line in fsck_path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
 finished_at = datetime.now(timezone.utc).isoformat()
+count_path.write_text(f"{len(findings)}\n", encoding="utf-8")
 
 lines = [
     "# Git 全 refs 秘密扫描报告",
@@ -149,16 +165,19 @@ summary_path.write_text("\n".join(lines), encoding="utf-8")
 PY
 
   if [[ "$GITLEAKS_STATUS" -eq 0 ]]; then
-    echo "All-refs scan passed with no findings."
-  elif [[ "$GITLEAKS_STATUS" -eq 1 ]]; then
-    echo "All-refs scan found potential secrets. Review the redacted report." >&2
-  else
-    echo "Gitleaks execution failed with status $GITLEAKS_STATUS." >&2
-    exit "$GITLEAKS_STATUS"
+    echo "All-refs scan passed with zero findings."
+    exit 0
   fi
+  if [[ "$GITLEAKS_STATUS" -eq 1 ]]; then
+    echo "All-refs scan found potential secrets. Review the redacted report." >&2
+    exit 3
+  fi
+
+  echo "Gitleaks execution failed with status $GITLEAKS_STATUS." >&2
+  exit "$GITLEAKS_STATUS"
 )
+AUDIT_STATUS=$?
+set -e
 
 echo "Audit outputs written to: $OUTPUT_DIR"
-if [[ -s "$REPORT_JSON" ]]; then
-  exit 3
-fi
+exit "$AUDIT_STATUS"
