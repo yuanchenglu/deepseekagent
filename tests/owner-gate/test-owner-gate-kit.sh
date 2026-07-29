@@ -85,4 +85,79 @@ if [[ -e "${FAKE_STORE}/object.bin" ]]; then
   exit 1
 fi
 
+cat >"${FAKE_BIN}/git" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+  clone)
+    destination="${!#}"
+    mkdir -p "$destination"
+    ;;
+  show-ref)
+    printf '%040d refs/heads/develop\n' 0
+    ;;
+  fsck)
+    ;;
+  *)
+    echo "unexpected fake git command: $*" >&2
+    exit 80
+    ;;
+esac
+EOF
+chmod +x "${FAKE_BIN}/git"
+
+cat >"${FAKE_BIN}/gitleaks" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+report_path=""
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --report-path)
+      report_path="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+if [[ -z "$report_path" ]]; then
+  exit 81
+fi
+if [[ "${FAKE_GITLEAKS_MODE:-clean}" == "findings" ]]; then
+  cat >"$report_path" <<'JSON'
+[{"RuleID":"generic-api-key","File":"config.env","Secret":"REDACTED"}]
+JSON
+  exit 1
+fi
+printf '[]\n' >"$report_path"
+exit 0
+EOF
+chmod +x "${FAKE_BIN}/gitleaks"
+
+CLEAN_OUTPUT="${TEMP_DIR}/audit-clean"
+PATH="${FAKE_BIN}:${PATH}" FAKE_GITLEAKS_MODE=clean \
+  bash "$AUDIT_SCRIPT" https://example.invalid/deepseekagent.git "$CLEAN_OUTPUT" >/dev/null
+
+grep -Fxq '0' "${CLEAN_OUTPUT}/gitleaks-findings-count.txt"
+grep -Fq -- '- Gitleaks findings：0' "${CLEAN_OUTPUT}/all-refs-secret-audit.md"
+
+FINDINGS_OUTPUT="${TEMP_DIR}/audit-findings"
+set +e
+PATH="${FAKE_BIN}:${PATH}" FAKE_GITLEAKS_MODE=findings \
+  bash "$AUDIT_SCRIPT" https://example.invalid/deepseekagent.git "$FINDINGS_OUTPUT" >/dev/null 2>&1
+FINDINGS_STATUS=$?
+set -e
+if [[ "$FINDINGS_STATUS" -ne 3 ]]; then
+  echo "Expected findings exit code 3, got $FINDINGS_STATUS" >&2
+  exit 1
+fi
+grep -Fxq '1' "${FINDINGS_OUTPUT}/gitleaks-findings-count.txt"
+grep -Fq '| `generic-api-key` | 1 |' "${FINDINGS_OUTPUT}/all-refs-secret-audit.md"
+
+if grep -R -Fq 'must-not-leak' "$TEMP_DIR"; then
+  echo "A test secret leaked into generated outputs" >&2
+  exit 1
+fi
+
 echo "owner-gate kit tests passed"
