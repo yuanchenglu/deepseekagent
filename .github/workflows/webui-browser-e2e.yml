@@ -45,7 +45,19 @@ jobs:
           cache-dependency-path: webui/package-lock.json
 
       - name: Install WebUI dependencies
-        run: npm ci --no-audit --no-fund
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          set +e
+          npm ci --no-audit --no-fund --loglevel=error
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::group::npm debug log tail"
+            find "$HOME/.npm/_logs" -type f -name '*-debug-0.log' -print -exec tail -n 160 {} \; 2>/dev/null || true
+            echo "::endgroup::"
+          fi
+          exit "$status"
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
