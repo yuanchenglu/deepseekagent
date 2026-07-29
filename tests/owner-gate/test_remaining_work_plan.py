@@ -16,6 +16,7 @@ SPEC.loader.exec_module(MODULE)
 
 PLAN_PATH = ROOT / "docs" / "open-source-readiness" / "remaining-work-plan.json"
 RUNBOOK_PATH = ROOT / "docs" / "open-source-readiness" / "16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
+CATALOG_PATH = ROOT / "docs" / "open-source-readiness" / "18-WORK-ID-ACCEPTANCE-CATALOG.md"
 PROMPT_PATH = ROOT / "docs" / "open-source-readiness" / "17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md"
 
 
@@ -25,10 +26,16 @@ class RemainingWorkPlanTests(unittest.TestCase):
 
     def test_repository_plan_and_docs_are_valid(self) -> None:
         tasks = MODULE.validate_graph(copy.deepcopy(self.plan))
-        MODULE.validate_docs(tasks, RUNBOOK_PATH, PROMPT_PATH)
-        self.assertGreater(len(tasks), 50)
+        MODULE.validate_docs(tasks, RUNBOOK_PATH, CATALOG_PATH, PROMPT_PATH)
+        self.assertEqual(len(tasks), 65)
         self.assertEqual(tasks[0]["id"], "BOOT-001")
         self.assertEqual(tasks[-1]["id"], "STB-012")
+
+    def test_wrong_task_count_is_rejected(self) -> None:
+        invalid = copy.deepcopy(self.plan)
+        invalid["tasks"].pop()
+        with self.assertRaisesRegex(ValueError, "expected 65 tasks"):
+            MODULE.validate_graph(invalid)
 
     def test_duplicate_id_is_rejected(self) -> None:
         invalid = copy.deepcopy(self.plan)
@@ -73,27 +80,31 @@ class RemainingWorkPlanTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.validate_graph(invalid)
 
-    def test_missing_task_reference_in_runbook_is_rejected(self) -> None:
+    def test_missing_task_reference_in_catalog_is_rejected(self) -> None:
         tasks = MODULE.validate_graph(copy.deepcopy(self.plan))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runbook = root / "runbook.md"
+            catalog = root / "catalog.md"
             prompt = root / "prompt.md"
-            runbook.write_text(RUNBOOK_PATH.read_text(encoding="utf-8").replace("STB-012", "STB-FINAL"), encoding="utf-8")
+            runbook.write_text(RUNBOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+            catalog.write_text(CATALOG_PATH.read_text(encoding="utf-8").replace("STB-012", "STB-FINAL"), encoding="utf-8")
             prompt.write_text(PROMPT_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "runbook does not mention"):
-                MODULE.validate_docs(tasks, runbook, prompt)
+            with self.assertRaisesRegex(ValueError, "catalog does not mention"):
+                MODULE.validate_docs(tasks, runbook, catalog, prompt)
 
     def test_missing_prompt_safeguard_is_rejected(self) -> None:
         tasks = MODULE.validate_graph(copy.deepcopy(self.plan))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runbook = root / "runbook.md"
+            catalog = root / "catalog.md"
             prompt = root / "prompt.md"
             runbook.write_text(RUNBOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+            catalog.write_text(CATALOG_PATH.read_text(encoding="utf-8"), encoding="utf-8")
             prompt.write_text(PROMPT_PATH.read_text(encoding="utf-8").replace("AUTHORIZE STABLE-PUBLISH", "AUTHORIZE RELEASE"), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "prompt missing required safeguards"):
-                MODULE.validate_docs(tasks, runbook, prompt)
+                MODULE.validate_docs(tasks, runbook, catalog, prompt)
 
 
 if __name__ == "__main__":
