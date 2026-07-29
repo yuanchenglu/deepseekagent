@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the deterministic remaining-work graph and its documentation references."""
+"""Validate the deterministic remaining-work graph and its persisted execution state."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 VALID_STATUSES = {"READY", "LOCKED", "IN_PROGRESS", "BLOCKED", "FAILED", "PASSED", "WAIVED"}
+COMPLETED_STATUSES = {"PASSED", "WAIVED"}
+FRONTIER_STATUSES = {"READY", "IN_PROGRESS", "BLOCKED", "FAILED"}
 VALID_EXECUTORS = {"local-ai", "owner", "owner+local-ai"}
 REQUIRED_TOP_LEVEL = {
     "schema_version",
@@ -34,7 +36,9 @@ REQUIRED_TASK_FIELDS = {
     "authorization_required",
     "status",
 }
+STATE_METADATA_KEYS = {"execution", "evidence", "blocker", "failure", "waiver"}
 ID_PATTERN = re.compile(r"^[A-Z]+-[0-9]{3}$")
+SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 EXPECTED_TASK_COUNT = 65
 EXPECTED_RUNBOOK = "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md"
 
@@ -53,6 +57,85 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         fail("plan root must be an object")
     return value
+
+
+def require_mapping(task: dict[str, Any], key: str, fields: set[str]) -> dict[str, Any]:
+    value = task.get(key)
+    if not isinstance(value, dict):
+        fail(f"{task['id']} status {task['status']} requires object field {key}")
+    missing = fields - set(value)
+    if missing:
+        fail(f"{task['id']} {key} missing fields: {sorted(missing)}")
+    for field in fields:
+        if not isinstance(value[field], str) or not value[field].strip():
+            fail(f"{task['id']} {key}.{field} must be a non-empty string")
+    return value
+
+
+def validate_state_metadata(task: dict[str, Any]) -> None:
+    status = task["status"]
+    task_id = task["id"]
+    present = STATE_METADATA_KEYS & set(task)
+
+    if status in {"READY", "LOCKED"}:
+        if present:
+            fail(f"{task_id} status {status} must not retain state metadata: {sorted(present)}")
+        return
+
+    if status == "IN_PROGRESS":
+        execution = require_mapping(task, "execution", {"branch", "started_at"})
+        if not execution["branch"].startswith("work/"):
+            fail(f"{task_id} execution.branch must start with work/")
+        if present - {"execution"}:
+            fail(f"{task_id} IN_PROGRESS has incompatible metadata: {sorted(present - {'execution'})}")
+        return
+
+    if status == "BLOCKED":
+        require_mapping(task, "blocker", {"reason", "required_input", "owner_action"})
+        if present - {"blocker"}:
+            fail(f"{task_id} BLOCKED has incompatible metadata: {sorted(present - {'blocker'})}")
+        return
+
+    if status == "FAILED":
+        require_mapping(task, "failure", {"evidence_file", "root_cause", "next_action"})
+        if present - {"failure"}:
+            fail(f"{task_id} FAILED has incompatible metadata: {sorted(present - {'failure'})}")
+        return
+
+    if status == "PASSED":
+        evidence = task.get("evidence")
+        if not isinstance(evidence, dict):
+            fail(f"{task_id} PASSED requires object field evidence")
+        required = {"evidence_file", "pr_number", "final_head_sha", "merge_sha"}
+        missing = required - set(evidence)
+        if missing:
+            fail(f"{task_id} evidence missing fields: {sorted(missing)}")
+        if not isinstance(evidence["evidence_file"], str) or not evidence["evidence_file"].strip():
+            fail(f"{task_id} evidence.evidence_file must be a non-empty string")
+        if not isinstance(evidence["pr_number"], int) or evidence["pr_number"] <= 0:
+            fail(f"{task_id} evidence.pr_number must be a positive integer")
+        for field in ("final_head_sha", "merge_sha"):
+            if not isinstance(evidence[field], str) or not SHA_PATTERN.fullmatch(evidence[field]):
+                fail(f"{task_id} evidence.{field} must be a 40-character lowercase commit SHA")
+        if present - {"evidence"}:
+            fail(f"{task_id} PASSED has incompatible metadata: {sorted(present - {'evidence'})}")
+        return
+
+    if status == "WAIVED":
+        if task["irreversible"] or task["id"].startswith(("SEC-", "HIST-")):
+            fail(f"{task_id} cannot be waived")
+        if task.get("waivable") is not True:
+            fail(f"{task_id} WAIVED requires explicit waivable=true in the Plan")
+        require_mapping(
+            task,
+            "waiver",
+            {"owner", "authorized_at", "rationale", "compensating_controls", "evidence_file"},
+        )
+        if present - {"waiver"}:
+            fail(f"{task_id} WAIVED has incompatible metadata: {sorted(present - {'waiver'})}")
+        return
+
+    fail(f"unsupported status for {task_id}: {status}")
 
 
 def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -102,6 +185,7 @@ def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
             fail(f"boolean fields invalid for {task_id}")
         if task["irreversible"] and not task["authorization_required"]:
             fail(f"irreversible task must require authorization: {task_id}")
+        validate_state_metadata(task)
         ids.append(task_id)
         orders.append(task["order"])
         by_id[task_id] = task
@@ -118,6 +202,14 @@ def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
                 fail(f"unknown dependency {dependency} for {task['id']}")
             if by_id[dependency]["order"] >= task["order"]:
                 fail(f"dependency must precede task: {dependency} -> {task['id']}")
+        if task["status"] != "LOCKED":
+            incomplete_dependencies = [
+                dependency
+                for dependency in task["depends_on"]
+                if by_id[dependency]["status"] not in COMPLETED_STATUSES
+            ]
+            if incomplete_dependencies:
+                fail(f"{task['id']} is unlocked before dependencies complete: {incomplete_dependencies}")
 
     indegree = {task_id: 0 for task_id in ids}
     outgoing: dict[str, list[str]] = defaultdict(list)
@@ -137,11 +229,25 @@ def validate_graph(plan: dict[str, Any]) -> list[dict[str, Any]]:
     if len(visited) != len(tasks):
         fail("dependency graph contains a cycle")
 
-    ready = [task["id"] for task in tasks if task["status"] == "READY"]
-    if ready != ["BOOT-001"]:
-        fail(f"initial graph must have only BOOT-001 READY, found {ready}")
-    if any(task["status"] in {"IN_PROGRESS", "PASSED", "WAIVED"} for task in tasks):
-        fail("repository baseline must not pre-claim local-only remaining tasks")
+    frontier_index: int | None = None
+    for index, task in enumerate(tasks):
+        if task["status"] not in COMPLETED_STATUSES:
+            frontier_index = index
+            break
+
+    if frontier_index is None:
+        return tasks
+
+    frontier = tasks[frontier_index]
+    if frontier["status"] not in FRONTIER_STATUSES:
+        fail(f"first incomplete task {frontier['id']} must be READY/IN_PROGRESS/BLOCKED/FAILED")
+
+    for task in tasks[:frontier_index]:
+        if task["status"] not in COMPLETED_STATUSES:
+            fail(f"task before frontier is not complete: {task['id']}")
+    for task in tasks[frontier_index + 1 :]:
+        if task["status"] != "LOCKED":
+            fail(f"task after frontier must remain LOCKED: {task['id']}={task['status']}")
 
     expected_prefixes = {"BOOT", "SEC", "HIST", "CLI", "WEB", "DESK", "STB"}
     actual_prefixes = {task_id.split("-", 1)[0] for task_id in ids}
