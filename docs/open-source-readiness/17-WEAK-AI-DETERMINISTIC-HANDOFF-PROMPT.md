@@ -1,8 +1,9 @@
-# 弱 AI 专用：DeepAgent 剩余 Plan 确定性交接提示词
+# 弱 AI 专用：DeepAgent 全剩余 Plan 最终确定性交接提示词
 
-> 使用方式：把下方代码块完整复制给执行 AI，不要删减。  
-> 目标：即使执行 AI 推理能力较弱，也只能按固定 Work ID、依赖、证据和发布纪律推进。  
-> 本提示词不是建议，是执行协议。
+> **文档状态**：当前权威执行提示词  
+> **使用方式**：将本文代码块完整复制给新的本地高权限执行 AI，不得删减、概括、重排。  
+> **事实纪律**：GitHub 远程实时状态优先于本文中的任何历史 SHA。  
+> **执行目标**：即使执行 AI 推理能力较弱，也必须按固定任务图、依赖、证据、授权和发布纪律连续完成全部剩余工作。
 
 ```text
 @GitHub
@@ -15,39 +16,251 @@ Remote：
 
   https://github.com/yuanchenglu/deepseekagent.git
 
-你的任务是：严格按照仓库当前有效 Plan、机器可读任务图和确定性执行手册，自主、连续、串行完成所有剩余 Work ID、Gate、阶段发布、反馈闭环、Stable 准备和最终 Stable 发布。
-
-你不得自由改顺序，不得跳过 Gate，不得一次并行多个任务，不得因为完成一个 PR 就停止，也不得等待用户反复发送“继续”。
+开发分支：develop
+发布分支：master
 
 ============================================================
-一、你必须先接受的事实
+一、总任务
 ============================================================
+
+你的任务不是只分析代码、提出建议、完成一个 PR、完成一个阶段，或等待用户反复发送“继续”。
+
+你的任务是：
+
+从 GitHub 远程仓库的当前真实状态开始，严格按照仓库当前有效 Plan、机器可读任务图、逐项验收目录和执行 Runbook，自主、连续、串行完成所有剩余 Work ID、Owner Gate、Git 历史安全清理、CLI Alpha、WebUI Beta、Electron Preview、反馈闭环、Stable 准备和最终 Stable 发布。
+
+完成一个合法 Work ID 后立即进入下一个合法 Work ID，不等待“继续”。
+
+只有遇到以下真实阻断才允许停止：
+
+1. 缺少必须由 Owner 操作的外部平台权限；
+2. 缺少真实 Secret，但不得要求用户把 Secret 发到聊天中；
+3. 缺少物理 Apple Silicon Mac；
+4. 缺少真实模型账号、真实用户或受控测试环境；
+5. 缺少 Apple Developer 身份、证书或公证权限；
+6. 缺少针对某次不可逆操作的精确 Owner 授权；
+7. 外部服务故障，且已经完成重试、根因调查和远程保存；
+8. 当前上下文已经无法可靠继续，且全部成果已推送远程并形成完整交接。
+
+============================================================
+二、事实源和状态纪律
+============================================================
+
+事实源优先级：
+
+GitHub 远程最新代码、分支、PR、Issue、Actions、Review、Artifact
+→ remaining-work-plan.json
+→ 16-REMAINING-WORK-EXECUTION-RUNBOOK.md
+→ 18-WORK-ID-ACCEPTANCE-CATALOG.md
+→ 当前有效 Plan 和状态文档
+→ 历史交接
+→ 旧会话、旧容器和聊天记录
+
+必须接受：
 
 1. GitHub 远程仓库是唯一事实源。
-2. 旧会话、旧容器、旧 SHA、百分比、未推送文件都不是事实源。
-3. 代码实现、自动化通过、真实物理机验证、公开发布、用户反馈是五种不同状态，不能互相替代。
-4. 当前剩余任务包含真实 Secret、不可逆 Git 历史重写、物理 Apple Silicon Mac、真实模型、真实用户、Apple 签名/公证和公开发布授权。
-5. Secret 永远不得进入聊天、Commit、PR、Issue、文档、Actions 日志、命令行参数、录屏或公开 artifact。
-6. 不清楚就失败关闭。没有证据就不是完成。
+2. 旧容器、旧 SHA、旧百分比和本地未推送文件不是事实源。
+3. 文档中的 Head 只能作为历史证据，不代表永久最新 Head。
+4. ahead_by 只代表提交图差异，不代表工程进度。
+5. 代码实现、自动化通过、物理机验证、真实模型验证、用户验收和公开发布是不同状态，不能相互替代。
+6. 没有远程可复核证据，就不能标记 PASSED。
+7. 不清楚时失败关闭，不得猜测。
+8. 禁止“基本通过”“主体完成”“约 95%”“看起来没问题”“先算完成”。
+9. 失败必须保留并解释根因，不能通过反复重跑隐藏。
 
 ============================================================
-二、启动后第一批动作：必须按顺序执行
+三、权限边界
 ============================================================
 
-步骤 1：确认 GitHub 身份和权限。
+你可以自主执行：
+
+- 读取仓库、分支、PR、Issue、Actions、Artifact 和 Review；
+- 创建安全本地工作区；
+- 创建普通功能分支；
+- 修改代码、测试、Workflow 和文档；
+- Commit、Push 普通工作分支；
+- 创建和更新 PR；
+- 回复并解决 Review；
+- Gate 全部满足后 squash merge 到 develop；
+- 删除已经确认无唯一提交、无唯一证据的陈旧功能分支；
+- 关闭已经被后续工作完全取代的陈旧 PR；
+- 执行无公开副作用的测试、构建、审计和 dry run。
+
+本提示词不构成以下不可逆操作的授权：
+
+- 撤销真实生产凭据；
+- Force Push 或远程历史重写；
+- 创建或移动 Tag；
+- 创建 GitHub Release；
+- 提升 Alpha/Beta/Preview/Stable Channel；
+- 使用 Apple Developer 身份签名或公证；
+- 覆盖已有公开制品；
+- 合并 develop 到 master；
+- 对外发帖或发布公告。
+
+上述操作必须满足对应 Work ID 的全部条件，并取得包含精确参数的 Owner 授权。
+
+============================================================
+四、开发和远程保存规范
+============================================================
+
+开发优先流程：
+
+功能分支 → PR → 最终 Head CI → Review 清零 → squash merge develop → 删除分支
+
+严禁：
+
+- 在本地 develop 上直接开发；
+- 用普通 git pull 制造 merge commit；
+- git merge origin/develop；
+- 把多个 Work ID 混入同一个 PR；
+- 未经授权修改 master、Tag、Release 或公开 Channel；
+- 跳过、删除或弱化测试；
+- 合并没有有效最终 Head CI 的 PR。
+
+同步 develop 只能使用：
+
+  git fetch origin --prune --tags
+  git checkout develop
+  git reset --hard origin/develop
+
+或：
+
+  git pull --ff-only origin develop
+
+远程保存是强制要求：
+
+1. 临时沙箱可能随时销毁，任何有价值成果不得只留在本地。
+2. 每完成一个可独立保存的原子工作，立即 Commit 并 Push。
+3. 会话结束前必须执行 git status、git log、分支和 upstream 核对。
+4. 不得留下未跟踪文件、未提交修改或未推送 Commit。
+5. PR 是首选交付方式，但不是保存成果的唯一方式。
+6. 如果 PR 因 GitHub 工具、CI 触发、权限或平台异常无法有效创建或合入，而改动安全、可逆、已验证且目标明确，则允许直接 Push 到 develop。
+7. 直接 Push 前必须重新基于最新 origin/develop，确认无冲突、无 Secret、测试通过。
+8. 直接 Push 的 Commit 信息必须写明 PR 失败原因、验证结果和技术债务。
+9. 直接 Push 后必须读取远程 develop Head，确认 Commit 已真实存在。
+10. 如果不能安全直推 develop，至少将全部 Commit Push 到明确命名的远程保存分支，并在交接中给出分支和 Head；不得让成果随沙箱丢失。
+
+============================================================
+五、Secret 安全
+============================================================
+
+执行任何凭据或外部平台命令前：
+
+  set +x
+  umask 077
+  export HISTFILE=/dev/null
+
+Secret 只允许存在于：
+
+- 密码管理器；
+- macOS Keychain；
+- GitHub/Provider Secret Store；
+- 当前进程的受限环境变量；
+- 权限 0600 的临时文件，使用后立即删除。
+
+Secret 不得进入：
+
+- 聊天、Issue、PR、Commit；
+- 仓库文件或 .env；
+- Shell History 或命令行参数；
+- 进程列表；
+- Actions 日志；
+- Screenshot、录屏或 Artifact；
+- URL Query、Authorization Header 的公开输出。
+
+不得要求用户在聊天中提供 Secret。
+
+============================================================
+六、PREBOOT-000：远程分支和 PR 卫生审计
+============================================================
+
+在 BOOT-001 前必须先执行 PREBOOT-000。
+
+步骤 1：确认身份和仓库。
 
   gh auth status
-  gh repo view yuanchenglu/deepseekagent --json nameWithOwner,defaultBranchRef,url
+  gh repo view yuanchenglu/deepseekagent --json nameWithOwner,defaultBranchRef,url,isPrivate
 
-步骤 2：从空目录获取最新仓库。
+步骤 2：从空目录克隆，不复用旧容器工作区。
 
   git clone https://github.com/yuanchenglu/deepseekagent.git
   cd deepseekagent
   git fetch --all --tags --prune
   git checkout develop
-  git pull --ff-only origin develop
+  git reset --hard origin/develop
+  git status --short
 
-步骤 3：完整读取以下文件，不得只读摘要：
+工作区必须为空。
+
+步骤 3：使用分页接口全量枚举远程分支。
+
+  gh api --paginate repos/yuanchenglu/deepseekagent/branches --jq '.[].name'
+
+对每个非 develop/master/gh-pages 分支执行：
+
+  git fetch origin "<branch>:refs/remotes/origin/<branch>"
+  git rev-list --left-right --count origin/develop...origin/<branch>
+  git log --oneline origin/develop..origin/<branch>
+  git diff --stat origin/develop...origin/<branch>
+
+每个分支只能分类为：
+
+- ACTIVE_WORK
+- OPEN_PR
+- FULLY_MERGED
+- SUPERSEDED
+- DEPLOYMENT_BRANCH
+- UNKNOWN
+
+UNKNOWN 分支不得删除。
+
+gh-pages 是独立部署分支，不得与 develop/master 合并，不得因无共同祖先而删除。
+
+步骤 4：全量枚举开放 PR。
+
+  gh pr list --repo yuanchenglu/deepseekagent --state open --limit 100 \
+    --json number,title,url,isDraft,baseRefName,headRefName,headRefOid,mergeStateStatus,createdAt,updatedAt
+
+每个 PR 必须检查：
+
+- Base、Head 和实时落后情况；
+- 是否降低 Plan 版本；
+- 是否重新打开已有 PASSED 证据的任务；
+- 是否有最终 Head CI；
+- 是否有未解决 Review；
+- 是否含独立有效提交；
+- 是否只是过期文档或重复分支。
+
+固定规则：
+
+- 零 Workflow Run = NO-GO，不等于无需测试。
+- PR 显示 0 conflicts 不等于可合并。
+- 旧 Plan PR 不得合入。
+- 被后续工作完全取代的 PR 应说明原因后关闭。
+
+已知检查线索，不得机械假定仍然存在：
+
+1. 若 PR #31 仍将 Plan 恢复到 v2.7.0、把已完成的双 Runtime E2E重新写为下一任务，且没有独立新工作，则关闭而不合并，并在确认无唯一提交后删除来源分支。
+2. 若 setup/auto-merge-workflow 仍只包含“所有 PR 自动启用 auto-merge”，则确认无唯一证据后删除，不得合入 develop。
+3. 若 chatgpt/sync-post-runtime-lease-protocol 相对 develop 领先为 0，则记录 FULLY_MERGED 后删除。
+
+步骤 5：检查提交图卫生。
+
+  git log origin/develop --merges -30 --oneline
+
+如果发现没有最终 Tree 净变化的同步 Merge Commit：
+
+- 记录 Git History Hygiene Finding；
+- 不得误算工程进展；
+- SEC Gate 完成前不得历史重写；
+- 交给 HIST 阶段统一处理。
+
+============================================================
+七、完整读取权威文件
+============================================================
+
+必须完整读取：
 
   AGENTS.md
   docs/open-source-readiness/00-INDEX.md
@@ -63,398 +276,407 @@ Remote：
   docs/open-source-readiness/14-REMOTE-RELEASE-STATE-AUDIT.md
   docs/open-source-readiness/15-LOCAL-HIGH-PERMISSION-EXECUTION-PROMPT.md
   docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md
+  docs/open-source-readiness/17-WEAK-AI-DETERMINISTIC-HANDOFF-PROMPT.md
+  docs/open-source-readiness/18-WORK-ID-ACCEPTANCE-CATALOG.md
   docs/open-source-readiness/remaining-work-plan.json
   docs/open-source-readiness/evidence/CREDENTIAL-ROTATION-TEMPLATE.md
-  docs/TECH_DEBT.md
   docs/open-source-readiness/HANDOFF_2026-07-28.md
+  docs/TECH_DEBT.md
 
-步骤 4：审计实时远程状态。
+还必须读取：
+
+  .github/workflows/local-owner-gate-kit-check.yml
+  .github/workflows/remote-release-state-audit.yml
+  scripts/validate_remaining_work_plan.py
+  scripts/audit-remote-release-state.py
+  scripts/owner-gate/verify-r2-credential-rotation.sh
+  scripts/owner-gate/audit-all-git-refs.sh
+  tests/owner-gate/test_remaining_work_plan.py
+  tests/owner-gate/test_remote_release_audit.py
+  tests/owner-gate/test-owner-gate-kit.sh
+
+============================================================
+八、交接体系防回退自检
+============================================================
+
+执行：
+
+  python3 -m unittest tests/owner-gate/test_remaining_work_plan.py -v
+  python3 -m unittest tests/owner-gate/test_remote_release_audit.py -v
+  bash tests/owner-gate/test-owner-gate-kit.sh
+  python3 scripts/validate_remaining_work_plan.py
+
+必须确认：
+
+- Work ID、Order 唯一；
+- 依赖无环；
+- 只有一个状态前沿；
+- PASSED 任务连续位于前部；
+- 后继任务保持 LOCKED；
+- Plan 版本不得低于当前有效最低版本；
+- Plan、总状态、技术债务和 JSON 前沿一致；
+- 已完成的双 Runtime E2E 不得重新描述为未完成；
+- Issue #21 未关闭前，HIST 和发布任务不得解锁。
+
+检查 local-owner-gate-kit-check.yml 是否覆盖权威 Plan、总状态、Electron 状态、Owner Gate、远程审计、15/16/17/18、JSON 和 TECH_DEBT。
+
+若缺少 Plan 防降级、状态一致性或触发路径：
+
+1. 不得直接进入 SEC；
+2. 创建独立防错加固分支；
+3. 扩展 Workflow、Validator 和测试；
+4. 完成最终 Head CI 和 Review；
+5. 合入 develop 后再开始 BOOT-001。
+
+============================================================
+九、实时远程状态审计
+============================================================
 
   git rev-parse origin/develop
   git rev-parse origin/master
   git log origin/develop -30 --date=iso-strict --pretty='%H%x09%ad%x09%s'
-  gh pr list --repo yuanchenglu/deepseekagent --state open --limit 100
   gh issue view 21 --repo yuanchenglu/deepseekagent --comments
   gh run list --repo yuanchenglu/deepseekagent --limit 100
 
-步骤 5：运行只读发布状态审计。
+触发只读审计：
 
   gh workflow run remote-release-state-audit.yml \
     --repo yuanchenglu/deepseekagent \
     --ref develop
 
-等待运行完成，下载 artifact，打开 JSON 和 Markdown，核对：
+等待完成，下载并打开 JSON/Markdown Artifact，核对：
 
 - develop/master Head；
 - 开放 PR；
 - Tags；
 - Releases，包括 Draft/Prerelease；
-- 当前 Active Actions；
+- Active Actions；
 - 当前引用 Head 最新失败；
-- Alpha/Beta/Preview/Stable 公开渠道。
+- 历史失败；
+- Alpha/Beta/Preview/Stable 公开 Channel。
 
-不得只看 workflow 显示绿色。
+不得只看绿色图标。
 
-步骤 6：创建或更新执行台账：
+快照必须注明 UTC 时间，并声明执行后续任务前需要重新核对。
+
+============================================================
+十、执行台账
+============================================================
+
+创建或更新：
 
   docs/open-source-readiness/evidence/EXECUTION-LEDGER-YYYY-MM-DD.md
 
-台账必须列出 remaining-work-plan.json 中所有 Work ID、状态、PR、Head、merge、artifact、阻塞和下一任务。
+台账必须列出全部 Work ID 的：
+
+- Order、状态、依赖、Executor；
+- 是否不可逆、是否需要 Owner 授权；
+- Evidence、PR、最终 Head、Merge SHA；
+- Workflow Run、Artifact ID/Digest；
+- Review、Blocker、下一任务。
+
+原始敏感证据只保存在安全本地目录，远程只提交脱敏内容。
 
 ============================================================
-三、选择下一任务：不得自行发挥
+十一、下一任务选择算法
 ============================================================
-
-每次只能按以下算法选择：
 
 候选任务 = remaining-work-plan.json 中：
 
-- status 是 READY 或 LOCKED；
-- depends_on 中每个任务都已经有远程 PASSED 证据；
-- 该任务本身尚无等价 PASSED 远程证据。
+- status 为 READY 或 LOCKED；
+- 全部 depends_on 已有远程 PASSED 证据；
+- 当前任务尚无等价 PASSED 证据。
 
-下一任务 = 候选任务中 order 最小的一项。
+下一任务 = 候选中 order 最小的一项。
 
-如果没有候选任务：
+规则：
 
-1. 检查 BLOCKED 任务缺什么输入；
-2. 检查 Owner 是否已在 Issue/PR 提供输入；
-3. 检查依赖是否完成但忘记更新状态；
-4. 仍无法推进时，更新 Plan、技术债务和交接后停止。
+1. 一次只能执行一个 Work ID。
+2. 多个候选仍只选 order 最小者。
+3. 不得并行两个 Work ID。
+4. 不得跳过 Owner Gate。
+5. 不得提前执行“容易”的后续任务。
+6. 不得把后续任务顺手混入当前 PR。
+7. 不得重复已有 PASSED 远程证据的任务。
 
-如果有多个候选，仍只执行 order 最小的一项。
-
-严禁同时实施两个 Work ID。
+没有候选时，检查 BLOCKED 输入、Owner 授权、状态遗漏和陈旧 PR；仍不能推进时，更新技术债务、台账和交接后停止。
 
 ============================================================
-四、每个 Work ID 的固定动作
+十二、每个 Work ID 的固定流程
 ============================================================
 
-对每一项，严格执行：
+1. 打开 Runbook 对应章节。
+2. 打开 Acceptance Catalog 对应条目。
+3. 检查全部依赖。
+4. 重新读取最新 origin/develop。
+5. 检查是否已有等价远程证据。
+6. 不满足前置条件则 BLOCKED。
+7. 将 JSON 和 Ledger 改为 IN_PROGRESS。
+8. 从最新 develop 创建一个独立分支：
 
-1. 打开 16-REMAINING-WORK-EXECUTION-RUNBOOK.md 中对应 Work ID。
-2. 检查所有前置条件；有一个不满足就 BLOCKED，不能继续。
-3. 把 remaining-work-plan.json 和执行台账中的状态改为 IN_PROGRESS。
-4. 从最新 develop 创建独立分支：
-
+     git fetch origin --prune --tags
      git checkout develop
-     git pull --ff-only origin develop
+     git reset --hard origin/develop
+     git status --short
      git checkout -b work/<work-id-lowercase>-<short-name>
 
-5. 执行手册规定的命令和验证。
-6. 保存原始证据到安全本地目录；原始证据可能含敏感内容时绝不上传。
-7. 生成脱敏证据：
+9. 严格执行 Runbook 的命令、测试、断言、失败处理和回滚。
+10. 保存原始证据到安全本地目录。
+11. 生成远程脱敏证据：
 
-     docs/open-source-readiness/evidence/<WORK-ID>-<YYYY-MM-DD>.md
+      docs/open-source-readiness/evidence/<WORK-ID>-<YYYY-MM-DD>.md
 
-8. 证据必须填写：
-
-   - Work ID；
-   - PASSED/FAILED/BLOCKED；
-   - UTC 时间；
-   - 执行人和复核人；
-   - develop 基线 SHA；
-   - 分支和最终 Head；
-   - OS/芯片/工具版本；
-   - 输入来源；
-   - 不含 Secret 的命令；
-   - 退出码；
-   - 强制断言；
-   - artifact ID/digest；
-   - Review；
-   - P0/P1；
-   - 回滚；
-   - 脱敏检查；
-   - 未验证内容；
-   - 下一 Work ID。
-
-9. 对所有拟提交文件运行 Secret 检查。不得上传 Secret、Authorization Header、签名 URL、证书私钥、模型 Token 或可还原值。
-10. 推送分支并创建 PR。
-11. PR 描述必须有：
-
-   ## Work ID
-   ## Gate 目标/问题根因
-   ## 前置依赖与证据
-   ## 执行步骤/技术方案
-   ## 修改范围
-   ## 最终 Head SHA
-   ## 测试和真实环境结果
-   ## Artifact/digest
-   ## Review 结果
-   ## 未验证内容
-   ## 回滚方案
-   ## Secret 脱敏检查
-   ## 技术债务
-   ## 下一唯一任务
-
-12. 等待最终 PR Head 的全部目标 CI。
-13. 读取所有 Review thread。每个 actionable comment 必须修复、回复、重新测试并标记 resolved。
-14. 只有最终 Head CI 成功、Review 为 0、证据完整，才能 squash merge 到 develop。
-15. 合并后重新读取 develop 和 Actions。
-16. 把 Work ID 改为 PASSED，并解锁唯一后继任务。
-17. 同步：Plan、总状态、阶段文档、测试报告、技术债务、00-INDEX、交接和执行台账。
-18. 自动进入下一 Work ID，不等待“继续”。
+12. 证据必须包含：Work ID、状态、UTC、执行/复核人、基线、分支、最终 Head、OS/芯片/工具、输入、不含 Secret 的命令、退出码、断言、Workflow、Artifact、Review、P0/P1、回滚、脱敏、未验证内容、下一 Work ID。
+13. 对 Diff、新文件、日志、Artifact 和历史执行 Secret 检查。
+14. Commit 并立即 Push 远程。
+15. 创建 PR；若 PR 工具或平台异常无法有效保存，按第四节的安全直推/远程保存分支规则处理。
+16. 等待最终 PR Head 的全部目标 CI。
+17. 零 Check 必须 NO-GO，调查 Path Filter 或手动触发；Run Head 必须等于最终 PR Head。
+18. 读取全部 Review；Actionable Comment 必须修复、测试、回复和 Resolve。
+19. 最终 Head CI 成功、Review 为 0、Evidence 完整后才可 squash merge develop。
+20. 合并后读取最新 develop 和 Push Actions。
+21. 将 Work ID 改为 PASSED，只解锁唯一后继任务。
+22. 同步 Plan、状态、阶段文档、Evidence、TECH_DEBT、Index、Handoff 和 Ledger。
+23. 自动进入下一 Work ID。
 
 ============================================================
-五、状态判定：只允许四种实际结果
+十三、PR、Commit 和 CI 固定要求
 ============================================================
 
-PASSED：所有强制断言均有可复核证据。
-FAILED：执行结束但至少一个强制断言失败。
-BLOCKED：缺少 Owner 权限、真实设备、真实用户或不可逆授权。
-IN_PROGRESS：当前正在执行，不能解锁后继任务。
+Commit 信息必须说明：
 
-禁止使用“基本通过”“主体完成”“约 95%”“看起来没问题”“先算完成”。
+- Problem / Root cause
+- Implementation
+- Validation
+- Unverified
+- Technical debt
 
-FAILED 后必须修复根因并重新执行整个当前 Work ID。不能只重跑直到绿色。
+PR 必须包含：
+
+- Work ID
+- Gate 目标/根因
+- 前置依赖与证据
+- 技术方案
+- 修改范围
+- 最终 Head SHA
+- 测试和真实环境结果
+- Workflow Run
+- Artifact ID/Digest
+- Review 结果
+- 失败历史和根因
+- 未验证内容
+- 回滚
+- Secret 脱敏
+- 技术债务
+- 下一唯一任务
+
+只有最终 PR Head 的结果有效。旧 Head、旧 Artifact、其他分支结果和没有 SHA 对应关系的截图无效。
 
 ============================================================
-六、当前安全 Gate 的固定顺序
+十四、状态规则
 ============================================================
 
-必须依次完成：
+允许状态：READY、LOCKED、IN_PROGRESS、BLOCKED、FAILED、PASSED、WAIVED。
+
+PASSED：全部强制断言有远程可复核证据。
+FAILED：至少一个强制断言失败。
+BLOCKED：缺 Owner 权限、设备、用户、凭据或不可逆授权。
+IN_PROGRESS：当前正在执行，后继不得解锁。
+
+SEC、HIST、签名、公证、发布和数据安全任务不得 WAIVED。
+
+FAILED 后必须修复根因并重新验证整个 Work ID，不能只重跑直到绿色。
+
+============================================================
+十五、安全 Gate 固定顺序
+============================================================
+
+除非机器任务图已通过 Reviewed PR 合法推进，否则：
 
 BOOT-001 → BOOT-002 → BOOT-003
 → SEC-001 → SEC-002 → SEC-003 → SEC-004 → SEC-005 → SEC-006 → SEC-007
 → HIST-001 → HIST-002 → HIST-003 → HIST-004 → HIST-005 → HIST-006 → HIST-007 → HIST-008
 
-Issue #21 未有远程 PASSED 证据并关闭前：
+Issue #21 未有远程 PASSED 证据并关闭前，禁止：
 
-- 禁止 Git 历史重写；
-- 禁止 force push；
-- 禁止发布 Tag；
-- 禁止公开 Release；
-- 禁止提升任何 channel。
-
-============================================================
-七、Secret 处理：必须严格执行
-============================================================
-
-安全 shell：
-
-  set +x
-  umask 077
-  export HISTFILE=/dev/null
-
-Secret 只允许存在：
-
-- 密码管理器；
-- macOS Keychain；
-- 受限临时环境变量；
-- GitHub/Provider Secret 存储；
-- 权限 600 的临时文件，并在完成后删除。
-
-不得存在：
-
-- 仓库文件；
-- `.env`；
-- shell history；
-- 命令参数；
-- PR/Issue/聊天；
-- Actions 日志；
-- 截图/录屏；
-- artifact。
-
-凭据轮换必须完成：盘点 → 新凭据 → 更新消费方 → 新凭据最小读写验证 → 撤销旧凭据 → 旧凭据只读认证失败 → 脱敏证据 PR → 关闭 Issue #21。
-
-R2 使用：
-
-  bash scripts/owner-gate/verify-r2-credential-rotation.sh
-
-旧凭据只“显示 revoked”不算完成，必须真实认证失败。
+- Git 历史重写；
+- Force Push；
+- Tag；
+- Release；
+- 提升任何公开 Channel；
+- develop 合并 master。
 
 ============================================================
-八、Git 历史重写：必须等 Owner 明确授权
+十六、凭据轮换固定顺序
 ============================================================
 
-先完成：
+盘点暴露面
+→ 创建最小权限新凭据
+→ 更新 Secret Store
+→ 新凭据隔离最小读写验证
+→ 撤销旧凭据
+→ 使用旧凭据执行安全只读认证并确认失败
+→ 提交脱敏证据
+→ 关闭 Issue #21
 
-- mirror clone；
-- 加密备份；
-- Git bundle；
-- refs-before；
-- fsck-before；
-- 全 refs gitleaks；
-- 每个 finding 对应的已失效凭据；
-- 精确 rewrite rules；
-- 隔离 dry run；
-- after refs；
-- 测试/构建；
-- 0 有效秘密；
-- 回滚 bundle 验证。
+R2 分阶段执行：
+
+  bash scripts/owner-gate/verify-r2-credential-rotation.sh --new-only
+
+只有旧凭据撤销后：
+
+  bash scripts/owner-gate/verify-r2-credential-rotation.sh --old-denial-only
+
+不得把平台显示 revoked 当作旧凭据失效证据，必须真实认证失败。
+
+============================================================
+十七、历史重写授权
+============================================================
+
+只有 SEC-007 PASSED 后才能进入 HIST。
+
+Force Push 前必须完成 mirror、加密备份、bundle、refs/fsck before、全 refs 扫描、Finding 对应凭据失效、精确规则、隔离 dry run、refs/fsck after、测试、全 refs 零有效 Secret、回滚验证和协作者重克隆说明。
 
 Owner 授权必须包含：
 
-  AUTHORIZE HIST-006
-  Repository:
-  Rewritten source digest:
-  Affected branches:
-  Affected tags:
-  Backup bundle digest:
-  Collaborator re-clone notice prepared: yes
-  Authorized by:
-  UTC time:
+OWNER-AUTHORIZATION
+action: HIST-006
+repository: yuanchenglu/deepseekagent
+current_remote_head: <SHA>
+rewrite_result_digest: <DIGEST>
+backup_bundle_digest: <DIGEST>
+branches_to_update: <EXACT LIST>
+tags_to_update: <EXACT LIST>
+rollback_location: <LOCATION>
+expires_at_utc: <TIME>
 
-缺任一字段不得 force push。
-
-============================================================
-九、发布前必须检查 Tag 触发冲突
-============================================================
-
-在推送任何 Tag 前：
-
-1. 搜索所有 `.github/workflows/*.yml` 的 `push.tags`；
-2. 计算候选 Tag 会匹配哪些 workflow；
-3. 只允许匹配预期发布工作流；
-4. 若会触发额外 workflow，先单独修复 trigger；
-5. 禁止“先推 Tag 再观察”。
-
-特别注意：Beta/Preview Tag 可能意外触发通用 `release.yml`。发现冲突必须先修复。
+字段不完整不得 Force Push。
 
 ============================================================
-十、三个阶段必须完整串行闭环
+十八、发布授权
 ============================================================
 
-CLI Alpha：
+任何公开发布授权必须包含：
 
-CLI-001 至 CLI-013 全部 PASSED，包括：dry run、干净 Mac、真实模型、升级、失败回滚、卸载、Hermes/OpenCode 共存、P0/P1=0、Owner 授权、发布、公开回归、Alpha 用户周期。
+OWNER-AUTHORIZATION
+action: <WORK-ID>
+repository: yuanchenglu/deepseekagent
+version: <VERSION>
+head: <EXACT SHA>
+tag: <EXACT TAG>
+channel: <EXACT CHANNEL>
+artifact_digest: <DIGEST>
+rollback_target: <TARGET>
+authorization_expires_at_utc: <TIME>
 
-WebUI Beta：
+发布前必须再次核对 Tag、Release、Channel、Workflow Trigger、并发运行、Artifact Digest、Rollback、Active Actions、当前 Head 失败和授权有效期。
 
-WEB-001 至 WEB-011 全部 PASSED，包括：迁移、迁移失败回滚、干净生命周期、Browser 安全、共存、Beta dry run、P0/P1=0、Owner 授权、发布、公开回归、Beta 用户周期。
+Channel 必须最后提升。
 
-Electron Preview：
-
-DESK-001 至 DESK-011 全部 PASSED，包括：DMG checksum、Gatekeeper 手工批准、双模式、升级/回滚/卸载、Crash/Lease、共存、受控用户测试、P0/P1=0、Owner 对无签名风险的明确授权、发布、反馈。
-
-Stable：
-
-STB-001 至 STB-012 全部 PASSED，包括：Apple 权限、签名、Hardened Runtime、Entitlements、公证、staple、更新链、干净 Mac、全矩阵、RC、P0/P1=0、Owner 最终授权、master/Tag/Release/Stable channel、公开回归、用户反馈、最终文档闭环。
-
-============================================================
-十一、公开发布必须使用固定授权
-============================================================
-
-没有以下明确授权，只准备 Draft、dry run、Release Notes、Manifest、Checksum 和回滚方案，不执行公开动作。
-
-CLI Alpha：
-
-  AUTHORIZE CLI-ALPHA-PUBLISH
-  Version:
-  Candidate Head SHA:
-  Tag:
-  Target GitHub Release:
-  Target R2 objects:
-  Target channel: alpha
-  Release Notes reviewed: yes
-  Rollback version/channel object:
-  Authorized by:
-  UTC time:
-
-WebUI Beta：使用 `AUTHORIZE WEBUI-BETA-PUBLISH`，并写清 BSL-1.1 许可口径。
-
-Electron Preview：使用 `AUTHORIZE ELECTRON-PREVIEW-PUBLISH`，并明确接受无签名、未公证和 Gatekeeper 手工批准风险。
-
-Stable：
-
-  AUTHORIZE STABLE-PUBLISH
-  Version:
-  Candidate Head SHA:
-  master PR:
-  Tag:
-  Signing identity fingerprint:
-  Notarization request/result:
-  Stapling verified: yes
-  Public channels:
-  Rollback release/channel:
-  P0 count: 0
-  P1 count: 0
-  Release Notes reviewed: yes
-  Legal/license wording reviewed: yes
-  Authorized by:
-  UTC time:
-
-缺任一字段不得发布。
+无签名 Electron Preview 不得描述为 Signed、Notarized 或 Stable。
 
 ============================================================
-十二、失败时不要猜，按分类处理
+十九、master 纪律
 ============================================================
 
-代码/配置错误：修复、加回归测试、重新跑整个 Work ID。
-测试错误：修测试，但必须证明生产行为正确。
-外部服务错误：记录状态码、时间、Provider；可重试则重试，持续失败则 BLOCKED。
-权限缺失：写清所需权限、Owner 步骤、预期结果和验证方式，BLOCKED。
-物理设备缺失：BLOCKED，不用模拟器证据替代。
-真实用户缺失：BLOCKED，不用内部 AI 自测替代。
-不可复现：增加日志和诊断；未定位前不能 PASSED。
+master 是发布分支，不是日常同步分支。
 
-禁止：降低断言、skip 测试、删除失败日志、使用旧 artifact、只重跑到绿色、未定位就合并。
+不得为了“保持最新”把 develop 直接合入 master。
+
+只有发布 Gate PASSED 且 Owner 精确授权后，才能通过 PR 将已验证发布 Commit 提升到 master。
 
 ============================================================
-十三、上下文不足时的自动交接
+二十、上下文腐烂和工具死循环
 ============================================================
 
-出现以下任一情况：
+出现以下任一情况视为上下文风险：
 
-- 无法准确说出当前 Work ID、依赖和 PASSED 条件；
-- 同一命令执行三次无新信息；
-- 混淆 develop/master、版本或候选 Head；
-- 不确定 PR 是否合并；
-- 引用 SHA 与远程冲突；
-- 工具循环；
-- 无法完整检查 CI/Review；
+- 无法准确说出当前 Work ID、分支、Head 或依赖；
+- 把已完成任务重新当作未完成；
+- 连续三次相同工具操作没有新增信息；
+- 在同一错误上反复重试却没有根因假设；
+- 忘记修改文件；
+- Plan、JSON、Ledger 和 PR 互相矛盾；
+- 不能保证继续操作不会误发布或误写远程。
 
 立即执行：
 
-1. 推送全部安全成果；
-2. 更新执行台账、Plan、状态、技术债务和交接；
-3. 写明当前 Work ID、已完成步骤、最后一个可靠证据、阻塞和下一条命令；
-4. 新会话从 BOOT-001 重新审计；
-5. 不重复已有 PASSED 远程证据的任务。
+  git status --short
+  git diff
+  git log -5 --oneline
+  git branch --show-current
+  git rev-parse HEAD
+  git rev-parse origin/develop
+
+然后：
+
+1. 停止开始新修改；
+2. 完成可安全完成的最小原子 Commit；
+3. Push 当前分支；
+4. 确认无本地未推送工作；
+5. 更新 Ledger、TECH_DEBT 和 Handoff；
+6. 记录 Work ID、状态、分支、Head、PR、CI、Review、根因和下一命令；
+7. 生成可直接复制的新会话提示词；
+8. 停止当前会话。
+
+如果平台不能自行创建新会话，则由用户复制交接提示词。不得声称后台继续。
 
 ============================================================
-十四、每次向用户汇报的固定格式
+二十一、停止前远程持久化检查
 ============================================================
 
-只汇报事实：
+任何停止、交接或会话结束前，必须执行并记录：
 
-当前 Work ID：
-状态：IN_PROGRESS / PASSED / FAILED / BLOCKED
-依赖证据：
-本次完成：
-最终 Head：
-PR：
-CI：
-Review：
-Artifact/digest：
-真实环境验证：
-未验证：
-技术债务：
-下一唯一任务：
-是否需要 Owner 输入：
+  git status --porcelain=v1
+  git branch --show-current
+  git rev-parse HEAD
+  git log --oneline --decorate -10
+  git rev-list --left-right --count @{upstream}...HEAD
+  git ls-remote --heads origin
 
-不得用“基本完成”“差不多”“应该可以”。
+通过条件：
+
+- git status 输出为空；
+- 当前有价值 Commit 已 Push；
+- 远程存在当前 Head；
+- 若目标是 develop，远程 develop 已包含该 Commit；
+- 若暂不能安全进入 develop，远程保存分支包含全部 Commit，且交接明确分支和 Head；
+- 没有仅在本地的未跟踪文件、未提交修改、stash 或 Commit。
+
+如发现未保存工作，必须先 Commit 和 Push，再停止。
 
 ============================================================
-十五、最终完成标准
+二十二、最终完成条件
 ============================================================
 
-只有 remaining-work-plan.json 中所有 Work ID 都为 PASSED，并且：
+只有全部满足才能声明整个 Plan 完成：
 
-- Issue #21 关闭且有脱敏证据；
-- 全 refs 有效秘密为 0；
-- 干净机安装/升级/失败回滚/卸载通过；
-- CLI/WebUI/Desktop/Hermes/OpenCode 共存通过；
-- 真实模型任务通过；
-- Alpha/Beta/Preview/Stable 和反馈周期全部闭环；
-- Apple 签名、公证、staple、更新链通过；
-- P0/P1 为 0 或符合正式豁免；
-- 最终 Head CI 成功、Review 为 0；
-- develop/master/Tags/Releases/Channels/Manifest/Checksum 一致；
-- 没有关键成果只在本地；
-- 发布后回归和文档闭环完成；
+- 全部 Work ID PASSED；
+- 所有 SEC Gate 完成；
+- 历史清理和全 refs 扫描完成；
+- CLI Alpha、WebUI Beta、Electron Preview 发布并完成反馈闭环；
+- Apple 签名、公证和 Stable Release 完成；
+- 公开渠道安装、升级、失败回滚和卸载回归通过；
+- P0/P1 清零；
+- Review Thread 为 0；
+- Tags、Releases、Channels、master 与证据一致；
+- Plan、Status、TECH_DEBT、Index、Evidence、Ledger 和 Handoff 同步；
+- 没有本地未推送工作；
+- 没有陈旧开放 PR；
+- 没有未分类远程分支；
+- 最终远程发布状态审计通过。
 
-才可以宣布整个 Plan 完成。
+最终报告必须区分：
 
-现在开始执行 BOOT-001。不要先输出宏观分析或待办列表；直接审计远程并持续推进。
+- 已完成并验证；
+- 已发布；
+- 未验证；
+- 技术债务；
+- 历史失败；
+- Owner 操作；
+- 最终远程 Head、Tag、Release、Channel；
+- Artifact 和 Digest；
+- 回滚路径。
+
+满足以上条件前，不得声称整个计划完成。
 ```
