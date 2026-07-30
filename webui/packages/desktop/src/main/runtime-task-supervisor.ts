@@ -468,7 +468,21 @@ export class RuntimeTaskSupervisor {
     const key = stableTaskKey(request.runtime, request.taskId)
     const record = this.records.get(key)
     if (!record) return { status: 200, body: { ok: true, code: 'already-terminal' } }
-    if (record.state === 'orphaned') return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(record) } }
+    if (record.state === 'orphaned') {
+      // A task restored without process evidence must remain fail-closed: it may
+      // not bind or resume an arbitrary PID. The original Runtime can still
+      // explicitly confirm that the unbound attempt is terminal, which closes
+      // the orphaned coordinator lease through the existing process-exit path.
+      if (record.process) return { status: 409, body: { ok: false, code: 'resume-required', task: cloneTask(record) } }
+      const terminal = this.coordinator.dispatch({
+        type: 'process-exit', eventId: request.eventId, observedAt: this.now(), runtime: record.runtime,
+        taskId: record.internalTaskId, leaseId: record.leaseId, exitCode: null, signal: null,
+      })
+      if (!terminal.ok) return { status: 409, body: { ok: false, code: terminal.code, message: terminal.message } }
+      this.records.delete(key)
+      this.persist()
+      return { status: 200, body: { ok: true, code: request.outcome } }
+    }
     const result = request.outcome === 'cancelled'
       ? this.adapters[record.runtime].dispatch({ type: 'cancel', eventId: request.eventId, observedAt: this.now(), taskId: record.internalTaskId, leaseId: record.leaseId, reason: 'cancelled-by-runtime' })
       : this.adapters[record.runtime].dispatch({ type: 'release', eventId: request.eventId, observedAt: this.now(), taskId: record.internalTaskId, leaseId: record.leaseId })
@@ -540,8 +554,12 @@ export class RuntimeTaskSupervisor {
     const now = this.now()
     const staleRuntimes = new Set<RuntimeKind>()
     for (const [key, record] of [...this.records]) {
+      // Orphaned tasks intentionally remain fail-closed. A missing or reused PID is
+      // not sufficient evidence to release their workspace after Runtime/Main loss;
+      // only an explicit process-exit confirmation or verified resume may do so.
+      if (record.state === 'orphaned') continue
       if (!record.process) {
-        if (record.state === 'active' && now - record.lastHeartbeatAt >= this.heartbeatTtlMs) staleRuntimes.add(record.runtime)
+        if (now - record.lastHeartbeatAt >= this.heartbeatTtlMs) staleRuntimes.add(record.runtime)
         continue
       }
       const evidence = await this.processProbe.inspect(record.process.pid)
@@ -553,7 +571,7 @@ export class RuntimeTaskSupervisor {
         if (result.ok) this.records.delete(key)
         continue
       }
-      if (record.state === 'active' && now - record.lastHeartbeatAt >= this.heartbeatTtlMs) staleRuntimes.add(record.runtime)
+      if (now - record.lastHeartbeatAt >= this.heartbeatTtlMs) staleRuntimes.add(record.runtime)
     }
     for (const runtime of staleRuntimes) this.markRuntimeOrphaned(runtime, 'heartbeat-timeout')
     this.persist()
@@ -573,9 +591,9 @@ export class RuntimeTaskSupervisor {
     }
     for (const task of persisted.tasks) {
       if (!validRuntime(task.runtime) || !validAccess(task.access) || !validString(task.taskId) || !validString(task.workspace, 4_096)) continue
-      if (!task.process || !validPid(task.process.pid) || !validString(task.process.fingerprint, 128)) continue
-      const evidence = await this.processProbe.inspect(task.process.pid)
-      if (!evidence || evidence.fingerprint !== task.process.fingerprint) continue
+      if (task.process && (!validPid(task.process.pid) || !validString(task.process.fingerprint, 128))) continue
+      const evidence = task.process ? await this.processProbe.inspect(task.process.pid) : null
+      const processVerified = Boolean(evidence && task.process && evidence.fingerprint === task.process.fingerprint)
       const key = stableTaskKey(task.runtime, task.taskId)
       const generation = task.runtime === 'deepagent'
         ? Math.max(1, task.generation || 1, this.generations.get(key) || 0)
@@ -587,15 +605,25 @@ export class RuntimeTaskSupervisor {
         identity: { workspace: task.workspace, taskId: internalTaskId, access: task.access },
       })
       if (!acquired.ok || !acquired.lease) continue
-      const bound = this.coordinator.dispatch({
-        type: 'bind-process', eventId: this.nextEventId('restore-bind'), observedAt: this.now(), runtime: task.runtime,
-        taskId: internalTaskId, leaseId: acquired.lease.leaseId,
-        process: { pid: evidence.pid, treeId: evidence.fingerprint.slice(0, 32) },
-      })
-      if (!bound.ok) continue
+      if (processVerified && evidence) {
+        const bound = this.coordinator.dispatch({
+          type: 'bind-process', eventId: this.nextEventId('restore-bind'), observedAt: this.now(), runtime: task.runtime,
+          taskId: internalTaskId, leaseId: acquired.lease.leaseId,
+          process: { pid: evidence.pid, treeId: evidence.fingerprint.slice(0, 32) },
+        })
+        if (!bound.ok) {
+          this.adapters[task.runtime].dispatch({
+            type: 'release', eventId: this.nextEventId('restore-bind-rollback'), observedAt: this.now(),
+            taskId: internalTaskId, leaseId: acquired.lease.leaseId,
+          })
+          continue
+        }
+      }
       this.records.set(key, {
         ...task, workspace: resolve(task.workspace), state: 'active', leaseId: acquired.lease.leaseId,
-        internalTaskId, process: evidence, lastHeartbeatAt: this.now(), generation,
+        internalTaskId,
+        process: processVerified && evidence ? evidence : task.process ? { ...task.process } : undefined,
+        lastHeartbeatAt: this.now(), generation,
       })
       activeRuntimes.add(task.runtime)
     }

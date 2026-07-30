@@ -1,0 +1,68 @@
+name: Runtime Task Dual Runtime E2E
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - ".github/workflows/runtime-task-dual-runtime-e2e.yml"
+      - "webui/package.json"
+      - "webui/package-lock.json"
+      - "webui/packages/desktop/src/main/runtime-task-lease.ts"
+      - "webui/packages/desktop/src/main/runtime-task-supervisor.ts"
+      - "webui/packages/server/src/services/runtime-task-supervisor-client.ts"
+      - "webui/packages/server/src/services/hermes/run-chat/handle-bridge-run.ts"
+      - "webui/packages/server/src/services/hermes/run-chat/handle-coding-agent-run.ts"
+      - "webui/packages/server/src/services/agent-runner/coding-agent-run-manager.ts"
+      - "webui/tests/server/runtime-task-dual-runtime-e2e.test.ts"
+  push:
+    branches: [develop]
+    paths:
+      - ".github/workflows/runtime-task-dual-runtime-e2e.yml"
+      - "webui/packages/desktop/src/main/runtime-task-supervisor.ts"
+      - "webui/packages/server/src/services/runtime-task-supervisor-client.ts"
+      - "webui/tests/server/runtime-task-dual-runtime-e2e.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-task-dual-runtime-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dual-runtime-e2e:
+    name: Real production-client workspace and failure E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.5.0'
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Install WebUI dependencies
+        working-directory: webui
+        run: npm ci --no-audit --no-fund
+
+      - name: Run dual Runtime production-client E2E
+        working-directory: webui
+        run: |
+          mkdir -p ../dist/test-results
+          npx vitest run tests/server/runtime-task-dual-runtime-e2e.test.ts \
+            --reporter=json \
+            --outputFile=../dist/test-results/runtime-task-dual-runtime-vitest.json
+
+      - name: Upload E2E logs and state snapshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-task-dual-runtime-e2e
+          path: |
+            dist/test-results/runtime-task-dual-runtime-vitest.json
+            dist/test-results/runtime-task-dual-runtime-e2e.json
+          if-no-files-found: warn
+          retention-days: 30
