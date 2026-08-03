@@ -496,8 +496,8 @@ generate_checksums() {
     detect_sha_cmd
     generate_one_checksum "$TARBALL_CORE"
     if [ "$CORE_ONLY" != true ]; then
-        generate_one_checksum "$TARBALL_EMBEDDED"
-        generate_one_checksum "$TARBALL_WEBUI_SERVER"
+        [ -f "$TARBALL_EMBEDDED" ] && generate_one_checksum "$TARBALL_EMBEDDED"
+        [ -f "$TARBALL_WEBUI_SERVER" ] && generate_one_checksum "$TARBALL_WEBUI_SERVER"
     fi
     # Electron DMG 校验和（如果存在）
     for dmg in "${DIST_DIR}"/DeepAgent-*.dmg; do
