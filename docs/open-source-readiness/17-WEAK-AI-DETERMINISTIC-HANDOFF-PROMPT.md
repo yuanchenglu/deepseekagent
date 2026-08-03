@@ -393,7 +393,7 @@ gh-pages 是独立部署分支，不得与 develop/master 合并，不得因无�
 
 1. 一次只能执行一个 Work ID。
 2. 多个候选仍只选 order 最小者。
-3. 不得并行两个 Work ID。
+3. 不得并行两个 Work ID。严禁同时实施两个 Work ID。
 4. 不得跳过 Owner Gate。
 5. 不得提前执行“容易”的后续任务。
 6. 不得把后续任务顺手混入当前 PR。
@@ -569,11 +569,40 @@ artifact_digest: <DIGEST>
 rollback_target: <TARGET>
 authorization_expires_at_utc: <TIME>
 
-发布前必须再次核对 Tag、Release、Channel、Workflow Trigger、并发运行、Artifact Digest、Rollback、Active Actions、当前 Head 失败和授权有效期。
+发布前必须再次核对 Tag、Release、Channel、Workflow Trigger、并发运行、Artifact Digest、Rollback、Active Actions、当前 Head 失败和授权有效期。Tag 触发冲突检查必须在推送任何 Tag 前完成：列出所有匹配 push.tags 的 workflow，确认候选 Tag 只触发目标发布工作流。
 
 Channel 必须最后提升。
 
 无签名 Electron Preview 不得描述为 Signed、Notarized 或 Stable。
+
+授权必须包含精确的 Owner 授权格式：
+
+  AUTHORIZE HIST-006
+  Repository:
+  Rewritten source digest:
+  Affected branches:
+  Affected tags:
+  Backup bundle digest:
+  Collaborator re-clone notice prepared: yes
+  Authorized by:
+  UTC time:
+
+  AUTHORIZE STABLE-PUBLISH
+  Version:
+  Candidate Head SHA:
+  master PR:
+  Tag:
+  Signing identity fingerprint:
+  Notarization request/result:
+  Stapling verified: yes
+  Public channels:
+  Rollback release/channel:
+  P0 count: 0
+  P1 count: 0
+  Release Notes reviewed: yes
+  Legal/license wording reviewed: yes
+  Authorized by:
+  UTC time:
 
 ============================================================
 十九、master 纪律
