@@ -90,7 +90,11 @@ id = "discord-client-id"
     '''^website/docs/user-guide/features/voice-mode\.md$''',
     '''^website/docs/user-guide/messaging/discord\.md$''',
     '''^website/docs/user-guide/messaging/index\.md$''',
-    '''^website/docs/user-guide/security\.md$'''
+    '''^website/docs/user-guide/security\.md$''',
+    '''^exprted\.jsonl$''',
+    '''^docs/messaging\.md$''',
+    '''^README\.md$''',
+    '''^AGENTS\.md$'''
   ]
 
 [[rules]]
