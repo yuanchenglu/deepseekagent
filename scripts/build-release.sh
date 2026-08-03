@@ -391,7 +391,7 @@ build_webui_server_tarball() {
     mkdir -p "$stage_dir/webui/dist" "$stage_dir/webui/runtime/node/bin"
     cp -R "$PROJECT_ROOT/webui/dist/client" "$stage_dir/webui/dist/client"
     cp -R "$PROJECT_ROOT/webui/dist/server" "$stage_dir/webui/dist/server"
-    cp -R "$PROJECT_ROOT/webui/dist/data" "$stage_dir/webui/dist/data"
+    [ -d "$PROJECT_ROOT/webui/dist/data" ] && cp -R "$PROJECT_ROOT/webui/dist/data" "$stage_dir/webui/dist/data" || true
     cp -R "$PROJECT_ROOT/webui/bin" "$stage_dir/webui/bin"
     cp -R "$PROJECT_ROOT/webui/third_party_licenses" "$stage_dir/webui/third_party_licenses"
     cp "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/webui/package-lock.json" "$stage_dir/webui/"
