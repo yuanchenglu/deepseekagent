@@ -84,6 +84,8 @@ jobs:
             --output "../dist/releases/deepagent-webui-all-npm-licenses-${{ inputs.version }}.json"
 
       - name: Build Core, WebUI, and managed DeepCode artifacts
+        env:
+          SKIP_OPENCODE_CHECK: "1"
         run: bash scripts/build-release.sh --version "${{ inputs.version }}" --channel beta
 
       - name: Verify artifact boundaries
