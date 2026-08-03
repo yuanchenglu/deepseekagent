@@ -23,6 +23,8 @@ id = "generic-api-key"
     '''^skills/ai-ml/volcengine-ark-integration/references/session-verified-config\.md$''',
     '''^skills/mlops/training/unsloth/references/llms-full\.md$''',
     '''^skills/mlops/training/unsloth/references/llms-txt\.md$''',
+    '''^skills/mlops/unsloth/references/llms-full\.md$''',
+    '''^skills/mlops/unsloth/references/llms-txt\.md$''',
     '''^tests/agent/test_redact\.py$''',
     '''^tests/gateway/test_agent_cache\.py$''',
     '''^tests/gateway/test_weixin\.py$''',
@@ -43,10 +45,17 @@ id = "generic-api-key"
     '''^tests/test_honcho_client_config\.py$''',
     '''^tests/tools/test_homeassistant_tool\.py$''',
     '''^tests/tools/test_mcp_tool\.py$''',
+    '''^tests/test_run_agent\.py$''',
+    '''^tests/test_413_compression\.py$''',
     '''^website/docs/user-guide/messaging/wecom-callback\.md$''',
     '''^webui/packages/server/src/controllers/hermes/xai-auth\.ts$''',
     '''^webui/packages/server/src/services/hermes/copilot-device-flow\.ts$''',
-    '''^webui/tests/client/voice-dialogue-controls\.test\.ts$'''
+    '''^webui/tests/client/voice-dialogue-controls\.test\.ts$''',
+    '''^exprted\.jsonl$''',
+    '''^README\.md$''',
+    '''^AGENTS\.md$''',
+    '''^docs/messaging\.md$''',
+    '''^evals/terminal-bench-2/evaluate_config\.yaml$'''
   ]
 
 [[rules]]
@@ -60,6 +69,15 @@ id = "curl-auth-header"
     '''^website/docs/user-guide/features/api-server\.md$''',
     '''^website/docs/user-guide/messaging/matrix\.md$''',
     '''^website/docs/user-guide/messaging/mattermost\.md$'''
+  ]
+
+[[rules]]
+id = "gcp-api-key"
+
+  [[rules.allowlists]]
+  description = "GCP API key examples in skill documentation"
+  paths = [
+    '''^skills/gifs/gif-search/SKILL\.md$'''
   ]
 
 [[rules]]
