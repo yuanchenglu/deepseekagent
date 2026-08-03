@@ -1,6 +1,6 @@
 {
   "name": "deepagent-webui",
-  "version": "0.9.0-alpha.1",
+  "version": "0.9.0-beta.1",
   "description": "DeepAgent Desktop — AI-native agent with WebUI, multi-platform messaging, and embedded R&D team",
   "repository": {
     "type": "git",
