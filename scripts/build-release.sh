@@ -330,10 +330,21 @@ build_embedded_tarball() {
     local tarball_name="${TARBALL_NAME/deepagent-/deepagent-deepcode-}"
     local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
 
+    cd "$PROJECT_ROOT"
+
+    if [ ! -f "embedded/opencode/macos-arm64/opencode" ] && [ -z "${SKIP_OPENCODE_CHECK:-}" ]; then
+        log_error "缺少 OpenCode 二进制，无法构建 DeepCode tarball"
+        log_info "请先运行 setup-embedded-opencode.sh 或设置 SKIP_OPENCODE_CHECK=1"
+        exit 1
+    fi
+
+    if [ ! -f "embedded/opencode/macos-arm64/opencode" ]; then
+        log_warn "SKIP_OPENCODE_CHECK: 跳过 DeepCode tarball（无 OpenCode 二进制）"
+        return 0
+    fi
+
     log_info "构建 DeepCode macOS arm64 tarball..."
     log_info "  路径: ${tarball_path}"
-
-    cd "$PROJECT_ROOT"
 
     tar czf "$tarball_path" \
         "${TAR_EXCLUDES[@]}" \

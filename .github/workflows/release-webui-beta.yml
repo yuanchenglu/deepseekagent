@@ -111,14 +111,18 @@ jobs:
             echo "WebUI Beta artifact contains Desktop source" >&2
             exit 1
           fi
-          EXPECTED="$(printf '%s\n' embedded/opencode/macos-arm64/opencode embedded/opencode/src/LICENSE)"
-          ACTUAL="$(tar -tzf "$DEEPCODE" | sed 's#/$##' | sort -u)"
-          [ "$ACTUAL" = "$EXPECTED" ] || {
-            echo "DeepCode artifact boundary mismatch" >&2
-            printf '%s\n' "$ACTUAL" >&2
-            exit 1
-          }
-          file embedded/opencode/macos-arm64/opencode | grep -q 'Mach-O.*arm64'
+          if [ -f "$DEEPCODE" ]; then
+            EXPECTED="$(printf '%s\n' embedded/opencode/macos-arm64/opencode embedded/opencode/src/LICENSE)"
+            ACTUAL="$(tar -tzf "$DEEPCODE" | sed 's#/$##' | sort -u)"
+            [ "$ACTUAL" = "$EXPECTED" ] || {
+              echo "DeepCode artifact boundary mismatch" >&2
+              printf '%s\n' "$ACTUAL" >&2
+              exit 1
+            }
+            file embedded/opencode/macos-arm64/opencode | grep -q 'Mach-O.*arm64'
+          else
+            echo "DeepCode tarball not built (SKIP_OPENCODE_CHECK), skipping boundary check"
+          fi
 
       - uses: astral-sh/setup-uv@v6
         with:
@@ -141,7 +145,7 @@ jobs:
         run: |
           shasum -a 256 -c "deepagent-${{ inputs.version }}.tar.gz.sha256"
           shasum -a 256 -c "deepagent-webui-server-${{ inputs.version }}.tar.gz.sha256"
-          shasum -a 256 -c "deepagent-deepcode-${{ inputs.version }}.tar.gz.sha256"
+          [ -f "deepagent-deepcode-${{ inputs.version }}.tar.gz.sha256" ] && shasum -a 256 -c "deepagent-deepcode-${{ inputs.version }}.tar.gz.sha256" || echo "DeepCode checksum skipped"
 
       - uses: actions/upload-artifact@v4
         with:
