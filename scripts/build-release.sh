@@ -527,8 +527,8 @@ print_success() {
 
     local emb_size
     local emb_sha
-    emb_size=$(du -h "$TARBALL_EMBEDDED" 2>/dev/null | cut -f1)
-    emb_sha=$(awk '{print $1}' "${TARBALL_EMBEDDED}.sha256" 2>/dev/null)
+    emb_size=$(du -h "$TARBALL_EMBEDDED" 2>/dev/null | cut -f1 || true)
+    emb_sha=$(awk '{print $1}' "${TARBALL_EMBEDDED}.sha256" 2>/dev/null || true)
 
     local ws_size
     local ws_sha
