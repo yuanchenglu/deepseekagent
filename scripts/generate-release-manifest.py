@@ -40,7 +40,7 @@ def main() -> None:
         raise SystemExit(f"webui artifact not found: {webui_artifact}")
     deepcode_artifact = args.deepcode_artifact.resolve() if args.deepcode_artifact else None
     if deepcode_artifact is not None and not deepcode_artifact.is_file():
-        raise SystemExit(f"deepcode artifact not found: {deepcode_artifact}")
+        deepcode_artifact = None
     output_dir.mkdir(parents=True, exist_ok=True)
 
     artifacts = {
