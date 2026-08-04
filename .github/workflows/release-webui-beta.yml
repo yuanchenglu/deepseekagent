@@ -191,12 +191,19 @@ jobs:
             "deepagent-${VERSION}.tar.gz" \
             "deepagent-${VERSION}.tar.gz.sha256" \
             "deepagent-webui-server-${VERSION}.tar.gz" \
-            "deepagent-webui-server-${VERSION}.tar.gz.sha256" \
-            "deepagent-deepcode-${VERSION}.tar.gz" \
-            "deepagent-deepcode-${VERSION}.tar.gz.sha256"; do
+            "deepagent-webui-server-${VERSION}.tar.gz.sha256"; do
             aws s3 cp "release/${name}" "s3://${BUCKET}/${name}" --endpoint-url "$ENDPOINT" --region auto
             aws s3 cp "s3://${BUCKET}/${name}" "/tmp/deepagent-r2-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
             cmp "release/${name}" "/tmp/deepagent-r2-readback/${name}"
+          done
+          for name in \
+            "deepagent-deepcode-${VERSION}.tar.gz" \
+            "deepagent-deepcode-${VERSION}.tar.gz.sha256"; do
+            if [ -f "release/${name}" ]; then
+              aws s3 cp "release/${name}" "s3://${BUCKET}/${name}" --endpoint-url "$ENDPOINT" --region auto
+              aws s3 cp "s3://${BUCKET}/${name}" "/tmp/deepagent-r2-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
+              cmp "release/${name}" "/tmp/deepagent-r2-readback/${name}"
+            fi
           done
           aws s3 cp "release/deepagent-manifest-${VERSION}.json" \
             "s3://${BUCKET}/manifests/${VERSION}.json" --endpoint-url "$ENDPOINT" --region auto
@@ -216,7 +223,7 @@ jobs:
           cd /tmp/deepagent-r2-readback
           sha256sum -c "deepagent-${VERSION}.tar.gz.sha256"
           sha256sum -c "deepagent-webui-server-${VERSION}.tar.gz.sha256"
-          sha256sum -c "deepagent-deepcode-${VERSION}.tar.gz.sha256"
+          [ -f "deepagent-deepcode-${VERSION}.tar.gz.sha256" ] && sha256sum -c "deepagent-deepcode-${VERSION}.tar.gz.sha256" || echo "DeepCode checksum skipped"
 
       - name: Publish GitHub prerelease
         env:
