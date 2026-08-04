@@ -131,6 +131,7 @@ export default {
       cloudflareDownload: 'Cloudflare Download',
       allDownloads: 'View all release assets',
       prereq: 'Desktop builds bundle the DeepAgent runtime.',
+      gatekeeper: 'This Preview is unsigned. macOS may block the first launch. In Finder, locate DeepAgent.app, right-click, and choose Open.',
       downloads: [
         {
           title: 'macOS Apple Silicon',
