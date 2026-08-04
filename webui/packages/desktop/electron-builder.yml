@@ -39,6 +39,8 @@ mac:
   target:
     - target: dmg
       arch: [arm64]
+    - target: zip
+      arch: [arm64]
   category: public.app-category.developer-tools
   # Preview builds are intentionally unsigned until an Apple Developer account
   # is available. Explicitly disable identity discovery so local certificates
