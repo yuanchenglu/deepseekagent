@@ -206,7 +206,10 @@ jobs:
         run: |
           mkdir -p dist/releases
           DMG="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
+          ZIP="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.zip"
           cp "$DMG" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
+          [ -f "$ZIP" ] && cp "$ZIP" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.zip" || true
+          [ -f "webui/packages/desktop/release/latest-mac.yml" ] && cp "webui/packages/desktop/release/latest-mac.yml" "dist/releases/latest-mac.yml" || true
           cd dist/releases
           shasum -a 256 "DeepAgent-${PREVIEW_VERSION}-arm64.dmg" > "DeepAgent-${PREVIEW_VERSION}-arm64.dmg.sha256"
           python3 - "$PREVIEW_VERSION" "$RUNTIME_VERSION" <<'PY'
@@ -294,8 +297,10 @@ jobs:
           ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
           BUCKET="deepagent-releases"
           DMG="DeepAgent-${VERSION}-arm64.dmg"
+          ZIP="DeepAgent-${VERSION}-arm64.zip"
           mkdir -p /tmp/deepagent-desktop-readback
-          for name in "$DMG" "${DMG}.sha256"; do
+          for name in "$DMG" "${DMG}.sha256" "$ZIP" "latest-mac.yml"; do
+            [ -f "release/${name}" ] || { echo "Missing release artifact: ${name}" >&2; exit 1; }
             aws s3 cp "release/${name}" "s3://${BUCKET}/desktop/${name}" --endpoint-url "$ENDPOINT" --region auto
             aws s3 cp "s3://${BUCKET}/desktop/${name}" "/tmp/deepagent-desktop-readback/${name}" --endpoint-url "$ENDPOINT" --region auto
             cmp "release/${name}" "/tmp/deepagent-desktop-readback/${name}"
