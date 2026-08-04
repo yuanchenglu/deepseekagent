@@ -166,7 +166,7 @@ export class ModeManager {
       ...(config.profile ? { OPENCODE_PROFILE: config.profile } : {}),
       ...credentialEnv,
     }
-    const args = ['serve', '--hostname', '127.0.0.1', '--port', String(port), '--no-open']
+    const args = ['serve', '--hostname', '127.0.0.1', '--port', String(port)]
     try {
       this.codeProcess = spawnFn(command, args, env)
     } catch (err) {
