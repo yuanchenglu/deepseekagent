@@ -262,15 +262,15 @@ check_python() {
     if [ -n "${DEEPAGENT_PYTHON:-}" ]; then
         PYTHON_PATH="$DEEPAGENT_PYTHON"
         [ -x "$PYTHON_PATH" ] || { log_error "DEEPAGENT_PYTHON is not executable: $PYTHON_PATH"; exit 1; }
-        "$PYTHON_PATH" -c 'import sys; raise SystemExit(sys.version_info < (3, 11))' || {
-            log_error "DEEPAGENT_PYTHON must be Python 3.11 or newer"
+        "$PYTHON_PATH" -c 'import sys; raise SystemExit(sys.version_info < (3, 12))' || {
+            log_error "DEEPAGENT_PYTHON must be Python 3.12 or newer"
             exit 1
         }
         return 0
     fi
-    "$UV_CMD" python install 3.11
-    PYTHON_PATH="$("$UV_CMD" python find 3.11)"
-    [ -x "$PYTHON_PATH" ] || { log_error "Python 3.11 installation failed"; exit 1; }
+    "$UV_CMD" python install 3.12
+    PYTHON_PATH="$("$UV_CMD" python find 3.12)"
+    [ -x "$PYTHON_PATH" ] || { log_error "Python 3.12 installation failed"; exit 1; }
 }
 
 json_field() {
