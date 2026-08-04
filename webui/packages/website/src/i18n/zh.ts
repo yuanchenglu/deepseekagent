@@ -131,6 +131,7 @@ export default {
       cloudflareDownload: 'Cloudflare 下载',
       allDownloads: '查看全部发布文件',
       prereq: '桌面版已内置 DeepAgent 运行时。',
+      gatekeeper: 'Preview 未签名，macOS 可能拦截首次启动。请在 Finder 中找到 DeepAgent.app，右键 -> 打开。',
       downloads: [
         {
           title: 'macOS Apple Silicon',

@@ -104,6 +104,7 @@ function copyText(text: string) {
         >
           {{ t('install.desktop.allDownloads') }}
         </a>
+        <p class="gatekeeper-note">{{ t('install.desktop.gatekeeper') }}</p>
       </template>
       <template v-else-if="activeTab === 'npm'">
         <div class="code-block" @click="copyText(t('install.npm.cmd1'))">
@@ -443,5 +444,16 @@ function copyText(text: string) {
   color: rgba(42, 50, 64, 0.58);
   font-size: 13px;
   margin: 16px 6px 2px;
+}
+
+.gatekeeper-note {
+  color: rgba(190, 110, 30, 0.9);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 14px 6px 2px;
+  padding: 10px 14px;
+  border: 1px solid rgba(190, 110, 30, 0.22);
+  border-radius: 12px;
+  background: rgba(190, 110, 30, 0.06);
 }
 </style>
