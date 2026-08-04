@@ -131,7 +131,7 @@ export default {
       cloudflareDownload: 'Cloudflare Download',
       allDownloads: 'View all release assets',
       prereq: 'Desktop builds bundle the DeepAgent runtime.',
-      gatekeeper: 'This Preview is unsigned. macOS may block the first launch. In Finder, locate DeepAgent.app, right-click, and choose Open.',
+      gatekeeper: 'This Preview is unsigned. On first double-click, macOS may say the app is "damaged" or "cannot be verified" — this is expected. Do NOT move it to Trash. In Finder, right-click DeepAgent.app, choose Open, then click Open anyway. It will launch normally (no need to disable system security).',
       downloads: [
         {
           title: 'macOS Apple Silicon',

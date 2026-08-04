@@ -131,7 +131,7 @@ export default {
       cloudflareDownload: 'Cloudflare 下载',
       allDownloads: '查看全部发布文件',
       prereq: '桌面版已内置 DeepAgent 运行时。',
-      gatekeeper: 'Preview 未签名，macOS 可能拦截首次启动。请在 Finder 中找到 DeepAgent.app，右键 -> 打开。',
+      gatekeeper: 'Preview 未签名，首次双击 macOS 可能提示“已损坏”或“无法验证开发者”，属正常现象。请勿将 App 移到废纸篓；在 Finder 中右键 DeepAgent.app -> 选“打开” -> 再点“仍要打开”，即可正常启动（无需关闭系统安全）。',
       downloads: [
         {
           title: 'macOS Apple Silicon',
