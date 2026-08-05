@@ -1,7 +1,7 @@
 export default {
   brand: {
-    name: 'Hermes Studio',
-    logoAlt: 'Hermes',
+    name: 'DeepAgent',
+    logoAlt: 'DeepAgent',
   },
   ui: {
     copy: 'Copy',
@@ -29,8 +29,8 @@ export default {
       deploy: 'Deploy',
     },
     badge: 'Local-first AI Agent Workspace',
-    title: 'Hermes Studio',
-    subtitle: 'A desktop app and local control plane for Hermes Agent. Chat, manage profiles, run coding agents, inspect files, automate jobs, and keep your runtime under your control.',
+    title: 'DeepAgent',
+    subtitle: 'A desktop app and local control plane for DeepAgent Runtime. Chat, manage profiles, run coding agents, inspect files, automate jobs, and keep your runtime under your control.',
     cta: 'Download Desktop',
     docsCta: 'Read Docs',
     viewGithub: 'View on GitHub',
@@ -40,14 +40,14 @@ export default {
     docsTitle: 'Documentation',
     docsLibrary: 'Library',
     install: 'npm install -g hermes-web-ui',
-    previewAlt: 'Hermes Studio dashboard preview',
+    previewAlt: 'DeepAgent dashboard preview',
   },
   features: {
-    title: 'One Local Console for Hermes Agent',
-    desc: 'Hermes Studio brings chat, runtime management, automation, files, coding agents, and release-ready desktop distribution into one workspace.',
+    title: 'One Local Console for DeepAgent Runtime',
+    desc: 'DeepAgent brings chat, runtime management, automation, files, coding agents, and release-ready desktop distribution into one workspace.',
     streaming: {
       title: 'Agent Chat',
-      desc: 'Streaming Hermes Agent conversations with sessions, Markdown, tool traces, uploads, downloads, model badges, and context usage.',
+      desc: 'Streaming DeepAgent Runtime conversations with sessions, Markdown, tool traces, uploads, downloads, model badges, and context usage.',
     },
     platforms: {
       title: 'Platform Channels',
@@ -71,7 +71,7 @@ export default {
     },
     profiles: {
       title: 'Profiles & Access',
-      desc: 'Account-authorized Hermes profiles with isolated config, models, uploads, jobs, usage, memory, skills, plugins, providers, and visibility.',
+      desc: 'Account-authorized DeepAgent profiles with isolated config, models, uploads, jobs, usage, memory, skills, plugins, providers, and visibility.',
     },
     files: {
       title: 'File Browser',
@@ -83,7 +83,7 @@ export default {
     },
     quickInstall: {
       title: 'Desktop Runtime',
-      desc: 'Windows, macOS, and Linux desktop builds bundle the Web UI runtime and manage Hermes Studio state separately from Hermes Agent data.',
+      desc: 'Windows, macOS, and Linux desktop builds bundle the Web UI runtime and manage DeepAgent state separately from DeepAgent Runtime data.',
     },
     i18n: {
       title: 'Coding Agents & MCP',
@@ -115,22 +115,23 @@ export default {
     items: [
       {
         src: '/image.gif',
-        alt: 'Hermes Studio product walkthrough',
-        title: 'Hermes Studio Workflow',
+        alt: 'DeepAgent product walkthrough',
+        title: 'DeepAgent Workflow',
         desc: 'Chat with coding agents, preview versions, manage runtime assets, and browse your workspace in one app.',
       },
     ],
   },
   install: {
     title: 'Quick Start',
-    desc: 'Download the desktop app or run Hermes Studio yourself.',
+    desc: 'Download the desktop app or run DeepAgent yourself.',
     desktop: {
       title: 'Desktop',
       download: 'Download',
       githubDownload: 'GitHub Download',
       cloudflareDownload: 'Cloudflare Download',
       allDownloads: 'View all release assets',
-      prereq: 'Desktop builds bundle the Hermes Studio runtime.',
+      prereq: 'Desktop builds bundle the DeepAgent runtime.',
+      gatekeeper: 'This Preview is unsigned. On first double-click, macOS may say the app is "damaged" or "cannot be verified" — this is expected. Do NOT move it to Trash. In Finder, right-click DeepAgent.app, choose Open, then click Open anyway. It will launch normally (no need to disable system security).',
       downloads: [
         {
           title: 'macOS Apple Silicon',
@@ -189,7 +190,7 @@ export default {
     chartAlt: 'Star History',
   },
   footer: {
-    description: 'Self-hosted AI chat dashboard for Hermes Agent.',
+    description: 'Self-hosted AI chat dashboard for DeepAgent Runtime.',
     license: 'BSL-1.1 License',
     madeWith: 'Built with Vue 3, Naive UI, and TypeScript.',
     github: 'Open GitHub',
@@ -209,45 +210,45 @@ export default {
     },
     gettingStarted: {
       title: 'Getting Started',
-      intro: 'Hermes Studio is a self-hosted web dashboard for managing AI conversations, platform channels, scheduled jobs, and more. It wraps the Hermes Agent CLI and provides a beautiful web interface.',
+      intro: 'DeepAgent is a self-hosted web dashboard for managing AI conversations, platform channels, scheduled jobs, and more. It wraps the DeepAgent Runtime CLI and provides a beautiful web interface.',
       install: {
         title: 'Installation',
         content: 'Install globally via npm. Node.js 23 or higher is required.',
       },
       firstRun: {
         title: 'First Run',
-        content: 'On first start, Hermes Studio will automatically generate an auth token, initialize local data, start the Hermes agent bridge, and open the dashboard in your browser.',
+        content: 'On first start, DeepAgent will automatically generate an auth token, initialize local data, start the DeepAgent agent bridge, and open the dashboard in your browser.',
       },
       login: {
         title: 'Login',
-        content: 'The auto-generated token is stored in ~/.hermes-web-ui/.token. Username/password login is available with bootstrap credentials admin / 123456 on first use, and the app prompts users to change default credentials after login.',
+        content: 'DeepAgent stores WebUI state under ~/.deepagent. Run `deepagent webui open` to create a short-lived, one-time local login ticket; no default password is provided.',
       },
     },
     configuration: {
       title: 'Configuration',
-      intro: 'Hermes Studio can be configured via environment variables.',
+      intro: 'DeepAgent can be configured via environment variables.',
       envVars: {
         title: 'Environment Variables',
         rows: [
           ['PORT', 'Server listen port (default: 8648)'],
           ['BIND_HOST', 'Server bind host (default: 0.0.0.0). Set :: explicitly to enable IPv6 listening.'],
-          ['HERMES_WEB_UI_HOME', 'Hermes Studio data home for auth token, credentials, logs, DB, and default uploads'],
+          ['HERMES_WEB_UI_HOME', 'DeepAgent data home for auth token, credentials, logs, DB, and default uploads'],
           ['HERMES_WEBUI_STATE_DIR', 'Compatibility alias for HERMES_WEB_UI_HOME'],
-          ['HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT', 'Disable startup injection of the managed hermes-studio MCP server into Hermes profile configs'],
+          ['HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT', 'Disable startup injection of the managed hermes-studio MCP server into DeepAgent profile configs'],
           ['HERMES_WEB_UI_ALLOW_TRANSIENT_MCP_AUTOINJECT', 'Allow managed MCP injection when HERMES_WEB_UI_HOME is under a temporary directory, such as Version Preview runtimes'],
           ['UPLOAD_DIR', 'Custom upload root. Uploaded files are stored below profile-scoped subdirectories.'],
           ['CORS_ORIGINS', 'Cross-origin allowlist for HTTP, Socket.IO, and WebSocket requests (default: same host only; set * only for intentional legacy wildcard CORS)'],
           ['AUTH_TOKEN', 'Custom bearer token; overrides the auto-generated token'],
           ['AUTH_JWT_SECRET', 'JWT signing secret override for username/password sessions'],
-          ['PROFILE', 'Startup/default Hermes profile'],
+          ['PROFILE', 'Startup/default DeepAgent profile'],
           ['LOG_LEVEL', 'Server log level'],
           ['BRIDGE_LOG_LEVEL', 'Bridge log level'],
           ['MAX_DOWNLOAD_SIZE', 'Maximum file download size'],
           ['MAX_EDIT_SIZE', 'Maximum editable file size'],
           ['WORKSPACE_BASE', 'Base directory for workspace browsing'],
-          ['HERMES_HOME', 'Hermes data home'],
-          ['HERMES_BIN', 'Custom Hermes CLI binary path'],
-          ['HERMES_AGENT_ROOT', 'Hermes Agent source checkout containing run_agent.py'],
+          ['HERMES_HOME', 'DeepAgent data home'],
+          ['HERMES_BIN', 'Custom DeepAgent CLI binary path'],
+          ['HERMES_AGENT_ROOT', 'DeepAgent Runtime source checkout containing run_agent.py'],
           ['HERMES_AGENT_BRIDGE_PYTHON', 'Python interpreter used to launch the agent bridge'],
           ['HERMES_AGENT_BRIDGE_UV', 'uv executable used to launch the agent bridge when available'],
           ['UV', 'Fallback uv executable path'],
@@ -259,23 +260,23 @@ export default {
           ['HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN', 'Stop the bridge broker during Web UI shutdown and restart by default; set 0/false/no/off to preserve the broker across restarts'],
           ['HERMES_AGENT_BRIDGE_AUTO_RESTART', 'Auto-restart the bridge broker after unexpected exit; set 0/false/no/off to disable'],
           ['HERMES_AGENT_BRIDGE_RESTART_DELAY_MS', 'Base delay for bridge auto-restart backoff'],
-          ['HERMES_AGENT_BRIDGE_PLATFORM', 'Platform identity passed to Hermes Agent'],
+          ['HERMES_AGENT_BRIDGE_PLATFORM', 'Platform identity passed to DeepAgent Runtime'],
           ['HERMES_AGENT_BRIDGE_WORKER_TRANSPORT', 'Profile worker endpoint transport. Set tcp for loopback TCP, or ipc/unix for Unix domain sockets; defaults to Windows TCP and macOS/Linux IPC'],
           ['HERMES_AGENT_BRIDGE_WORKER_PORT_BASE', 'Base port for TCP worker endpoints (default: 18780). Version Preview uses an isolated 19650 port range'],
           ['HERMES_BRIDGE_PROVIDER', 'Provider override for bridge runs'],
           ['HERMES_BRIDGE_TOOLSETS', 'Toolset override for bridge runs'],
           ['HERMES_BRIDGE_MAX_TURNS', 'Maximum turn override for bridge runs'],
-          ['HERMES_BRIDGE_SUPPRESS_PLATFORM_HINT', 'Controls bridge platform hint suppression passed to Hermes Agent'],
+          ['HERMES_BRIDGE_SUPPRESS_PLATFORM_HINT', 'Controls bridge platform hint suppression passed to DeepAgent Runtime'],
           ['HERMES_OPENROUTER_APP_REFERER', 'OpenRouter attribution referer sent by bridge runs'],
           ['HERMES_OPENROUTER_APP_TITLE', 'OpenRouter attribution title sent by bridge runs'],
           ['HERMES_OPENROUTER_APP_CATEGORIES', 'OpenRouter attribution categories sent by bridge runs'],
-          ['HERMES_WEB_UI_MANAGED_GATEWAY', 'Controls Web UI-managed Hermes gateway handling. Enabled by default; set 0/false/off to use hermes gateway start'],
-          ['HERMES_WEB_UI_DISABLE_GATEWAY_AUTOSTART', 'Skip startup gateway checks/autostart for dashboard-only deployments where another service owns Hermes gateway lifecycle'],
-          ['HERMES_WEB_UI_DISABLE_SKILL_INJECTION', 'Skip startup bundled skill injection when skills are managed outside Hermes Web UI. Enabled injection only updates Web UI-managed or identical bundled copies; local edits are skipped'],
-          ['HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN', 'Controls whether Hermes Studio shutdown also stops managed gateway processes'],
-          ['HERMES_GATEWAY_URL / GATEWAY_URL', 'Explicit Hermes gateway upstream URL for proxy routes'],
-          ['GATEWAY_HOST', 'Default Hermes gateway upstream host for proxy routes'],
-          ['GATEWAY_PORT', 'Default Hermes gateway upstream port for proxy routes'],
+          ['HERMES_WEB_UI_MANAGED_GATEWAY', 'Controls Web UI-managed DeepAgent gateway handling. Enabled by default; set 0/false/off to use hermes gateway start'],
+          ['HERMES_WEB_UI_DISABLE_GATEWAY_AUTOSTART', 'Skip startup gateway checks/autostart for dashboard-only deployments where another service owns DeepAgent gateway lifecycle'],
+          ['HERMES_WEB_UI_DISABLE_SKILL_INJECTION', 'Skip startup bundled skill injection when skills are managed outside DeepAgent WebUI. Enabled injection only updates Web UI-managed or identical bundled copies; local edits are skipped'],
+          ['HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN', 'Controls whether DeepAgent shutdown also stops managed gateway processes'],
+          ['HERMES_GATEWAY_URL / GATEWAY_URL', 'Explicit DeepAgent gateway upstream URL for proxy routes'],
+          ['GATEWAY_HOST', 'Default DeepAgent gateway upstream host for proxy routes'],
+          ['GATEWAY_PORT', 'Default DeepAgent gateway upstream port for proxy routes'],
           ['HERMES_WEB_UI_PREVIEW_REPO', 'GitHub repository used by Version Preview'],
           ['HERMES_WEB_UI_PREVIEW_AGENT_BRIDGE_TRANSPORT', 'Version Preview broker endpoint transport. Set tcp to use loopback TCP for Preview on macOS/Linux; when unset, Preview follows HERMES_AGENT_BRIDGE_WORKER_TRANSPORT=tcp'],
           ['HERMES_WEB_UI_PREVIEW_AGENT_BRIDGE_ENDPOINT', 'Directly overrides the Version Preview broker endpoint for deployments that need a fully custom Preview bridge address'],
@@ -285,19 +286,19 @@ export default {
       },
       gateway: {
         title: 'Agent Bridge Runtime',
-        content: 'Chat runs are handled through the Hermes agent bridge, which runs alongside the Hermes Studio server and talks directly to the Hermes Agent runtime. HERMES_AGENT_BRIDGE_ENDPOINT controls the Node-to-broker address, while HERMES_AGENT_BRIDGE_WORKER_TRANSPORT controls the broker-to-profile-worker transport. Web UI shutdown and CLI/app restarts stop the bridge broker by default; set HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN=0 only when you intentionally want to preserve bridge sessions across restart. Switching the frontend Hermes Profile changes later request context only; it does not restart the bridge or clear other running tasks.',
+        content: 'Chat runs are handled through the DeepAgent agent bridge, which runs alongside the DeepAgent server and talks directly to the DeepAgent Runtime runtime. HERMES_AGENT_BRIDGE_ENDPOINT controls the Node-to-broker address, while HERMES_AGENT_BRIDGE_WORKER_TRANSPORT controls the broker-to-profile-worker transport. Web UI shutdown and CLI/app restarts stop the bridge broker by default; set HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN=0 only when you intentionally want to preserve bridge sessions across restart. Switching the frontend DeepAgent Profile changes later request context only; it does not restart the bridge or clear other running tasks.',
       },
       profiles: {
         title: 'Profiles',
-        content: 'Profiles provide isolated configurations for different use cases. Super administrators can manage every profile, while regular administrators only see and use profiles assigned to their account. Create, clone, import, export, or switch Hermes profiles from the Profiles page.',
+        content: 'Profiles provide isolated configurations for different use cases. Super administrators can manage every profile, while regular administrators only see and use profiles assigned to their account. Create, clone, import, export, or switch DeepAgent profiles from the Profiles page.',
       },
     },
     features: {
       title: 'Features',
-      intro: 'Explore the core features of Hermes Studio.',
+      intro: 'Explore the core features of DeepAgent.',
       chat: {
         title: 'AI Chat',
-        content: 'Real-time chat streaming over Socket.IO /chat-run. Supports multi-session management, Markdown rendering with syntax highlighting, tool call inspection, profile-scoped upload, path-based download, and Ctrl+K search across the Hermes Studio local session database.',
+        content: 'Real-time chat streaming over Socket.IO /chat-run. Supports multi-session management, Markdown rendering with syntax highlighting, tool call inspection, profile-scoped upload, path-based download, and Ctrl+K search across the DeepAgent local session database.',
       },
       kanban: {
         title: 'Kanban Board',
@@ -333,8 +334,8 @@ export default {
       },
     },
     hermesStudioManual: {
-      title: 'Hermes Studio Client Manual',
-      intro: 'This page publishes the complete Hermes Studio 0.6.12 client operations manual. The full manual is currently authored in Chinese and covers day-to-day usage, configuration, operations, acceptance review, internal training, visible navigation, dialogs, status pages, key actions, common workflows, and risk notes.',
+      title: 'DeepAgent Client Manual',
+      intro: 'This page publishes the complete DeepAgent 0.6.12 client operations manual. The full manual is currently authored in Chinese and covers day-to-day usage, configuration, operations, acceptance review, internal training, visible navigation, dialogs, status pages, key actions, common workflows, and risk notes.',
       open: {
         title: 'Open the full manual',
         content: 'The uploaded manual preserves the original HTML layout, annotated screenshots, tables, and PDF export. Use the HTML version for online browsing and the PDF version for offline review, archiving, or training distribution.',
@@ -354,7 +355,7 @@ export default {
       scope: {
         title: 'Scope',
         rows: [
-          ['Version', 'Hermes Studio 0.6.12 client operations manual'],
+          ['Version', 'DeepAgent 0.6.12 client operations manual'],
           ['Language', 'Full manual in Chinese, with bilingual website entry copy'],
           ['Coverage', 'Login, chat, history, memory, skills, plugins, files, terminal, jobs, group chat, Kanban, usage, logs, MCP, platform integrations, devices, settings, backup, security, and troubleshooting'],
           ['Audience', 'Individual users, administrators, support teams, acceptance reviewers, and internal training teams'],
@@ -362,12 +363,12 @@ export default {
       },
       maintenance: {
         title: 'Maintenance note',
-        content: 'When the website, reference docs, Hermes agent docs, and the current client UI differ, the manual treats the currently visible client interface as the operational source of truth. For future releases, replace the uploaded HTML/PDF assets and update the version scope on this page.',
+        content: 'When the website, reference docs, DeepAgent agent docs, and the current client UI differ, the manual treats the currently visible client interface as the operational source of truth. For future releases, replace the uploaded HTML/PDF assets and update the version scope on this page.',
       },
     },
     esp32Intro: {
-      title: 'Hermes ESP32-C3 Device Intro',
-      intro: 'This page publishes the public introduction for the Hermes ESP32-C3 desktop AI conversation box. The device handles the small display, microphone, speaker, physical buttons, and local network connection, while Hermes Studio handles model access, speech recognition, speech synthesis, and session execution.',
+      title: 'DeepAgent ESP32-C3 Device Intro',
+      intro: 'This page publishes the public introduction for the DeepAgent ESP32-C3 desktop AI conversation box. The device handles the small display, microphone, speaker, physical buttons, and local network connection, while DeepAgent handles model access, speech recognition, speech synthesis, and session execution.',
       open: {
         title: 'Open the full intro page',
         content: 'The uploaded intro page preserves the original HTML layout, product visuals, setup flow, specification notes, pre-purchase checklist, and FAQ. It is useful for public presentation, handoff notes, and quick user orientation.',
@@ -375,26 +376,26 @@ export default {
           {
             label: 'Open the Chinese ESP32 intro page',
             href: '/docs/hermes-esp32-intro/index.html',
-            description: 'Includes product visuals, hardware highlights, Wi-Fi provisioning notes, Hermes Studio connection guidance, specifications, and FAQ.',
+            description: 'Includes product visuals, hardware highlights, Wi-Fi provisioning notes, DeepAgent connection guidance, specifications, and FAQ.',
           },
         ],
       },
       overview: {
         title: 'Device positioning',
-        content: 'This is a desktop hardware entry point for Hermes Studio, not an offline standalone large-model device. The ESP32-C3 provides local interaction and status feedback, while AI capability comes from Hermes Studio running on a computer or server plus the model, STT, and TTS services configured by the user.',
+        content: 'This is a desktop hardware entry point for DeepAgent, not an offline standalone large-model device. The ESP32-C3 provides local interaction and status feedback, while AI capability comes from DeepAgent running on a computer or server plus the model, STT, and TTS services configured by the user.',
       },
       requirements: {
         title: 'Requirements',
         rows: [
-          ['Network', 'The ESP32 device and Hermes Studio should communicate on the same local network.'],
+          ['Network', 'The ESP32 device and DeepAgent should communicate on the same local network.'],
           ['Service address', 'Enter the computer or server LAN IP plus port on the device page; do not use 127.0.0.1.'],
-          ['Voice capability', 'Hermes Studio needs working speech recognition, speech synthesis, and model services.'],
-          ['Best fit', 'Built for Hermes Studio users, ESP32/Arduino/PlatformIO makers, open hardware customization, and desktop AI interaction demos.'],
+          ['Voice capability', 'DeepAgent needs working speech recognition, speech synthesis, and model services.'],
+          ['Best fit', 'Built for DeepAgent users, ESP32/Arduino/PlatformIO makers, open hardware customization, and desktop AI interaction demos.'],
         ],
       },
       maintenance: {
         title: 'Maintenance note',
-        content: 'If firmware behavior, provisioning pages, ports, device visuals, or the Hermes Studio device connection flow changes, update the static HTML asset and this page scope together.',
+        content: 'If firmware behavior, provisioning pages, ports, device visuals, or the DeepAgent device connection flow changes, update the static HTML asset and this page scope together.',
       },
     },
     platforms: {
@@ -435,18 +436,18 @@ export default {
     },
     api: {
       title: 'API Reference',
-      intro: 'Hermes Studio provides a local BFF API for the dashboard and Socket.IO endpoints for streaming chat.',
+      intro: 'DeepAgent provides a local BFF API for the dashboard and Socket.IO endpoints for streaming chat.',
       local: {
         title: 'Local BFF Endpoints',
         content: 'The Koa server handles session management, profile CRUD, account- and profile-scoped management, config read/write, log access, skill listing, memory operations, and static assets.',
       },
       proxy: {
         title: 'Chat Streaming',
-        content: 'Chat runs use the /chat-run Socket.IO namespace and the Hermes agent bridge. Gateway proxy routes are kept only for compatibility where applicable.',
+        content: 'Chat runs use the /chat-run Socket.IO namespace and the DeepAgent agent bridge. Gateway proxy routes are kept only for compatibility where applicable.',
       },
       auth: {
         title: 'Authentication',
-        content: 'API endpoints require authenticated access. The token is auto-generated on first run and stored in ~/.hermes-web-ui/.token. Username/password login uses account records; super administrators manage users and profile bindings, while regular administrators manage their own account details.',
+        content: 'API endpoints require authenticated access. The token is auto-generated on first run and stored in ~/.deepagent/data/webui/.token. Username/password login uses account records; super administrators manage users and profile bindings, while regular administrators manage their own account details.',
       },
     },
   },

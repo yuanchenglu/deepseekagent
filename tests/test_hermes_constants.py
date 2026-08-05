@@ -7,7 +7,36 @@ from unittest.mock import patch
 import pytest
 
 import hermes_constants
-from hermes_constants import get_default_hermes_root, is_container
+from hermes_constants import get_deepagent_home, get_default_hermes_root, get_hermes_home, is_container
+
+
+@pytest.fixture(autouse=True)
+def _clear_product_home(monkeypatch):
+    """Do not let the developer shell choose a test's product namespace."""
+    monkeypatch.delenv("DEEPAGENT_HOME", raising=False)
+
+
+class TestProductHomeIsolation:
+    def test_deepagent_home_ignores_existing_hermes_home(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("DEEPAGENT_HOME", raising=False)
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+        assert get_deepagent_home() == tmp_path / ".deepagent"
+
+    def test_internal_home_keeps_explicit_legacy_compatibility(self, tmp_path, monkeypatch):
+        legacy = tmp_path / ".hermes"
+        monkeypatch.delenv("DEEPAGENT_HOME", raising=False)
+        monkeypatch.setenv("HERMES_HOME", str(legacy))
+
+        assert get_hermes_home() == legacy
+
+    def test_internal_compatibility_home_can_be_scoped_by_entrypoint(self, tmp_path, monkeypatch):
+        product = tmp_path / ".deepagent"
+        monkeypatch.setenv("DEEPAGENT_HOME", str(product))
+        monkeypatch.setenv("HERMES_HOME", str(product))
+
+        assert get_hermes_home() == product
 
 
 class TestGetDefaultHermesRoot:

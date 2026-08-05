@@ -11,10 +11,19 @@ export async function fetchAuthStatus(): Promise<AuthStatus> {
   return res.json()
 }
 
-export async function loginWithPassword(username: string, password: string): Promise<string> {
+export interface AuthenticatedSession {
+  user: {
+    id: number
+    username: string
+    role: UserRole
+  }
+}
+
+export async function loginWithPassword(username: string, password: string): Promise<AuthenticatedSession> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     body: JSON.stringify({ username, password }),
   })
   if (!res.ok) {
@@ -23,8 +32,30 @@ export async function loginWithPassword(username: string, password: string): Pro
     err.status = res.status
     throw err
   }
-  const data = await res.json()
-  return data.token
+  return res.json()
+}
+
+export async function loginWithTicket(ticket: string): Promise<AuthenticatedSession> {
+  const res = await fetch('/api/auth/ticket', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ ticket }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const err: any = new Error(data.error || 'Login ticket is invalid or expired')
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function logoutSession(): Promise<void> {
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+  }).catch(() => undefined)
 }
 
 export interface CurrentUser {

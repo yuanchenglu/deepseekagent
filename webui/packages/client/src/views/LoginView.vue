@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { setApiKey, hasApiKey } from "@/api/client";
-import { fetchAuthStatus, loginWithPassword } from "@/api/auth";
+import { hasApiKey, markCookieSession } from "@/api/client";
+import { fetchAuthStatus, fetchCurrentUser, loginWithPassword, loginWithTicket } from "@/api/auth";
 
 const { t } = useI18n();
+const route = useRoute();
 const router = useRouter();
 
 const username = ref("");
@@ -14,12 +15,37 @@ const loading = ref(false);
 const errorMsg = ref("");
 const showLockResetHint = ref(false);
 
-// If already has a key, try to go to main page
-if (hasApiKey()) {
-  router.replace("/hermes/chat");
-}
-
 onMounted(async () => {
+  const rawTicket = Array.isArray(route.query.ticket) ? route.query.ticket[0] : route.query.ticket;
+  if (typeof rawTicket === "string" && rawTicket) {
+    loading.value = true;
+    await router.replace({ name: "login", query: {} });
+    try {
+      const session = await loginWithTicket(rawTicket);
+      markCookieSession(session.user);
+      await router.replace("/hermes/chat");
+      return;
+    } catch (err: any) {
+      errorMsg.value = err.message || "Login ticket is invalid or expired";
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  if (hasApiKey()) {
+    await router.replace("/hermes/chat");
+    return;
+  }
+
+  try {
+    const user = await fetchCurrentUser();
+    markCookieSession(user);
+    await router.replace("/hermes/chat");
+    return;
+  } catch {
+    // No valid cookie session. Keep the manual login form available.
+  }
+
   try {
     await fetchAuthStatus();
   } catch {
@@ -42,8 +68,8 @@ async function handlePasswordLogin() {
   showLockResetHint.value = false;
 
   try {
-    const sessionToken = await loginWithPassword(username.value.trim(), password.value);
-    setApiKey(sessionToken);
+    const session = await loginWithPassword(username.value.trim(), password.value);
+    markCookieSession(session.user);
     router.replace("/hermes/chat");
   } catch (err: any) {
     if (err.status === 429 || err.status === 503) {
@@ -66,8 +92,6 @@ async function handlePasswordLogin() {
       </div>
       <h1 class="login-title">{{ t("login.title") }}</h1>
       <p class="login-desc">{{ t("login.description") }}</p>
-      <p class="login-default-hint">{{ t("login.defaultCredentialsHint") }}</p>
-
       <form class="login-form" @submit.prevent="handleLogin">
         <input
           v-model="username"
@@ -87,9 +111,7 @@ async function handlePasswordLogin() {
         <div v-if="errorMsg" class="login-error">{{ errorMsg }}</div>
         <div v-if="showLockResetHint" class="login-lock-hint">
           <span>{{ t("login.lockResetHint") }}</span>
-          <code>hermes-web-ui clear-login-locks --restart</code>
-          <span>{{ t("login.defaultLoginResetHint") }}</span>
-          <code>hermes-web-ui reset-default-login</code>
+          <code>deepagent webui stop &amp;&amp; deepagent webui start</code>
         </div>
         <button type="submit" class="login-btn" :disabled="loading">
           {{ loading ? "..." : t("login.submit") }}
@@ -140,13 +162,6 @@ async function handlePasswordLogin() {
   color: $text-muted;
   margin: 0 0 12px;
   line-height: 1.6;
-}
-
-.login-default-hint {
-  margin: 0 0 28px;
-  font-family: $font-code;
-  font-size: 13px;
-  color: $text-secondary;
 }
 
 .login-form {

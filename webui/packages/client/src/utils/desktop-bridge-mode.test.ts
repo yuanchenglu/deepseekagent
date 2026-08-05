@@ -16,7 +16,6 @@ describe('desktopBridge', () => {
     const fake: HermesDesktopBridge = {
       isDesktop: true,
       platform: 'linux',
-      getToken: async () => '',
       retryBootstrap: async () => {},
       notifyCompletion: async () => false,
       getWindowState: async () => ({ isMaximized: false }),
@@ -30,7 +29,6 @@ describe('desktopBridge', () => {
     const bridge: HermesDesktopBridge = {
       isDesktop: true,
       platform: 'linux',
-      getToken: async () => '',
       retryBootstrap: async () => {},
       notifyCompletion: async () => false,
       getWindowState: async () => ({ isMaximized: false }),

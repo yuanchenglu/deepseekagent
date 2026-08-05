@@ -36,6 +36,11 @@ class TestWriteDenyExactPaths:
         path = os.path.join(str(Path.home()), ".hermes", ".env")
         assert _is_write_denied(path) is True
 
+    def test_deepagent_env(self):
+        home = str(Path.home())
+        assert _is_write_denied(os.path.join(home, ".deepagent", ".env")) is True
+        assert _is_write_denied(os.path.join(home, ".deepagent", "config", ".env")) is True
+
     def test_shell_profiles(self):
         home = str(Path.home())
         for name in [".bashrc", ".zshrc", ".profile", ".bash_profile", ".zprofile"]:

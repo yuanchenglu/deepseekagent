@@ -108,6 +108,17 @@ async function waitForMockCalls(mock: { mock: { calls: unknown[] } }, count: num
   }
 }
 
+async function waitForMockCall(
+  mock: { mock: { calls: unknown[][] } },
+  predicate: (call: unknown[]) => boolean,
+): Promise<void> {
+  const startedAt = Date.now()
+  while (!mock.mock.calls.some(predicate) && Date.now() - startedAt < 1000) {
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+  if (!mock.mock.calls.some(predicate)) throw new Error('expected mock call did not arrive before timeout')
+}
+
 describe('GlobalAgentServer', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -679,6 +690,9 @@ describe('GlobalAgentServer', () => {
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body))).toMatchObject({
       text: '结果如下： | 名称 | 值 | | --- | --- | | foo | 1 | 请确认。',
     })
+    await waitForMockCall(agentSocket.emit, call => (
+      call[0] === 'audio.enqueue' && (call[1] as any)?.segmentId === 'voice-1-tts-2'
+    ))
     expect(agentSocket.emit).toHaveBeenCalledWith('audio.enqueue', expect.objectContaining({
       interactionId: 'voice-1',
       segmentId: 'voice-1-tts-2',

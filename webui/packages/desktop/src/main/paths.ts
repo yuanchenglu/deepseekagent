@@ -335,30 +335,15 @@ export function desktopTrayTemplateIcon(): string {
 }
 
 export function webUiHome(): string {
-  return process.env.HERMES_WEB_UI_HOME?.trim() || resolve(homedir(), '.hermes-web-ui')
+  return process.env.HERMES_WEB_UI_HOME?.trim() || join(deepAgentHome(), 'data', 'webui')
+}
+
+export function deepAgentHome(): string {
+  return resolve(process.env.DEEPAGENT_HOME?.trim() || join(homedir(), '.deepagent'))
 }
 
 export function hermesHome(): string {
-  const override = process.env.HERMES_HOME?.trim()
-  if (override) return resolve(override)
-
-  const defaultHome = resolve(homedir(), '.hermes')
-
-  if (isWin) {
-    const candidates = [
-      process.env.LOCALAPPDATA,
-      process.env.APPDATA,
-    ]
-      .map(value => value?.trim())
-      .filter((value): value is string => !!value)
-      .map(value => resolve(value, 'hermes'))
-
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate
-    }
-  }
-
-  return defaultHome
+  return deepAgentHome()
 }
 
 export function tokenFile(): string {

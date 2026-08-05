@@ -172,29 +172,8 @@ async function hydrateDesktopWindowPosition(): Promise<void> {
 }
 
 async function ensureDesktopAuthReady(): Promise<void> {
-  if (!isDesktopWindow.value || localStorage.getItem('hermes_api_key')) return
-  const token = await bridge?.getToken?.().catch(() => '')
-  if (token) {
-    try {
-      localStorage.setItem('AUTH_TOKEN', token)
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ username: 'admin', password: '123456' }),
-      })
-      const body = await res.json().catch(() => null) as { token?: string; jwt?: string } | null
-      const jwt = body?.token || body?.jwt
-      if (jwt) localStorage.setItem('hermes_api_key', jwt)
-    } catch {
-      /* preload performs the same desktop auto-login; this is a fallback. */
-    }
-  }
-  for (let i = 0; i < 20 && !localStorage.getItem('hermes_api_key'); i += 1) {
-    await new Promise(resolve => window.setTimeout(resolve, 100))
-  }
+  if (!isDesktopWindow.value) return
+  await bridge?.ensureAuth?.().catch(() => false)
 }
 
 function draw(): void {

@@ -11,17 +11,26 @@ from pathlib import Path
 def get_deepagent_home() -> Path:
     """返回 DeepAgent 主目录（默认：~/.deepagent）。
 
-    优先读 DEEPAGENT_HOME 环境变量，fallback 到 HERMES_HOME（向后兼容），
-    最终 fallback 到 ~/.deepagent。
-    这是所有路径的唯一权威来源——所有其他文件应通过此函数获取路径。
+    产品入口只认 ``DEEPAGENT_HOME``，绝不继承用户现有的
+    ``HERMES_HOME``。这避免 DeepAgent 误读、覆盖或删除 Hermes 数据。
     """
-    return Path(os.getenv("DEEPAGENT_HOME",
-               os.getenv("HERMES_HOME",
-               Path.home() / ".deepagent")))
+    return Path(os.getenv("DEEPAGENT_HOME", Path.home() / ".deepagent"))
 
 
-# 兼容旧调用，逐步迁移
-get_hermes_home = get_deepagent_home
+def get_hermes_home() -> Path:
+    """Return the internal runtime home with legacy compatibility.
+
+    DeepAgent entrypoints set ``DEEPAGENT_HOME`` before importing runtime
+    modules, so the legacy variable can never redirect the product into an
+    existing Hermes installation. Standalone upstream-compatible entrypoints
+    may still opt in to ``HERMES_HOME`` explicitly.
+    """
+    return Path(
+        os.getenv(
+            "HERMES_HOME",
+            os.getenv("DEEPAGENT_HOME", Path.home() / ".deepagent"),
+        )
+    )
 
 
 def get_default_hermes_root() -> Path:
@@ -41,7 +50,7 @@ def get_default_hermes_root() -> Path:
     Import-safe — no dependencies beyond stdlib.
     """
     native_home = Path.home() / ".deepagent"
-    env_home = os.environ.get("HERMES_HOME", "")
+    env_home = os.environ.get("HERMES_HOME") or os.environ.get("DEEPAGENT_HOME", "")
     if not env_home:
         return native_home
     env_path = Path(env_home)

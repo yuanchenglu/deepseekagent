@@ -17,7 +17,7 @@
 # Step 2:  校验版本号格式
 # Step 3:  检查预构建 WebUI 是否存在
 # Step 4:  检查内置 OpenCode 二进制是否存在
-# Step 5:  构建 Skills bundled manifest
+# Step 5:  确认发布包不携带未审计 Skills
 # Step 6:  创建 dist/releases/ 输出目录
 # Step 7:  用 tar 打包，排除 dev/构建产物
 # Step 8:  包含指定路径清单
@@ -45,6 +45,8 @@ VERSION_FILE="${PROJECT_ROOT}/VERSION"          # 版本号文件（含 v 前缀
 DIST_DIR="${PROJECT_ROOT}/dist/releases"         # 产物输出目录
 TARBALL_NAME=""                                  # 由版本号决定
 VERSION=""                                       # 用户指定或从文件读取
+CORE_ONLY=false                                  # 第一阶段仅构建 MIT Core
+CHANNEL="alpha"                                  # alpha=CLI, beta=WebUI
 
 # ============================================================================
 # 辅助函数
@@ -96,6 +98,15 @@ validate_version() {
         exit 1
     fi
 
+    local source_version
+    source_version="$(tr -d '[:space:]' < "$VERSION_FILE")"
+    source_version="${source_version#v}"
+    if [ "$source_version" != "$VERSION" ]; then
+        log_error "VERSION 文件与发布版本不一致: ${source_version} != ${VERSION}"
+        log_info "请先在发布 Commit 中更新 VERSION，不得生成版本不一致的制品"
+        exit 1
+    fi
+
     log_success "版本号格式通过: v${VERSION}"
 }
 
@@ -132,36 +143,10 @@ check_webui() {
 check_opencode() {
     log_info "检查内置 OpenCode 二进制..."
 
-    local found=false
-
-    # 扫描 embedded/opencode/ 下所有平台目录中的 opencode 可执行文件
-    while IFS= read -r -d '' binary; do
-        # 取相对路径（用于显示）
-        local rel_path="${binary#${PROJECT_ROOT}/}"
-        if [ -x "$binary" ]; then
-            log_success "  OpenCode: ${rel_path}"
-            found=true
-        else
-            log_warn "  OpenCode 不可执行: ${rel_path}"
-        fi
-    done < <(find "${PROJECT_ROOT}/embedded/opencode" -type f -name "opencode" -print0 2>/dev/null || true)
-
-    # 也检查 embedded/opencode/ 下有无 opencode 命名但无 x 权限的文件
-    # （可能在非本机架构上，比如 macOS 上扫描 linux-amd64 二进制）
-    while IFS= read -r -d '' binary; do
-        local rel_path="${binary#${PROJECT_ROOT}/}"
-        if [ ! -x "$binary" ]; then
-            log_info "  OpenCode（不可执行，需 chmod）: ${rel_path}"
-        fi
-    done < <(find "${PROJECT_ROOT}/embedded/opencode" -type f -name "opencode" -print0 2>/dev/null || true)
-
-    if [ "$found" = false ]; then
-        if [ -d "${PROJECT_ROOT}/embedded/opencode" ]; then
-            # embedded/opencode/ 目录存在但无 opencode 文件
-            log_error "embedded/opencode/ 目录中未找到 opencode 可执行文件"
-        else
-            log_error "embedded/opencode/ 目录不存在"
-        fi
+    local binary="${PROJECT_ROOT}/embedded/opencode/macos-arm64/opencode"
+    local license="${PROJECT_ROOT}/embedded/opencode/src/LICENSE"
+    if [ ! -f "$binary" ] || [ ! -x "$binary" ] || [ ! -f "$license" ]; then
+        log_error "缺少可执行的 macOS arm64 OpenCode 或上游许可证"
         echo ""
         log_info "请先运行 setup-embedded-opencode.sh 下载 OpenCode 二进制:"
         log_info "  ./scripts/setup-embedded-opencode.sh"
@@ -172,7 +157,10 @@ check_opencode() {
             exit 1
         fi
         log_warn "SKIP_OPENCODE_CHECK 已设置，跳过 OpenCode 检查（仅用于预发布测试）"
+        return 0
     fi
+    log_success "  OpenCode: embedded/opencode/macos-arm64/opencode"
+    log_success "  License: embedded/opencode/src/LICENSE"
 }
 
 # ============================================================================
@@ -257,9 +245,8 @@ create_dist_dir() {
 #      源码 + CLI + tools + gateway + skills（约 5 MB）
 #      不含 webui/dist/ 和 embedded/
 #
-#   2. deepagent-embedded-{VERSION}.tar.gz
-#      所有平台的 OpenCode 二进制（约 254 MB raw）
-#      安装脚本按架构只下载对应文件
+#   2. deepagent-deepcode-{VERSION}.tar.gz
+#      仅含首发支持的 macOS arm64 OpenCode 二进制及其许可证
 #
 #   3. deepagent-webui-server-{VERSION}.tar.gz
 #      Web 服务端 + 前端（约 60 MB，不含 Electron）
@@ -302,8 +289,13 @@ build_core_tarball() {
         \
         pyproject.toml \
         uv.lock \
-        requirements.txt \
-        constraints-termux.txt \
+        README.md \
+        LICENSE \
+        NOTICE \
+        SECURITY.md \
+        CONTRIBUTING.md \
+        CODE_OF_CONDUCT.md \
+        THIRD_PARTY_NOTICES.md \
         cli.py \
         model_tools.py \
         run_agent.py \
@@ -320,7 +312,8 @@ build_core_tarball() {
         cron/ \
         acp_adapter/ \
         plugins/ \
-        skills/ \
+        scripts/audit-python-licenses.py \
+        scripts/install-release.sh \
         VERSION
 
     if [ -f "$tarball_path" ]; then
@@ -334,24 +327,36 @@ build_core_tarball() {
 }
 
 build_embedded_tarball() {
-    local tarball_name="${TARBALL_NAME/deepagent-/deepagent-embedded-}"
+    local tarball_name="${TARBALL_NAME/deepagent-/deepagent-deepcode-}"
     local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
-
-    log_info "构建 Embedded tarball..."
-    log_info "  路径: ${tarball_path}"
 
     cd "$PROJECT_ROOT"
 
+    if [ ! -f "embedded/opencode/macos-arm64/opencode" ] && [ -z "${SKIP_OPENCODE_CHECK:-}" ]; then
+        log_error "缺少 OpenCode 二进制，无法构建 DeepCode tarball"
+        log_info "请先运行 setup-embedded-opencode.sh 或设置 SKIP_OPENCODE_CHECK=1"
+        exit 1
+    fi
+
+    if [ ! -f "embedded/opencode/macos-arm64/opencode" ]; then
+        log_warn "SKIP_OPENCODE_CHECK: 跳过 DeepCode tarball（无 OpenCode 二进制）"
+        return 0
+    fi
+
+    log_info "构建 DeepCode macOS arm64 tarball..."
+    log_info "  路径: ${tarball_path}"
+
     tar czf "$tarball_path" \
         "${TAR_EXCLUDES[@]}" \
-        embedded/
+        embedded/opencode/macos-arm64/opencode \
+        embedded/opencode/src/LICENSE
 
     if [ -f "$tarball_path" ]; then
         local tarball_size
         tarball_size=$(du -h "$tarball_path" | cut -f1)
-        log_success "Embedded tarball 已创建: ${tarball_path} (${tarball_size})"
+        log_success "DeepCode tarball 已创建: ${tarball_path} (${tarball_size})"
     else
-        log_error "Embedded tarball 创建失败！"
+        log_error "DeepCode tarball 创建失败！"
         exit 1
     fi
 }
@@ -359,19 +364,66 @@ build_embedded_tarball() {
 build_webui_server_tarball() {
     local tarball_name="${TARBALL_NAME/deepagent-/deepagent-webui-server-}"
     local tarball_path="${DIST_DIR}/${tarball_name}.tar.gz"
+    local stage_dir node_binary node_root
 
     log_info "构建 WebUI Server tarball（不含 Electron）..."
     log_info "  路径: ${tarball_path}"
 
-    cd "$PROJECT_ROOT"
+    command -v node >/dev/null 2>&1 || { log_error "WebUI 发布需要 Node.js 23"; exit 1; }
+    node -e 'const major=Number(process.versions.node.split(".")[0]);process.exit(major>=23?0:1)' || {
+        log_error "WebUI Beta 制品需要 Node.js 23 或更高版本"
+        exit 1
+    }
+    node_binary="$(node -p 'require("node:fs").realpathSync(process.execPath)')"
+    file "$node_binary" | grep -q 'Mach-O.*arm64' || {
+        log_error "WebUI Beta 仅允许内置 macOS arm64 Node.js"
+        exit 1
+    }
+    if otool -L "$node_binary" | tail -n +2 | grep -Ev '^[[:space:]]*(/usr/lib/|/System/Library/)' | grep -q .; then
+        log_error "Node.js 不是可独立分发的官方构建（检测到外部动态库）"
+        log_info "请使用 actions/setup-node 或 nodejs.org 的 macOS arm64 官方发行包"
+        exit 1
+    fi
+    node_root="$(cd "$(dirname "$node_binary")/.." && pwd -P)"
+    [ -f "$node_root/LICENSE" ] || { log_error "Node.js LICENSE 缺失: $node_root/LICENSE"; exit 1; }
 
-    tar czf "$tarball_path" \
-        "${TAR_EXCLUDES[@]}" \
-        webui/dist/client/ \
-        webui/dist/server/ \
-        webui/dist/data/ \
-        webui/bin/ \
-        webui/package.json
+    stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/deepagent-webui-release.XXXXXX")"
+    mkdir -p "$stage_dir/webui/dist" "$stage_dir/webui/runtime/node/bin"
+    cp -R "$PROJECT_ROOT/webui/dist/client" "$stage_dir/webui/dist/client"
+    cp -R "$PROJECT_ROOT/webui/dist/server" "$stage_dir/webui/dist/server"
+    [ -d "$PROJECT_ROOT/webui/dist/data" ] && cp -R "$PROJECT_ROOT/webui/dist/data" "$stage_dir/webui/dist/data" || true
+    cp -R "$PROJECT_ROOT/webui/bin" "$stage_dir/webui/bin"
+    cp -R "$PROJECT_ROOT/webui/third_party_licenses" "$stage_dir/webui/third_party_licenses"
+    cp "$PROJECT_ROOT/webui/package.json" "$PROJECT_ROOT/webui/package-lock.json" "$stage_dir/webui/"
+    cp "$node_binary" "$stage_dir/webui/runtime/node/bin/node"
+    cp "$node_root/LICENSE" "$stage_dir/webui/runtime/node/LICENSE"
+    chmod 0755 "$stage_dir/webui/runtime/node/bin/node"
+
+    log_info "从已校验 lockfile 安装树复制 WebUI 生产依赖..."
+    node "$PROJECT_ROOT/webui/scripts/copy-production-deps.mjs" \
+        --source "$PROJECT_ROOT/webui" \
+        --destination "$stage_dir/webui"
+    [ -f "$stage_dir/webui/node_modules/socket.io/package.json" ] || {
+        log_error "WebUI 生产依赖缺少 socket.io"
+        exit 1
+    }
+    [ -f "$stage_dir/webui/node_modules/node-pty/package.json" ] || {
+        log_error "WebUI 生产依赖缺少 node-pty"
+        exit 1
+    }
+    (cd "$stage_dir/webui" && "$stage_dir/webui/runtime/node/bin/node" -e \
+        "require('socket.io'); require('node-pty')") || {
+        log_error "WebUI 生产依赖无法由内置 Node.js 加载"
+        exit 1
+    }
+    node "$PROJECT_ROOT/webui/scripts/audit-npm-licenses.mjs" \
+        --root "$stage_dir/webui" \
+        --output "$DIST_DIR/deepagent-webui-npm-licenses-${VERSION}.json"
+    cp "$DIST_DIR/deepagent-webui-npm-licenses-${VERSION}.json" \
+        "$stage_dir/webui/THIRD_PARTY_NOTICES.json"
+
+    tar czf "$tarball_path" -C "$stage_dir" webui
+    rm -rf "$stage_dir"
 
     if [ -f "$tarball_path" ]; then
         local tarball_size
@@ -386,7 +438,7 @@ build_webui_server_tarball() {
 # 汇总所有 tarball 路径
 collect_tarballs() {
     TARBALL_CORE="${DIST_DIR}/${TARBALL_NAME}.tar.gz"
-    TARBALL_EMBEDDED="${DIST_DIR}/deepagent-embedded-${VERSION}.tar.gz"
+    TARBALL_EMBEDDED="${DIST_DIR}/deepagent-deepcode-${VERSION}.tar.gz"
     TARBALL_WEBUI_SERVER="${DIST_DIR}/deepagent-webui-server-${VERSION}.tar.gz"
 }
 
@@ -443,12 +495,15 @@ generate_checksums() {
     log_info "生成 SHA256 校验和..."
     detect_sha_cmd
     generate_one_checksum "$TARBALL_CORE"
-    generate_one_checksum "$TARBALL_EMBEDDED"
-    generate_one_checksum "$TARBALL_WEBUI_SERVER"
+    if [ "$CORE_ONLY" != true ]; then
+        [ -f "$TARBALL_EMBEDDED" ] && generate_one_checksum "$TARBALL_EMBEDDED"
+        [ -f "$TARBALL_WEBUI_SERVER" ] && generate_one_checksum "$TARBALL_WEBUI_SERVER"
+    fi
     # Electron DMG 校验和（如果存在）
     for dmg in "${DIST_DIR}"/DeepAgent-*.dmg; do
         [ -f "$dmg" ] && generate_one_checksum "$dmg"
     done
+    return 0
 }
 
 # ============================================================================
@@ -461,10 +516,19 @@ print_success() {
     core_size=$(du -h "$TARBALL_CORE" 2>/dev/null | cut -f1)
     core_sha=$(awk '{print $1}' "${TARBALL_CORE}.sha256" 2>/dev/null)
 
+    if [ "$CORE_ONLY" = true ]; then
+        echo ""
+        echo -e "${GREEN}${BOLD}✓ DeepAgent CLI Alpha Core 构建完成${NC}"
+        printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "core" "${core_size}" "${core_sha}"
+        echo "  manifest: ${DIST_DIR}/deepagent-manifest-${VERSION}.json"
+        echo "  channel:  ${DIST_DIR}/deepagent-channel-${CHANNEL}.json"
+        return 0
+    fi
+
     local emb_size
     local emb_sha
-    emb_size=$(du -h "$TARBALL_EMBEDDED" 2>/dev/null | cut -f1)
-    emb_sha=$(awk '{print $1}' "${TARBALL_EMBEDDED}.sha256" 2>/dev/null)
+    emb_size=$(du -h "$TARBALL_EMBEDDED" 2>/dev/null | cut -f1 || true)
+    emb_sha=$(awk '{print $1}' "${TARBALL_EMBEDDED}.sha256" 2>/dev/null || true)
 
     local ws_size
     local ws_sha
@@ -482,7 +546,7 @@ print_success() {
     echo -e "${CYAN}${BOLD}📦 Release 产物概览 (v${VERSION})${NC}"
     echo ""
     printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "core"          "${core_size}" "${core_sha}"
-    printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "embedded"      "${emb_size}" "${emb_sha}"
+    printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "deepcode"      "${emb_size}" "${emb_sha}"
     printf "  ${YELLOW}%-40s${NC} ${GREEN}%8s${NC}  ${CYAN}%s${NC}\n" "webui-server"  "${ws_size}" "${ws_sha}"
     echo ""
 
@@ -490,7 +554,7 @@ print_success() {
     echo ""
     echo -e "   1. 上传到 Cloudflare R2:"
     echo -e "      ${GREEN}aws s3 cp ${TARBALL_CORE} s3://deepagent-releases/deepagent-core-${VERSION}.tar.gz${NC}"
-    echo -e "      ${GREEN}aws s3 cp ${TARBALL_EMBEDDED} s3://deepagent-releases/deepagent-embedded-${VERSION}.tar.gz${NC}"
+    echo -e "      ${GREEN}aws s3 cp ${TARBALL_EMBEDDED} s3://deepagent-releases/deepagent-deepcode-${VERSION}.tar.gz${NC}"
     echo -e "      ${GREEN}aws s3 cp ${TARBALL_WEBUI_SERVER} s3://deepagent-releases/deepagent-webui-server-${VERSION}.tar.gz${NC}"
     echo ""
     echo -e "   2. 上传 Electron DMG 到 R2:"
@@ -522,6 +586,17 @@ parse_args() {
                 VERSION="$2"
                 shift 2
                 ;;
+            --core-only)
+                CORE_ONLY=true
+                shift
+                ;;
+            --channel)
+                case "${2:-}" in
+                    alpha|beta) CHANNEL="$2" ;;
+                    *) log_error "--channel 只支持 alpha 或 beta"; exit 1 ;;
+                esac
+                shift 2
+                ;;
             -h|--help)
                 echo "DeepAgent Release Tarball Builder"
                 echo ""
@@ -529,6 +604,8 @@ parse_args() {
                 echo "  ./scripts/build-release.sh                          # 从 VERSION 文件读取"
                 echo "  ./scripts/build-release.sh --version 0.9.0          # 指定版本"
                 echo "  ./scripts/build-release.sh --version 0.9.0-beta.1   # pre-release"
+                echo "  ./scripts/build-release.sh --core-only              # CLI Alpha Core only"
+                echo "  ./scripts/build-release.sh --channel beta           # WebUI Beta artifacts"
                 echo ""
                 echo "环境变量:"
                 echo "  SKIP_WEBUI_CHECK=1     跳过 WebUI 预构建检查（预发布测试用）"
@@ -582,20 +659,24 @@ main() {
     echo -e "${BLUE}${BOLD}[Step 2/10] 版本号校验${NC}"
     validate_version
 
-    # ---- Step 3: 检查预构建 WebUI ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 3/10] 检查预构建 WebUI${NC}"
-    check_webui
+    if [ "$CORE_ONLY" != true ]; then
+        # ---- Step 3: 检查预构建 WebUI ----
+        echo ""
+        echo -e "${BLUE}${BOLD}[Step 3/10] 检查预构建 WebUI${NC}"
+        check_webui
 
-    # ---- Step 4: 检查内置 OpenCode 二进制 ----
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 4/10] 检查内置 OpenCode 二进制${NC}"
-    check_opencode
+        # ---- Step 4: 检查内置 OpenCode 二进制 ----
+        echo ""
+        echo -e "${BLUE}${BOLD}[Step 4/10] 检查内置 OpenCode 二进制${NC}"
+        check_opencode
+    else
+        log_info "Core-only 模式：不检查或打包 BSL WebUI/Desktop 与 OpenCode"
+    fi
 
-    # ---- Step 5: 构建 Skills bundled manifest ----
+    # ---- Step 5: Skills 许可边界 ----
     echo ""
-    echo -e "${BLUE}${BOLD}[Step 5/10] 构建 Skills manifest${NC}"
-    build_skills_manifest
+    echo -e "${BLUE}${BOLD}[Step 5/10] 检查 Skills 发布边界${NC}"
+    log_info "当前 Alpha/Beta 制品不打包未完成许可审计的 bundled Skills"
 
     # ---- Step 6: 创建输出目录 ----
     echo ""
@@ -607,13 +688,15 @@ main() {
     echo -e "${BLUE}${BOLD}[Step 7/10] 打包 Core tarball${NC}"
     build_core_tarball
 
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 8/10] 打包 Embedded tarball${NC}"
-    build_embedded_tarball
+    if [ "$CORE_ONLY" != true ]; then
+        echo ""
+        echo -e "${BLUE}${BOLD}[Step 8/10] 打包 Embedded tarball${NC}"
+        build_embedded_tarball
 
-    echo ""
-    echo -e "${BLUE}${BOLD}[Step 9/10] 打包 WebUI Server tarball${NC}"
-    build_webui_server_tarball
+        echo ""
+        echo -e "${BLUE}${BOLD}[Step 9/10] 打包 WebUI Server tarball${NC}"
+        build_webui_server_tarball
+    fi
 
     # ---- 收集路径 ----
     collect_tarballs
@@ -622,6 +705,18 @@ main() {
     echo ""
     echo -e "${BLUE}${BOLD}[Step 10/10] 生成 SHA256 校验和${NC}"
     generate_checksums
+
+    local manifest_args=(
+        --version "$VERSION"
+        --channel "$CHANNEL"
+        --artifact "$TARBALL_CORE"
+        --output-dir "$DIST_DIR"
+    )
+    if [ "$CORE_ONLY" != true ]; then
+        manifest_args+=(--webui-artifact "$TARBALL_WEBUI_SERVER")
+        manifest_args+=(--deepcode-artifact "$TARBALL_EMBEDDED")
+    fi
+    python3 "${PROJECT_ROOT}/scripts/generate-release-manifest.py" "${manifest_args[@]}"
 
     # ---- 打印成功信息 ----
     print_success

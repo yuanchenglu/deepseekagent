@@ -1,71 +1,90 @@
 /**
- * Deep Agent — Electron Main Process
+ * DeepAgent Legacy Preview — security-only desktop wrapper.
  *
- * A lightweight desktop wrapper for the Deep Agent WebUI.
- * Loads the pre-built dist/client/index.html directly.
- *
- * Usage:
- *   npx electron webui/electron/main.js
- *
- * Build:
- *   npm run build:electron   (from webui/)
- *   scripts/package-electron.sh
+ * This preview contains no Agent runtime. It starts the installed DeepAgent
+ * WebUI through the managed CLI and authenticates with a one-time ticket.
  */
 
 const { app, BrowserWindow, Menu, shell } = require('electron')
+const { createHash, randomBytes } = require('crypto')
+const { execFileSync } = require('child_process')
+const { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } = require('fs')
+const { homedir } = require('os')
 const path = require('path')
-const fs = require('fs')
-const { execSync } = require('child_process')
 
-// ---- Constants ----
 const IS_MAC = process.platform === 'darwin'
-const IS_DEV = !app.isPackaged
-const WINDOW_TITLE = 'Deep Agent'
-const WINDOW_WIDTH = 1280
-const WINDOW_HEIGHT = 800
-const MIN_WIDTH = 960
-const MIN_HEIGHT = 600
+const WINDOW_TITLE = 'DeepAgent Legacy Preview'
+const DEEPAGENT_HOME = path.resolve(process.env.DEEPAGENT_HOME || path.join(homedir(), '.deepagent'))
+const RUNTIME_DIR = path.join(DEEPAGENT_HOME, 'runtime', 'webui')
+const SAFE_ENV_NAMES = [
+  'PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL', 'LC_CTYPE',
+  'SHELL', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'NODE_EXTRA_CA_CERTS',
+]
 
-// ---- Backend Detection ----
-const DEEPAGENT_HOME = path.join(process.env.HOME, '.deepagent')
+mkdirSync(path.join(DEEPAGENT_HOME, 'data', 'electron-legacy'), { recursive: true, mode: 0o700 })
+app.setName(WINDOW_TITLE)
+app.setPath('userData', path.join(DEEPAGENT_HOME, 'data', 'electron-legacy'))
 
-function ensureBackend() {
-  const versionFile = path.join(DEEPAGENT_HOME, 'VERSION')
-  if (fs.existsSync(versionFile)) {
-    console.log('[DeepAgent] Backend already installed at', DEEPAGENT_HOME)
-    return true
+function managedCli() {
+  const configured = process.env.DEEPAGENT_CLI
+  const candidate = configured
+    ? path.resolve(configured)
+    : path.join(DEEPAGENT_HOME, 'current', '.venv', 'bin', 'deepagent')
+  if (!existsSync(candidate)) throw new Error('DeepAgent CLI is not installed')
+  const real = realpathSync(candidate)
+  const managedRoot = realpathSync(DEEPAGENT_HOME)
+  if (!configured && !real.startsWith(`${managedRoot}${path.sep}`)) {
+    throw new Error('DeepAgent CLI path escapes the product directory')
   }
-  // Backend not installed: silently execute install script
-  console.log('[DeepAgent] Backend not found at', DEEPAGENT_HOME)
-  console.log('[DeepAgent] Running silent install...')
-  const installScript = `curl -fsSL https://deepseekagent.starseas.org/install.sh | sh -s -- --skip-setup --no-dmg --no-path`
-  try {
-    execSync(installScript, { stdio: 'pipe', timeout: 5 * 60 * 1000 })
-    console.log('[DeepAgent] Backend installed successfully')
-    return true
-  } catch (e) {
-    console.error('[DeepAgent] Backend installation failed:', e.message)
-    console.log('[DeepAgent] The app will start without backend. Run install.sh manually to set up.')
-    return false
+  return real
+}
+
+function childEnv() {
+  const env = {}
+  for (const name of SAFE_ENV_NAMES) {
+    if (process.env[name]) env[name] = process.env[name]
+  }
+  return {
+    ...env,
+    DEEPAGENT_HOME,
+    HERMES_HOME: DEEPAGENT_HOME,
   }
 }
 
-// ---- Resolve the path to the built web client ----
-function resolveDistIndex() {
-  // In dev mode, __dirname is webui/electron/; dist is at webui/dist/
-  // In packaged mode (electron-builder), the app.asar contains
-  // electron/main.js and extraResources places dist/ alongside.
-  if (IS_DEV) {
-    // When running `npx electron webui/electron/main.js` from webui/
-    return path.join(__dirname, '..', 'dist', 'client', 'index.html')
+function readManagedPort() {
+  const record = JSON.parse(readFileSync(path.join(RUNTIME_DIR, 'port.json'), 'utf8'))
+  const port = Number(record.port)
+  if (record.product !== 'deepagent-webui' || record.host !== '127.0.0.1' || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('DeepAgent WebUI returned an invalid local endpoint')
   }
-  // Packaged — electron-builder config below copies dist/ into extraResources
-  return path.join(process.resourcesPath, 'dist', 'client', 'index.html')
+  return port
 }
 
-// ---- Build the application menu ----
+function createLoginUrl(port) {
+  const ticket = randomBytes(32).toString('base64url')
+  const digest = createHash('sha256').update(ticket).digest('hex')
+  const tickets = path.join(RUNTIME_DIR, 'login-tickets')
+  mkdirSync(tickets, { recursive: true, mode: 0o700 })
+  writeFileSync(path.join(tickets, `${digest}.json`), `${JSON.stringify({
+    schema_version: 1,
+    product: 'deepagent-webui-ticket',
+    sha256: digest,
+    expires_at: Date.now() + 60_000,
+  })}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+  return `http://127.0.0.1:${port}/#/?ticket=${ticket}`
+}
+
+function startManagedWebUi() {
+  execFileSync(managedCli(), ['webui', 'start'], {
+    env: childEnv(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 60_000,
+  })
+  return createLoginUrl(readManagedPort())
+}
+
 function buildMenu() {
-  const template = [
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
     {
       label: WINDOW_TITLE,
       submenu: [
@@ -80,58 +99,26 @@ function buildMenu() {
         { role: 'quit' },
       ],
     },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { type: 'separator' },
-        ...(IS_MAC
-          ? [{ role: 'front' }, { type: 'separator' }, { role: 'window' }]
-          : [{ role: 'close' }]),
-      ],
-    },
-  ]
-
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
+    { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+    { label: 'View', submenu: [{ role: 'reload' }, { role: 'forceReload' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }] },
+    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, ...(IS_MAC ? [{ role: 'front' }, { role: 'window' }] : [{ role: 'close' }])] },
+  ]))
 }
 
-// ---- Create the main browser window ----
 let mainWindow = null
+
+function errorPage(error) {
+  const message = String(error instanceof Error ? error.message : error)
+    .replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))
+  return `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>${WINDOW_TITLE}</title><body style="font-family:system-ui;padding:32px;background:#1a1a1a;color:#eee"><h2>DeepAgent WebUI is unavailable</h2><p>${message}</p><p>Install it with <code>deepagent webui install</code>, then reopen this preview.</p></body>`)}`
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    minWidth: MIN_WIDTH,
-    minHeight: MIN_HEIGHT,
+    width: 1280,
+    height: 800,
+    minWidth: 960,
+    minHeight: 600,
     title: WINDOW_TITLE,
     backgroundColor: '#1a1a1a',
     show: false,
@@ -139,52 +126,34 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   })
-
-  // Show window when ready
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  // Open external links in the system browser
+  mainWindow.once('ready-to-show', () => mainWindow?.show())
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('file://') || url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
-      return { action: 'allow' }
-    }
-    shell.openExternal(url).catch(() => {})
+    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url).catch(() => {})
     return { action: 'deny' }
   })
-
-  // Load the built web client
-  const indexPath = resolveDistIndex()
-  mainWindow.loadFile(indexPath).catch((err) => {
-    console.error('[electron] Failed to load index.html:', err)
-    mainWindow.loadURL(
-      `data:text/html;charset=utf-8,<h1>Error Loading Deep Agent</h1><p>${encodeURIComponent(err.message)}</p>`
-    )
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('http://127.0.0.1:')) return
+    event.preventDefault()
+    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url).catch(() => {})
   })
+  try {
+    mainWindow.loadURL(startManagedWebUi())
+  } catch (error) {
+    mainWindow.loadURL(errorPage(error))
+  }
 }
 
-// ---- App lifecycle ----
 app.whenReady().then(() => {
-  // First: ensure backend is installed
-  ensureBackend()
-
   buildMenu()
   createWindow()
-
   app.on('activate', () => {
-    // macOS: re-create window when dock icon is clicked
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  if (!IS_MAC) {
-    app.quit()
-  }
+  if (!IS_MAC) app.quit()
 })

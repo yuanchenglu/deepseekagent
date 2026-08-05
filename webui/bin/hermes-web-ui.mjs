@@ -3,7 +3,7 @@ import { spawn, execSync, execFileSync } from 'child_process'
 import { resolve, dirname, join, delimiter } from 'path'
 import { fileURLToPath } from 'url'
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync, chmodSync, statSync, existsSync, realpathSync } from 'fs'
-import { randomBytes, scryptSync } from 'crypto'
+import { randomBytes } from 'crypto'
 import { homedir } from 'os'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -12,21 +12,20 @@ const serverEntry = resolve(__dirname, '..', 'dist', 'server', 'index.js')
 const pkgDir = resolve(__dirname, '..')
 const pkg = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf-8'))
 const VERSION = pkg.version
+const DEEPAGENT_HOME = process.env.DEEPAGENT_HOME?.trim()
+  ? resolve(process.env.DEEPAGENT_HOME.trim())
+  : resolve(homedir(), '.deepagent')
 const WEB_UI_HOME = process.env.HERMES_WEB_UI_HOME?.trim()
   ? resolve(process.env.HERMES_WEB_UI_HOME.trim())
-  : resolve(homedir(), '.hermes-web-ui')
-const PID_DIR = WEB_UI_HOME
+  : join(DEEPAGENT_HOME, 'data', 'webui')
+const PID_DIR = process.env.DEEPAGENT_WEBUI_RUNTIME_DIR?.trim()
+  ? resolve(process.env.DEEPAGENT_WEBUI_RUNTIME_DIR.trim())
+  : join(DEEPAGENT_HOME, 'runtime', 'webui')
 const PID_FILE = join(PID_DIR, 'server.pid')
 const LOG_FILE = join(PID_DIR, 'server.log')
-const TOKEN_FILE = join(PID_DIR, '.token')
+const TOKEN_FILE = join(WEB_UI_HOME, '.token')
 const LOGIN_LOCK_FILE = join(WEB_UI_HOME, '.login-lock.json')
-const WEB_UI_DB_FILE = join(WEB_UI_HOME, 'hermes-web-ui.db')
 const DEFAULT_PORT = 8648
-const PREVIEW_BACKEND_PORT = 8650
-const PREVIEW_FRONTEND_PORT = 8651
-const PREVIEW_AGENT_BRIDGE_PORT = 18650
-const DEFAULT_USERNAME = 'admin'
-const DEFAULT_PASSWORD = '123456'
 const DEFAULT_RESTART_GRACE_MS = 5000
 const DEFAULT_STOP_GRACE_MS = 15000
 const STOP_POLL_INTERVAL_MS = 500
@@ -72,9 +71,6 @@ function getToken() {
 }
 
 function ensureToken() {
-  // If AUTH_TOKEN is set, let server handle it.
-  if (process.env.AUTH_TOKEN) return process.env.AUTH_TOKEN
-
   let token = getToken()
   if (!token) {
     mkdirSync(dirname(TOKEN_FILE), { recursive: true })
@@ -292,62 +288,6 @@ function getListeningPids(port) {
   return []
 }
 
-function killListeningPids(port, pids = getListeningPids(port)) {
-  if (pids.length === 0) return
-
-  console.log(`  ⚠ Port ${port} is in use by PID(s): ${pids.join(' ')}, killing...`)
-  try {
-    if (process.platform === 'win32') {
-      execSync(`taskkill /F /PID ${pids.join(' /PID ')}`, { encoding: 'utf-8' })
-    } else {
-      execSync(`kill -9 ${pids.join(' ')}`, { encoding: 'utf-8' })
-    }
-  } catch {}
-}
-
-function stopPreviewRuntimeFromCli() {
-  const previewPorts = [
-    PREVIEW_BACKEND_PORT,
-    PREVIEW_FRONTEND_PORT,
-    ...(process.platform === 'win32' ? [PREVIEW_AGENT_BRIDGE_PORT] : []),
-  ]
-  const pids = [...new Set(previewPorts.flatMap(port => getListeningPids(port)))]
-  if (!pids.length) return 0
-
-  console.log(`  ⏹ Stopping preview runtime (PID(s): ${pids.join(' ')})...`)
-  for (const pid of pids) {
-    try {
-      if (process.platform === 'win32') {
-        execFileSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
-      } else {
-        execSync(`kill -TERM -${pid}`, { stdio: 'ignore' })
-      }
-    } catch {
-      try {
-        if (process.platform === 'win32') {
-          execFileSync('taskkill.exe', ['/PID', String(pid), '/F'], { stdio: 'ignore', windowsHide: true })
-        } else {
-          execSync(`kill -9 ${pid}`, { stdio: 'ignore' })
-        }
-      } catch {}
-    }
-  }
-
-  return pids.length
-}
-
-function recoverPidFromPort() {
-  const port = getPortFromArgs() ?? DEFAULT_PORT
-  for (const pid of getListeningPids(port)) {
-    if (isRunning(pid)) {
-      mkdirSync(PID_DIR, { recursive: true })
-      writePid(pid)
-      return pid
-    }
-  }
-  return null
-}
-
 function readPidFile() {
   try {
     const pid = parseInt(readFileSync(PID_FILE, 'utf-8').trim())
@@ -360,11 +300,26 @@ function readPidFile() {
 function getPid() {
   const pid = readPidFile()
   if (pid) {
-    if (isRunning(pid)) return pid
+    if (isRunning(pid) && isOwnedServerProcess(pid)) return pid
     removePid()
   }
 
-  return recoverPidFromPort()
+  return null
+}
+
+function isOwnedServerProcess(pid) {
+  // Phase 2 officially supports macOS Apple Silicon. Refuse to stop an
+  // unverifiable PID on other platforms rather than risk another product.
+  if (process.platform === 'win32') return false
+  try {
+    const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return command.includes(serverEntry)
+  } catch {
+    return false
+  }
 }
 
 function isRunning(pid) {
@@ -377,31 +332,64 @@ function isRunning(pid) {
 }
 
 function writePid(pid) {
-  writeFileSync(PID_FILE, String(pid))
+  writeFileSync(PID_FILE, String(pid), { mode: 0o600 })
 }
 
 function removePid() {
   try { unlinkSync(PID_FILE) } catch {}
 }
 
+function buildServerEnv(port, token) {
+  const passthrough = [
+    'PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL', 'LC_CTYPE',
+    'SHELL', 'SystemRoot', 'ComSpec', 'PATHEXT', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+    'NODE_EXTRA_CA_CERTS', 'PROFILE', 'WORKSPACE_BASE',
+    'HERMES_DESKTOP', 'DEEPAGENT_RUNTIME_LEASE_SOCKET',
+    'DEEPAGENT_RUNTIME_LEASE_TOKEN', 'DEEPAGENT_RUNTIME_LEASE_TTL_MS',
+    'HERMES_WEB_UI_AUTH_JWT_EXPIRES_IN',
+    'HERMES_WEB_UI_DISABLE_GATEWAY_AUTOSTART',
+    'HERMES_WEB_UI_MANAGED_GATEWAY',
+    'HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN',
+    'HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT',
+    'HERMES_WEB_UI_DISABLE_SKILL_INJECTION',
+  ]
+  const env = {}
+  for (const name of passthrough) {
+    if (process.env[name]) env[name] = process.env[name]
+  }
+  Object.assign(env, {
+    DEEPAGENT_HOME,
+    HERMES_HOME: DEEPAGENT_HOME,
+    HERMES_WEB_UI_HOME: WEB_UI_HOME,
+    HERMES_WEBUI_STATE_DIR: WEB_UI_HOME,
+    DEEPAGENT_WEBUI_RUNTIME_DIR: PID_DIR,
+    BIND_HOST: '127.0.0.1',
+    HERMES_LAN_DISCOVERY_ENABLED: 'false',
+    NODE_ENV: 'production',
+    PORT: String(port),
+    AUTH_TOKEN: token,
+  })
+  return env
+}
+
 function startDaemon(port) {
   const existing = getPid()
   if (existing && isRunning(existing)) {
-    console.log(`  ✗ hermes-web-ui is already running (PID: ${existing})`)
-    console.log(`    Use "hermes-web-ui stop" to stop it first`)
+    console.log(`  ✗ DeepAgent WebUI is already running (PID: ${existing})`)
+    console.log('    Use "deepagent webui stop" to stop it first')
     process.exit(1)
   }
   removePid()
 
-  // Check if port is already in use
+  // Never kill, reuse, or adopt another product's process.
   const occupied = getListeningPids(port)
   if (occupied.length) {
-    killListeningPids(port, occupied)
-    // Brief wait for port to be released
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500)
+    console.log(`  ✗ Port ${port} is already in use; choose another port`)
+    process.exit(1)
   }
 
-  mkdirSync(PID_DIR, { recursive: true })
+  mkdirSync(PID_DIR, { recursive: true, mode: 0o700 })
+  chmodSync(PID_DIR, 0o700)
 
   ensureNativeModules()
   const token = ensureToken()
@@ -422,7 +410,7 @@ function startDaemon(port) {
 
   const logStream = openSync(LOG_FILE, 'a')
   const windowsShell = process.platform === 'win32' ? getWindowsShell() : null
-  const serverEnv = { ...process.env, NODE_ENV: 'production', PORT: String(port), AUTH_TOKEN: token }
+  const serverEnv = buildServerEnv(port, token)
   if (windowsShell) {
     serverEnv.SHELL = serverEnv.SHELL?.trim() || windowsShell
     serverEnv.ComSpec = serverEnv.ComSpec?.trim() || windowsShell
@@ -450,12 +438,12 @@ function startDaemon(port) {
   const interval = 500
   let waited = 0
 
-  console.log(`  ⏳ Starting hermes-web-ui (PID: ${child.pid}, port: ${port})...`)
+  console.log(`  ⏳ Starting DeepAgent WebUI (PID: ${child.pid}, port: ${port})...`)
 
   function poll() {
     waited += interval
     if (!isRunning(child.pid)) {
-      console.log('  ✗ Failed to start hermes-web-ui')
+      console.log('  ✗ Failed to start DeepAgent WebUI')
       console.log(`    Check log: ${LOG_FILE}`)
       removePid()
       process.exit(1)
@@ -464,12 +452,8 @@ function startDaemon(port) {
 
     fetch(healthUrl).then(res => {
       if (res.ok) {
-        const listeningPid = recoverPidFromPort()
-        if (listeningPid) {
-          writePid(listeningPid)
-        }
         const url = `http://localhost:${port}`
-        console.log(`  ✓ hermes-web-ui started`)
+        console.log('  ✓ DeepAgent WebUI started')
         console.log(`    ${url}`)
         console.log(`    Log: ${LOG_FILE}`)
         if (shouldOpenBrowser()) {
@@ -502,30 +486,29 @@ function startDaemon(port) {
 
 function stopDaemon(options = {}) {
   const { restart = false } = options
-  const stoppedPreviewPids = stopPreviewRuntimeFromCli()
   let pidFromFile = readPidFile()
   let cleanedStalePid = false
   if (pidFromFile && !isRunning(pidFromFile)) {
     removePid()
-    console.log(`  ✓ hermes-web-ui was not running (cleaned stale PID: ${pidFromFile})`)
+    console.log(`  ✓ DeepAgent WebUI was not running (cleaned stale PID: ${pidFromFile})`)
     pidFromFile = null
     cleanedStalePid = true
   }
+  if (pidFromFile && !isOwnedServerProcess(pidFromFile)) {
+    console.log(`  ✗ Refusing to stop PID ${pidFromFile}: it is not the DeepAgent WebUI server`)
+    process.exit(1)
+  }
 
-  const pid = pidFromFile ?? recoverPidFromPort()
+  const pid = pidFromFile
   if (!pid) {
     if (cleanedStalePid) return
-    if (stoppedPreviewPids) {
-      console.log(`  ✓ hermes-web-ui preview stopped`)
-      return
-    }
-    console.log('  ✗ hermes-web-ui is not running')
+    console.log('  ✗ DeepAgent WebUI is not running')
     process.exit(1)
   }
 
   if (!isRunning(pid)) {
     removePid()
-    console.log(`  ✓ hermes-web-ui was not running (cleaned stale PID)`)
+    console.log('  ✓ DeepAgent WebUI was not running (cleaned stale PID)')
     return
   }
 
@@ -551,7 +534,7 @@ function stopDaemon(options = {}) {
       }
     }
     removePid()
-    console.log(`  ✓ hermes-web-ui stopped (PID: ${pid})`)
+    console.log(`  ✓ DeepAgent WebUI stopped (PID: ${pid})`)
   } catch (err) {
     console.log(`  ✗ Failed to stop: ${err.message}`)
     process.exit(1)
@@ -561,11 +544,11 @@ function stopDaemon(options = {}) {
 function showStatus() {
   const pid = getPid()
   if (pid && isRunning(pid)) {
-    console.log(`  ✓ hermes-web-ui is running (PID: ${pid})`)
+    console.log(`  ✓ DeepAgent WebUI is running (PID: ${pid})`)
     console.log(`    PID file: ${PID_FILE}`)
   } else {
     if (pid) removePid()
-    console.log('  ✗ hermes-web-ui is not running')
+    console.log('  ✗ DeepAgent WebUI is not running')
   }
 }
 
@@ -588,81 +571,26 @@ function clearLoginLocks(options = {}) {
   }
 
   if (!silent && serverRunning) {
-    console.log('  ⚠ hermes-web-ui is running; restart it to clear in-memory login locks.')
-    console.log('    Run: hermes-web-ui restart')
+    console.log('  ⚠ DeepAgent WebUI is running; restart it to clear in-memory login locks.')
+    console.log('    Run: deepagent webui stop && deepagent webui start')
   }
 
   return { path: LOGIN_LOCK_FILE, removed, serverRunning }
-}
-
-function hashPassword(password) {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(password, salt, 64).toString('hex')
-  return `scrypt:${salt}:${hash}`
-}
-
-async function resetDefaultLogin(options = {}) {
-  const { silent = false } = options
-  mkdirSync(WEB_UI_HOME, { recursive: true })
-  const { DatabaseSync } = await import('node:sqlite')
-  const db = new DatabaseSync(WEB_UI_DB_FILE)
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'admin',
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        last_login_at INTEGER
-      )
-    `)
-
-    const now = Date.now()
-    const passwordHash = hashPassword(DEFAULT_PASSWORD)
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(DEFAULT_USERNAME)
-    if (existing?.id) {
-      db.prepare(
-        `UPDATE users
-         SET password_hash = ?, role = 'super_admin', status = 'active', updated_at = ?
-         WHERE id = ?`
-      ).run(passwordHash, now, existing.id)
-      if (!silent) {
-        console.log(`  ✓ Reset default login: ${DEFAULT_USERNAME} / ${DEFAULT_PASSWORD}`)
-        console.log(`    Database: ${WEB_UI_DB_FILE}`)
-      }
-      return { path: WEB_UI_DB_FILE, username: DEFAULT_USERNAME, password: DEFAULT_PASSWORD, action: 'updated' }
-    }
-
-    db.prepare(
-      `INSERT INTO users (username, password_hash, role, status, created_at, updated_at)
-       VALUES (?, ?, 'super_admin', 'active', ?, ?)`
-    ).run(DEFAULT_USERNAME, passwordHash, now, now)
-    if (!silent) {
-      console.log(`  ✓ Created default login: ${DEFAULT_USERNAME} / ${DEFAULT_PASSWORD}`)
-      console.log(`    Database: ${WEB_UI_DB_FILE}`)
-    }
-    return { path: WEB_UI_DB_FILE, username: DEFAULT_USERNAME, password: DEFAULT_PASSWORD, action: 'created' }
-  } finally {
-    db.close()
-  }
 }
 
 async function main() {
   const command = process.argv[2] || 'start'
 
   if (['-v', '--version', 'version'].includes(command)) {
-    console.log(`hermes-web-ui v${VERSION}`)
+    console.log(`DeepAgent WebUI v${VERSION}`)
     process.exit(0)
   }
 
   if (['-h', '--help', 'help'].includes(command)) {
     console.log(`
-hermes-web-ui v${VERSION}
+DeepAgent WebUI v${VERSION}
 
-Usage: hermes-web-ui <command> [options]
+Internal launcher used by: deepagent webui <command>
 
 Commands:
   start [port]       Start the server (default port: ${DEFAULT_PORT})
@@ -671,9 +599,6 @@ Commands:
   restart [port]     Restart the server
   status             Show server status
   clear-login-locks  Delete the login IP lock file
-  reset-default-login Create or reset the default login (${DEFAULT_USERNAME} / ${DEFAULT_PASSWORD})
-  update             Update to latest version and restart
-  upgrade            Alias for update
   version            Show version number
 
 Options:
@@ -714,91 +639,11 @@ Options:
       }
       break
     }
-    case 'reset-default-login':
-      await resetDefaultLogin()
-      break
-    case 'update':
-    case 'upgrade':
-      doUpdate()
-      break
     default:
-      ensureNativeModules()
-      const port = !isNaN(command) ? parseInt(command) : DEFAULT_PORT
-      const windowsShell = process.platform === 'win32' ? getWindowsShell() : null
-      const serverEnv = {
-        ...process.env,
-        NODE_ENV: 'production',
-        PORT: String(port),
-      }
-      if (windowsShell) {
-        serverEnv.SHELL = serverEnv.SHELL?.trim() || windowsShell
-        serverEnv.ComSpec = serverEnv.ComSpec?.trim() || windowsShell
-      }
-      const child = spawn(process.execPath, [serverEntry], {
-        cwd: pkgDir,
-        stdio: 'inherit',
-        env: serverEnv,
-        windowsHide: true,
-      })
-      child.on('exit', (code) => process.exit(code ?? 1))
-      process.on('SIGTERM', () => child.kill('SIGTERM'))
-      process.on('SIGINT', () => child.kill('SIGINT'))
+      console.error(`  ✗ Unknown DeepAgent WebUI command: ${command}`)
+      console.error('    Run: deepagent webui --help')
+      process.exit(1)
   }
-}
-
-function doUpdate() {
-  console.log('  ⬆ Updating hermes-web-ui...')
-
-  const npm = getNpmBin()
-  try {
-    console.log('  🧹 Cleaning npm cache...')
-    execFileSync(npm, ['cache', 'clean', '--force'], {
-      stdio: 'inherit',
-      env: getCurrentNodeEnv(),
-    })
-  } catch (err) {
-    console.log(`  ⚠ Failed to clean npm cache, continuing update: ${err?.message || err}`)
-  }
-
-  runUpdateInstall(npm)
-}
-
-function runUpdateInstall(npm) {
-  const child = spawnCli(npm, ['install', '-g', 'hermes-web-ui@latest'], {
-    stdio: 'inherit',
-    windowsHide: true,
-    env: getCurrentNodeEnv(),
-  })
-
-  child.on('error', (err) => {
-    console.log(`  ✗ Update failed: ${err.message}`)
-    process.exit(1)
-  })
-
-  child.on('exit', (code) => {
-    if (code === 0) {
-      console.log('  ✓ Update complete, restarting...')
-      const cli = getGlobalCliBin()
-      if (!existsSync(cli)) {
-        console.log(`  ✗ Updated CLI not found: ${cli}`)
-        process.exit(1)
-      }
-
-      const restart = spawnCli(cli, getRestartArgs(getUpdatePort()), {
-        stdio: 'inherit',
-        windowsHide: true,
-        env: getCurrentNodeEnv(),
-      })
-      restart.on('error', (err) => {
-        console.log(`  ✗ Restart failed: ${err.message}`)
-        process.exit(1)
-      })
-      restart.on('exit', (restartCode) => process.exit(restartCode ?? 1))
-    } else {
-      console.log('  ✗ Update failed')
-      process.exit(code ?? 1)
-    }
-  })
 }
 
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === __filename) {
@@ -815,7 +660,6 @@ export {
   getListeningPids,
   getRestartArgs,
   parseUnixNetstatListeningPids,
-  resetDefaultLogin,
   shouldOpenBrowser,
   stopDaemon,
 }

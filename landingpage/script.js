@@ -4,18 +4,18 @@
 
 // --- Platform install commands ---
 const PLATFORMS = {
-  linux: {
+  macosArm64: {
     command:
       "curl -fsSL https://deepseekagent.starseas.org/install.sh | bash",
     prompt: "$",
-    note: "Works on Linux, macOS & WSL2 · No prerequisites · Installs everything automatically",
+    note: "CLI Alpha supports macOS Apple Silicon only · No sudo",
     stepNote:
-      "Installs uv, Python 3.11, clones the repo, sets up everything. No sudo needed.",
+      "Installs a checksum-verified, versioned Core release under ~/.deepagent. No sudo needed.",
   },
 };
 
 function detectPlatform() {
-  return "linux";
+  return "macosArm64";
 }
 
 function switchPlatform(platform) {

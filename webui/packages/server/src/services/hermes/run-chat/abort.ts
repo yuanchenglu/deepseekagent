@@ -75,9 +75,11 @@ export async function handleAbort(
   }
 
   if (isBridgeRunSource(activeState.source)) {
+    let cancellationConfirmed = false
     let interruptResult: any = null
     try {
       interruptResult = await bridge.interrupt(sessionId, 'Aborted by user', activeState.profile)
+      cancellationConfirmed = interruptResult?.synced !== false
     } catch (err) {
       logger.warn(err, '[chat-run-socket][abort] failed to interrupt CLI bridge for session %s', sessionId)
     }
@@ -103,11 +105,36 @@ export async function handleAbort(
       logger.warn({ sessionId, runId }, '[chat-run-socket][abort] CLI bridge interrupt did not sync before timeout')
       try {
         await bridge.destroy?.(sessionId, activeState.profile)
+        cancellationConfirmed = true
       } catch (err) {
         logger.warn(err, '[chat-run-socket][abort] failed to destroy timed-out CLI bridge session %s', sessionId)
       }
+      const lease = activeState.runtimeTaskLease
+      activeState.runtimeTaskLease = undefined
+      if (lease) {
+        if (cancellationConfirmed) {
+          try { await lease.finish('cancelled') } catch (err) {
+            lease.abandon()
+            logger.warn(err, '[chat-run-socket][abort] failed to finish cancelled DeepAgent Runtime task lease')
+          }
+        } else {
+          lease.abandon()
+        }
+      }
       await markAbortCompleted(nsp, socket, sessionId, runId || 'bridge_abort_timeout', sessionMap, runQueuedItem, false)
       return
+    }
+    const lease = activeState.runtimeTaskLease
+    activeState.runtimeTaskLease = undefined
+    if (lease) {
+      if (cancellationConfirmed) {
+        try { await lease.finish('cancelled') } catch (err) {
+          lease.abandon()
+          logger.warn(err, '[chat-run-socket][abort] failed to finish cancelled DeepAgent Runtime task lease')
+        }
+      } else {
+        lease.abandon()
+      }
     }
   } else if (activeState.source === 'coding_agent') {
     codingAgentRunManager.stop(sessionId, { reportClosed: false })

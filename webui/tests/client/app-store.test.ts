@@ -202,7 +202,7 @@ describe('App Store', () => {
 
     expect(ok).toBe(false)
     expect(store.updating).toBe(false)
-    expect(consoleError).toHaveBeenCalledWith('Failed to update Hermes Web UI:', expect.any(Error))
+    expect(consoleError).toHaveBeenCalledWith('Failed to update DeepAgent WebUI:', expect.any(Error))
     consoleError.mockRestore()
   })
 

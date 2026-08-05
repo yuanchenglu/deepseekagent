@@ -1,7 +1,7 @@
 export default {
   brand: {
-    name: 'Hermes Studio',
-    logoAlt: 'Hermes',
+    name: 'DeepAgent',
+    logoAlt: 'DeepAgent',
   },
   ui: {
     copy: '复制',
@@ -29,8 +29,8 @@ export default {
       deploy: '部署',
     },
     badge: '本地优先的 AI Agent 工作区',
-    title: 'Hermes Studio',
-    subtitle: '面向 Hermes Agent 的桌面应用和本地控制台。聊天、管理 Profile、运行 Coding Agent、查看文件、自动化任务，并掌控自己的运行环境。',
+    title: 'DeepAgent',
+    subtitle: '面向 DeepAgent Runtime 的桌面应用和本地控制台。聊天、管理 Profile、运行 Coding Agent、查看文件、自动化任务，并掌控自己的运行环境。',
     cta: '下载桌面版',
     docsCta: '查看文档',
     viewGithub: '查看 GitHub',
@@ -40,14 +40,14 @@ export default {
     docsTitle: '文档',
     docsLibrary: '资料库',
     install: 'npm install -g hermes-web-ui',
-    previewAlt: 'Hermes Studio 仪表板预览',
+    previewAlt: 'DeepAgent 仪表板预览',
   },
   features: {
-    title: 'Hermes Agent 的本地控制台',
-    desc: 'Hermes Studio 把聊天、运行时管理、自动化、文件、Coding Agent 和桌面分发整合到一个工作区。',
+    title: 'DeepAgent Runtime 的本地控制台',
+    desc: 'DeepAgent 把聊天、运行时管理、自动化、文件、Coding Agent 和桌面分发整合到一个工作区。',
     streaming: {
       title: 'Agent 聊天',
-      desc: 'Hermes Agent 流式对话，支持会话、Markdown、工具轨迹、上传下载、模型标签和上下文用量。',
+      desc: 'DeepAgent Runtime 流式对话，支持会话、Markdown、工具轨迹、上传下载、模型标签和上下文用量。',
     },
     platforms: {
       title: '平台渠道',
@@ -71,7 +71,7 @@ export default {
     },
     profiles: {
       title: 'Profile 与权限',
-      desc: '按账号授权的 Hermes Profile，隔离配置、模型、上传、任务、用量、记忆、技能、插件、Provider 和可见性。',
+      desc: '按账号授权的 DeepAgent Profile，隔离配置、模型、上传、任务、用量、记忆、技能、插件、Provider 和可见性。',
     },
     files: {
       title: '文件管理',
@@ -83,7 +83,7 @@ export default {
     },
     quickInstall: {
       title: '桌面运行时',
-      desc: 'Windows、macOS 和 Linux 桌面版内置 Web UI 运行时，并把 Hermes Studio 状态与 Hermes Agent 数据分开管理。',
+      desc: 'Windows、macOS 和 Linux 桌面版内置 Web UI 运行时，并把 DeepAgent 状态与 DeepAgent Runtime 数据分开管理。',
     },
     i18n: {
       title: 'Coding Agent 与 MCP',
@@ -115,22 +115,23 @@ export default {
     items: [
       {
         src: '/image.gif',
-        alt: 'Hermes Studio 产品流程演示',
-        title: 'Hermes Studio 工作流',
+        alt: 'DeepAgent 产品流程演示',
+        title: 'DeepAgent 工作流',
         desc: '在一个应用里完成 Agent 对话、版本预览、Runtime 管理和工作区浏览。',
       },
     ],
   },
   install: {
     title: '快速开始',
-    desc: '下载桌面应用，或自行运行 Hermes Studio。',
+    desc: '下载桌面应用，或自行运行 DeepAgent。',
     desktop: {
       title: '桌面版',
       download: '下载',
       githubDownload: 'GitHub 下载',
       cloudflareDownload: 'Cloudflare 下载',
       allDownloads: '查看全部发布文件',
-      prereq: '桌面版已内置 Hermes Studio 运行时。',
+      prereq: '桌面版已内置 DeepAgent 运行时。',
+      gatekeeper: 'Preview 未签名，首次双击 macOS 可能提示“已损坏”或“无法验证开发者”，属正常现象。请勿将 App 移到废纸篓；在 Finder 中右键 DeepAgent.app -> 选“打开” -> 再点“仍要打开”，即可正常启动（无需关闭系统安全）。',
       downloads: [
         {
           title: 'macOS Apple Silicon',
@@ -189,7 +190,7 @@ export default {
     chartAlt: 'Star 历史',
   },
   footer: {
-    description: 'Hermes Agent 的自托管 AI 聊天仪表板。',
+    description: 'DeepAgent Runtime 的自托管 AI 聊天仪表板。',
     license: 'BSL-1.1 开源协议',
     madeWith: '使用 Vue 3、Naive UI 和 TypeScript 构建。',
     github: '打开 GitHub',
@@ -209,45 +210,45 @@ export default {
     },
     gettingStarted: {
       title: '快速开始',
-      intro: 'Hermes Studio 是一个自托管的 Web 仪表板，用于管理 AI 对话、平台通道、定时任务等。它封装了 Hermes Agent CLI 并提供美观的 Web 界面。',
+      intro: 'DeepAgent 是一个自托管的 Web 仪表板，用于管理 AI 对话、平台通道、定时任务等。它封装了 DeepAgent Runtime CLI 并提供美观的 Web 界面。',
       install: {
         title: '安装',
         content: '通过 npm 全局安装。需要 Node.js 23 或更高版本。',
       },
       firstRun: {
         title: '首次运行',
-        content: '首次启动时，Hermes Studio 会自动生成认证令牌、初始化本地数据、启动 Hermes agent bridge 并在浏览器中打开仪表板。',
+        content: '首次启动时，DeepAgent 会自动生成认证令牌、初始化本地数据、启动 DeepAgent agent bridge 并在浏览器中打开仪表板。',
       },
       login: {
         title: '登录',
-        content: '自动生成的令牌存储在 ~/.hermes-web-ui/.token。首次使用可通过默认登录名 admin / 默认密码 123456 登录；登录后系统会提示尽快修改默认账户和密码。',
+        content: 'DeepAgent 将 WebUI 状态保存在 ~/.deepagent 下。运行 `deepagent webui open` 可创建短时、一次性的本地登录 Ticket；产品不提供默认密码。',
       },
     },
     configuration: {
       title: '配置说明',
-      intro: 'Hermes Studio 可通过环境变量进行配置。',
+      intro: 'DeepAgent 可通过环境变量进行配置。',
       envVars: {
         title: '环境变量',
         rows: [
           ['PORT', '服务器监听端口（默认：8648）'],
           ['BIND_HOST', '服务器绑定地址（默认：0.0.0.0）。如需 IPv6，请显式设置为 ::。'],
-          ['HERMES_WEB_UI_HOME', 'Hermes Studio 数据目录，用于认证 token、登录凭据、日志、数据库和默认上传目录'],
+          ['HERMES_WEB_UI_HOME', 'DeepAgent 数据目录，用于认证 token、登录凭据、日志、数据库和默认上传目录'],
           ['HERMES_WEBUI_STATE_DIR', 'HERMES_WEB_UI_HOME 的兼容别名'],
-          ['HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT', '关闭启动时向 Hermes profile 配置自动注入托管的 hermes-studio MCP server'],
+          ['HERMES_WEB_UI_DISABLE_MCP_AUTOINJECT', '关闭启动时向 DeepAgent profile 配置自动注入托管的 hermes-studio MCP server'],
           ['HERMES_WEB_UI_ALLOW_TRANSIENT_MCP_AUTOINJECT', '当 HERMES_WEB_UI_HOME 位于临时目录（例如 Version Preview runtime）时，仍允许托管 MCP 自动注入'],
           ['UPLOAD_DIR', '自定义上传根目录。文件会保存在按 Profile 隔离的子目录下'],
           ['CORS_ORIGINS', 'HTTP、Socket.IO、WebSocket 跨源 allowlist（默认：仅同 host；只有明确需要旧版 wildcard CORS 时才设置为 *）'],
           ['AUTH_TOKEN', '自定义 bearer token，会覆盖自动生成的 token'],
           ['AUTH_JWT_SECRET', '用户名/密码会话的 JWT 签名密钥覆盖'],
-          ['PROFILE', '启动/默认 Hermes profile'],
+          ['PROFILE', '启动/默认 DeepAgent profile'],
           ['LOG_LEVEL', 'Server 日志级别'],
           ['BRIDGE_LOG_LEVEL', 'Bridge 日志级别'],
           ['MAX_DOWNLOAD_SIZE', '最大文件下载大小'],
           ['MAX_EDIT_SIZE', '最大可编辑文件大小'],
           ['WORKSPACE_BASE', 'Workspace 浏览根目录'],
-          ['HERMES_HOME', 'Hermes 数据目录'],
-          ['HERMES_BIN', '自定义 Hermes CLI 二进制路径'],
-          ['HERMES_AGENT_ROOT', '包含 run_agent.py 的 Hermes Agent 源码目录'],
+          ['HERMES_HOME', 'DeepAgent 数据目录'],
+          ['HERMES_BIN', '自定义 DeepAgent CLI 二进制路径'],
+          ['HERMES_AGENT_ROOT', '包含 run_agent.py 的 DeepAgent Runtime 源码目录'],
           ['HERMES_AGENT_BRIDGE_PYTHON', '用于启动 agent bridge 的 Python 解释器'],
           ['HERMES_AGENT_BRIDGE_UV', '可用时用于启动 agent bridge 的 uv 可执行文件'],
           ['UV', 'uv 可执行文件 fallback'],
@@ -259,23 +260,23 @@ export default {
           ['HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN', 'Web UI 关闭和重启时默认停止 bridge broker；设为 0/false/no/off 才会在重启时保留 broker'],
           ['HERMES_AGENT_BRIDGE_AUTO_RESTART', 'bridge broker 意外退出后是否自动重启；设为 0/false/no/off 可关闭'],
           ['HERMES_AGENT_BRIDGE_RESTART_DELAY_MS', 'bridge 自动重启退避的基础延迟'],
-          ['HERMES_AGENT_BRIDGE_PLATFORM', '传给 Hermes Agent 的 platform 标识'],
+          ['HERMES_AGENT_BRIDGE_PLATFORM', '传给 DeepAgent Runtime 的 platform 标识'],
           ['HERMES_AGENT_BRIDGE_WORKER_TRANSPORT', 'profile worker endpoint transport。设为 tcp 使用 loopback TCP；设为 ipc/unix 使用 Unix domain socket；默认 Windows TCP、macOS/Linux IPC'],
           ['HERMES_AGENT_BRIDGE_WORKER_PORT_BASE', 'TCP worker endpoint 起始端口（默认：18780）。Version Preview 会使用独立端口段 19650'],
           ['HERMES_BRIDGE_PROVIDER', 'bridge 运行时的 provider 覆盖'],
           ['HERMES_BRIDGE_TOOLSETS', 'bridge 运行时的 toolset 覆盖'],
           ['HERMES_BRIDGE_MAX_TURNS', 'bridge 运行时的最大轮数覆盖'],
-          ['HERMES_BRIDGE_SUPPRESS_PLATFORM_HINT', '控制传给 Hermes Agent 的 bridge platform hint suppression'],
+          ['HERMES_BRIDGE_SUPPRESS_PLATFORM_HINT', '控制传给 DeepAgent Runtime 的 bridge platform hint suppression'],
           ['HERMES_OPENROUTER_APP_REFERER', 'bridge 运行发送给 OpenRouter 的 attribution referer'],
           ['HERMES_OPENROUTER_APP_TITLE', 'bridge 运行发送给 OpenRouter 的 attribution title'],
           ['HERMES_OPENROUTER_APP_CATEGORIES', 'bridge 运行发送给 OpenRouter 的 attribution categories'],
-          ['HERMES_WEB_UI_MANAGED_GATEWAY', '控制 Web UI 托管 Hermes gateway。默认开启；设为 0/false/off 时改用 hermes gateway start'],
-          ['HERMES_WEB_UI_DISABLE_GATEWAY_AUTOSTART', '跳过启动时的 gateway 检查/自动启动；适用于由其它服务管理 Hermes gateway 的 dashboard-only 部署'],
-          ['HERMES_WEB_UI_DISABLE_SKILL_INJECTION', '跳过启动时的内置 skill 注入；适用于由 Hermes Web UI 外部管理 skills 的部署。启用注入时只更新 Web UI 管理或完全相同的内置副本，本地修改会跳过'],
-          ['HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN', 'Hermes Studio 关闭时是否同时停止托管的 gateway 进程'],
-          ['HERMES_GATEWAY_URL / GATEWAY_URL', 'proxy 路由使用的 Hermes gateway upstream URL'],
-          ['GATEWAY_HOST', 'proxy 路由使用的默认 Hermes gateway upstream host'],
-          ['GATEWAY_PORT', 'proxy 路由使用的默认 Hermes gateway upstream port'],
+          ['HERMES_WEB_UI_MANAGED_GATEWAY', '控制 Web UI 托管 DeepAgent gateway。默认开启；设为 0/false/off 时改用 hermes gateway start'],
+          ['HERMES_WEB_UI_DISABLE_GATEWAY_AUTOSTART', '跳过启动时的 gateway 检查/自动启动；适用于由其它服务管理 DeepAgent gateway 的 dashboard-only 部署'],
+          ['HERMES_WEB_UI_DISABLE_SKILL_INJECTION', '跳过启动时的内置 skill 注入；适用于由 DeepAgent WebUI 外部管理 skills 的部署。启用注入时只更新 Web UI 管理或完全相同的内置副本，本地修改会跳过'],
+          ['HERMES_WEB_UI_STOP_GATEWAYS_ON_SHUTDOWN', 'DeepAgent 关闭时是否同时停止托管的 gateway 进程'],
+          ['HERMES_GATEWAY_URL / GATEWAY_URL', 'proxy 路由使用的 DeepAgent gateway upstream URL'],
+          ['GATEWAY_HOST', 'proxy 路由使用的默认 DeepAgent gateway upstream host'],
+          ['GATEWAY_PORT', 'proxy 路由使用的默认 DeepAgent gateway upstream port'],
           ['HERMES_WEB_UI_PREVIEW_REPO', 'Version Preview 使用的 GitHub 仓库'],
           ['HERMES_WEB_UI_PREVIEW_AGENT_BRIDGE_TRANSPORT', 'Version Preview 的 broker endpoint transport。设为 tcp 可让预览环境在 macOS/Linux 上也使用 loopback TCP；未设置时会跟随 HERMES_AGENT_BRIDGE_WORKER_TRANSPORT=tcp'],
           ['HERMES_WEB_UI_PREVIEW_AGENT_BRIDGE_ENDPOINT', '直接覆盖 Version Preview 的 broker endpoint；用于需要完全自定义预览 bridge 地址的部署'],
@@ -285,19 +286,19 @@ export default {
       },
       gateway: {
         title: 'Agent Bridge 运行时',
-        content: '聊天运行通过 Hermes agent bridge 处理。它随 Hermes Studio 服务一起运行，并直接连接 Hermes Agent runtime。HERMES_AGENT_BRIDGE_ENDPOINT 控制 Node 与 bridge broker 的连接地址；HERMES_AGENT_BRIDGE_WORKER_TRANSPORT 控制 broker 与各 Profile worker 的连接方式。Web UI 关闭以及 CLI/应用内重启默认会停止 bridge broker；只有明确希望跨重启保留 bridge session 时，才设置 HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN=0。前端切换 Hermes Profile 只影响后续请求上下文，不会重启 bridge 或清理其他正在运行的任务。',
+        content: '聊天运行通过 DeepAgent agent bridge 处理。它随 DeepAgent 服务一起运行，并直接连接 DeepAgent Runtime runtime。HERMES_AGENT_BRIDGE_ENDPOINT 控制 Node 与 bridge broker 的连接地址；HERMES_AGENT_BRIDGE_WORKER_TRANSPORT 控制 broker 与各 Profile worker 的连接方式。Web UI 关闭以及 CLI/应用内重启默认会停止 bridge broker；只有明确希望跨重启保留 bridge session 时，才设置 HERMES_AGENT_BRIDGE_STOP_ON_SHUTDOWN=0。前端切换 DeepAgent Profile 只影响后续请求上下文，不会重启 bridge 或清理其他正在运行的任务。',
       },
       profiles: {
         title: '配置文件',
-        content: 'Profile 为不同场景提供隔离配置。超级管理员可以管理全部 Profile；普通管理员只能查看和使用分配给自己的 Profile。可在 Profile 页面创建、克隆、导入、导出或切换 Hermes Profile。',
+        content: 'Profile 为不同场景提供隔离配置。超级管理员可以管理全部 Profile；普通管理员只能查看和使用分配给自己的 Profile。可在 Profile 页面创建、克隆、导入、导出或切换 DeepAgent Profile。',
       },
     },
     features: {
       title: '功能详解',
-      intro: '探索 Hermes Studio 的核心功能。',
+      intro: '探索 DeepAgent 的核心功能。',
       chat: {
         title: 'AI 聊天',
-        content: '通过 Socket.IO /chat-run 实时流式聊天。支持多会话管理、Markdown 渲染与语法高亮、工具调用检查、按 Profile 上传、按路径下载，以及 Ctrl+K 搜索 Hermes Studio 本地会话库。',
+        content: '通过 Socket.IO /chat-run 实时流式聊天。支持多会话管理、Markdown 渲染与语法高亮、工具调用检查、按 Profile 上传、按路径下载，以及 Ctrl+K 搜索 DeepAgent 本地会话库。',
       },
       kanban: {
         title: '看板管理',
@@ -333,8 +334,8 @@ export default {
       },
     },
     hermesStudioManual: {
-      title: 'Hermes Studio 客户端完整操作手册',
-      intro: '这份手册面向 Hermes Studio 桌面客户端和 Web 界面的使用、配置、运维、验收与内部培训场景，覆盖当前客户端可见导航、设置、弹窗、状态页、关键按钮、常见流程和风险提示。',
+      title: 'DeepAgent 客户端完整操作手册',
+      intro: '这份手册面向 DeepAgent 桌面客户端和 Web 界面的使用、配置、运维、验收与内部培训场景，覆盖当前客户端可见导航、设置、弹窗、状态页、关键按钮、常见流程和风险提示。',
       open: {
         title: '打开完整手册',
         content: '完整手册保留原始 HTML 排版、截图标注和 PDF 版本。HTML 版本适合在线浏览，PDF 版本适合归档、打印和离线分发。',
@@ -354,7 +355,7 @@ export default {
       scope: {
         title: '适用范围',
         rows: [
-          ['适用版本', 'Hermes Studio 0.6.12 客户端操作手册'],
+          ['适用版本', 'DeepAgent 0.6.12 客户端操作手册'],
           ['文档语言', '中文完整手册；官网提供中英文入口说明'],
           ['覆盖内容', '登录、聊天、历史、记忆、技能、插件、文件、终端、任务、群聊、看板、用量、日志、MCP、平台集成、设备、设置、备份、安全和故障排除'],
           ['推荐读者', '个人用户、管理员、技术支持、交付验收人员和内部培训对象'],
@@ -362,12 +363,12 @@ export default {
       },
       maintenance: {
         title: '维护说明',
-        content: '当官网、说明文档、Hermes 智能体文档与当前客户端界面存在差异时，操作步骤以当前客户端实际可见界面为准。后续版本更新时，请同步替换 HTML/PDF 资源并更新本页的适用版本说明。',
+        content: '当官网、说明文档、DeepAgent 智能体文档与当前客户端界面存在差异时，操作步骤以当前客户端实际可见界面为准。后续版本更新时，请同步替换 HTML/PDF 资源并更新本页的适用版本说明。',
       },
     },
     esp32Intro: {
-      title: 'Hermes ESP32-C3 设备介绍',
-      intro: '这页发布 Hermes ESP32-C3 桌面 AI 对话小方盒的官网介绍资料。设备侧负责小屏、麦克风、扬声器、实体按键和局域网连接；Hermes Studio 负责模型、语音识别、语音合成和会话运行。',
+      title: 'DeepAgent ESP32-C3 设备介绍',
+      intro: '这页发布 DeepAgent ESP32-C3 桌面 AI 对话小方盒的官网介绍资料。设备侧负责小屏、麦克风、扬声器、实体按键和局域网连接；DeepAgent 负责模型、语音识别、语音合成和会话运行。',
       open: {
         title: '打开完整介绍页',
         content: '完整介绍页保留原始 HTML 排版、产品图、使用流程、规格说明、购买前须知和常见问题，适合公开展示、交付说明和用户快速了解设备定位。',
@@ -375,26 +376,26 @@ export default {
           {
             label: '在线打开 ESP32 中文介绍页',
             href: '/docs/hermes-esp32-intro/index.html',
-            description: '包含产品图、硬件亮点、配网教程、连接 Hermes Studio 的说明、规格与常见问题。',
+            description: '包含产品图、硬件亮点、配网教程、连接 DeepAgent 的说明、规格与常见问题。',
           },
         ],
       },
       overview: {
         title: '设备定位',
-        content: '这是配合 Hermes Studio 使用的桌面硬件入口，不是离线独立大模型设备。ESP32-C3 提供本地交互与状态反馈，AI 能力由电脑端或服务器端 Hermes Studio 以及用户配置的模型、STT、TTS 服务提供。',
+        content: '这是配合 DeepAgent 使用的桌面硬件入口，不是离线独立大模型设备。ESP32-C3 提供本地交互与状态反馈，AI 能力由电脑端或服务器端 DeepAgent 以及用户配置的模型、STT、TTS 服务提供。',
       },
       requirements: {
         title: '使用前提',
         rows: [
-          ['网络', 'ESP32 设备和 Hermes Studio 需要在同一局域网内通信。'],
+          ['网络', 'ESP32 设备和 DeepAgent 需要在同一局域网内通信。'],
           ['服务地址', '设备端应填写电脑或服务器的局域网 IP + 端口，不能填写 127.0.0.1。'],
-          ['语音能力', '需要在 Hermes Studio 中配置可用的语音识别、语音合成和模型服务。'],
-          ['适合用户', '适合 Hermes Studio 用户、ESP32/Arduino/PlatformIO 玩家、开源硬件改造和桌面 AI 交互演示场景。'],
+          ['语音能力', '需要在 DeepAgent 中配置可用的语音识别、语音合成和模型服务。'],
+          ['适合用户', '适合 DeepAgent 用户、ESP32/Arduino/PlatformIO 玩家、开源硬件改造和桌面 AI 交互演示场景。'],
         ],
       },
       maintenance: {
         title: '维护说明',
-        content: '后续如固件、配网页、端口、设备外观或 Hermes Studio 设备接入流程变化，请同步更新静态 HTML 资源和本页的适用说明。',
+        content: '后续如固件、配网页、端口、设备外观或 DeepAgent 设备接入流程变化，请同步更新静态 HTML 资源和本页的适用说明。',
       },
     },
     platforms: {
@@ -435,18 +436,18 @@ export default {
     },
     api: {
       title: 'API 参考',
-      intro: 'Hermes Studio 提供本地 BFF API，并通过 Socket.IO 端点进行聊天流式通信。',
+      intro: 'DeepAgent 提供本地 BFF API，并通过 Socket.IO 端点进行聊天流式通信。',
       local: {
         title: '本地 BFF 端点',
         content: 'Koa 服务器处理会话管理、Profile CRUD、分账户分 Profile 管理、配置读写、日志访问、技能列表、记忆操作和静态资源。',
       },
       proxy: {
         title: '聊天流式通信',
-        content: '聊天运行使用 /chat-run Socket.IO 命名空间和 Hermes agent bridge。gateway proxy 路由仅在兼容场景下保留。',
+        content: '聊天运行使用 /chat-run Socket.IO 命名空间和 DeepAgent agent bridge。gateway proxy 路由仅在兼容场景下保留。',
       },
       auth: {
         title: '认证',
-        content: 'API 端点需要经过认证访问。令牌在首次运行时自动生成并存储在 ~/.hermes-web-ui/.token。用户名/密码登录使用账户记录；超级管理员管理用户和 Profile 绑定，普通管理员管理自己的账户信息。',
+        content: 'API 端点需要经过认证访问。令牌在首次运行时自动生成并存储在 ~/.deepagent/data/webui/.token。用户名/密码登录使用账户记录；超级管理员管理用户和 Profile 绑定，普通管理员管理自己的账户信息。',
       },
     },
   },

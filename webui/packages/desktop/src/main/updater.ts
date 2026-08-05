@@ -1,5 +1,6 @@
 import { app, dialog } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
+import { safeChildEnvironment } from './child-env'
 import { execFile } from 'node:child_process'
 import { rm } from 'node:fs/promises'
 import { basename } from 'node:path'
@@ -13,8 +14,8 @@ let downloadedUpdate: UpdateDownloadedEvent | null = null
 let tryingFallbackFeed = false
 let recoveringPendingUpdate = false
 
-const CLOUDFLARE_LATEST_FEED_URL = 'https://download.ekkolearnai.com/latest'
-const GITHUB_LATEST_FEED_URL = 'https://github.com/EKKOLearnAI/hermes-studio/releases/latest/download'
+const CLOUDFLARE_LATEST_FEED_URL = 'https://deepseekagent.starseas.org/releases/desktop'
+const GITHUB_LATEST_FEED_URL = 'https://github.com/yuanchenglu/deepseekagent/releases/latest/download'
 const execFileAsync = promisify(execFile)
 
 interface AutoUpdaterOptions {
@@ -125,7 +126,7 @@ Get-HermesStudioProcess | ForEach-Object {
   try {
     await execFileAsync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
       env: {
-        ...process.env,
+        ...safeChildEnvironment(),
         HERMES_STUDIO_UPDATE_EXE: normalizedExecPath,
         HERMES_STUDIO_UPDATE_PID: String(currentPid),
       },

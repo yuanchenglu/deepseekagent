@@ -1,12 +1,12 @@
 {
   "name": "deepagent-webui",
-  "version": "0.9.0-alpha.1",
+  "version": "0.9.0-beta.1",
   "description": "DeepAgent Desktop — AI-native agent with WebUI, multi-platform messaging, and embedded R&D team",
   "repository": {
     "type": "git",
-    "url": "https://github.com/EKKOLearnAI/hermes-studio.git"
+    "url": "https://github.com/yuanchenglu/deepseekagent.git"
   },
-  "homepage": "https://hermes-studio.ai",
+  "homepage": "https://deepseekagent.starseas.org",
   "license": "BSL-1.1",
   "engines": {
     "node": ">=23.0.0"
@@ -30,9 +30,8 @@
     "typescript"
   ],
   "bin": {
-    "hermes-web-ui": "./bin/hermes-web-ui.mjs",
-    "hermes-web-ui-mcp": "./bin/hermes-studio-mcp.mjs",
-    "hermes-studio-mcp": "./bin/hermes-studio-mcp.mjs"
+    "deepagent-webui": "./bin/hermes-web-ui.mjs",
+    "deepagent-webui-mcp": "./bin/hermes-studio-mcp.mjs"
   },
   "scripts": {
     "start": "vite --host --port 8648",
@@ -48,18 +47,15 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "licenses:audit": "node scripts/audit-npm-licenses.mjs",
     "dev:website": "vite --config vite.config.website.ts",
     "build:website": "vite build --config vite.config.website.ts",
     "preview:website": "vite preview --config vite.config.website.ts",
     "mcu:flash:clean": "pio run -d packages/esp32-c3 && pio run -d packages/esp32-c3 -t erase && pio run -d packages/esp32-c3 -t upload",
     "desktop:install": "npm ci --prefix packages/desktop --no-audit --no-fund",
-    "desktop:prepare-runtime": "npm --prefix packages/desktop run prepare:runtime",
-    "desktop:prepare-python": "npm --prefix packages/desktop run prepare:python",
     "desktop:dev": "HERMES_WEB_UI_DIR=\"$PWD\" npm --prefix packages/desktop run dev",
     "build:desktop": "npm run build && npm run desktop:install && npm --prefix packages/desktop run dist -- --publish never",
     "build:desktop:mac": "npm run build && npm run desktop:install && npm --prefix packages/desktop run dist -- --mac --publish never",
-    "build:desktop:win": "npm run build && npm run desktop:install && npm --prefix packages/desktop run dist -- --win --publish never",
-    "build:desktop:linux": "npm run build && npm run desktop:install && npm --prefix packages/desktop run dist -- --linux --publish never",
     "openapi:generate": "node scripts/generate-openapi.mjs",
     "claude": "claude --dangerously-skip-permissions",
     "electron:dev": "electron electron/main.js",

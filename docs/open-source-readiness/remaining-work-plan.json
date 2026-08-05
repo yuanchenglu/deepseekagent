@@ -1,0 +1,1348 @@
+{
+  "schema_version": 1,
+  "repository": "yuanchenglu/deepseekagent",
+  "default_branch": "develop",
+  "release_branch": "master",
+  "authoritative_runbook": "docs/open-source-readiness/16-REMAINING-WORK-EXECUTION-RUNBOOK.md",
+  "status_values": [
+    "READY",
+    "LOCKED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "FAILED",
+    "PASSED",
+    "WAIVED"
+  ],
+  "selection_rule": "Choose the lowest-order task whose status is READY or LOCKED and whose dependencies are all PASSED. Never execute more than one task at a time.",
+  "tasks": [
+    {
+      "id": "BOOT-001",
+      "order": 1,
+      "phase": "bootstrap",
+      "title": "重新审计 GitHub 远程真实状态",
+      "depends_on": [],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "BOOT-002",
+      "order": 2,
+      "phase": "bootstrap",
+      "title": "建立安全本地工作区与 Secret 隔离",
+      "depends_on": [
+        "BOOT-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "BOOT-003",
+      "order": 3,
+      "phase": "bootstrap",
+      "title": "建立执行台账、证据目录和当前状态快照",
+      "depends_on": [
+        "BOOT-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-001",
+      "order": 10,
+      "phase": "credential-gate",
+      "title": "盘点所有外部凭据及暴露面",
+      "depends_on": [
+        "BOOT-003"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "adb6bd28f1d13cbcbbc1833a8aa9e29378e458f3",
+        "merge_sha": "adb6bd28f1d13cbcbbc1833a8aa9e29378e458f3",
+        "pr_number": 34,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-002",
+      "order": 11,
+      "phase": "credential-gate",
+      "title": "创建最小权限替代凭据",
+      "depends_on": [
+        "SEC-001"
+      ],
+      "executor": "owner",
+      "irreversible": false,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-003",
+      "order": 12,
+      "phase": "credential-gate",
+      "title": "更新 GitHub 与外部平台 Secret 存储",
+      "depends_on": [
+        "SEC-002"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-004",
+      "order": 13,
+      "phase": "credential-gate",
+      "title": "验证新凭据最小读写闭环",
+      "depends_on": [
+        "SEC-003"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-005",
+      "order": 14,
+      "phase": "credential-gate",
+      "title": "撤销全部旧凭据",
+      "depends_on": [
+        "SEC-004"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-006",
+      "order": 15,
+      "phase": "credential-gate",
+      "title": "证明旧凭据认证失败",
+      "depends_on": [
+        "SEC-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "SEC-007",
+      "order": 16,
+      "phase": "credential-gate",
+      "title": "提交脱敏证据并关闭 Issue #21",
+      "depends_on": [
+        "SEC-006"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-001",
+      "order": 20,
+      "phase": "history-cleanup",
+      "title": "创建 mirror、加密备份、bundle 与清理前扫描",
+      "depends_on": [
+        "SEC-007"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-002",
+      "order": 21,
+      "phase": "history-cleanup",
+      "title": "逐项确认命中并建立精确重写规则",
+      "depends_on": [
+        "HIST-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-003",
+      "order": 22,
+      "phase": "history-cleanup",
+      "title": "在隔离副本执行历史重写 dry run",
+      "depends_on": [
+        "HIST-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-004",
+      "order": 23,
+      "phase": "history-cleanup",
+      "title": "验证重写后代码、refs、fsck、测试和全 refs 扫描",
+      "depends_on": [
+        "HIST-003"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-005",
+      "order": 24,
+      "phase": "history-cleanup",
+      "title": "取得 Owner 对 force push 与协作者重克隆的明确授权",
+      "depends_on": [
+        "HIST-004"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-006",
+      "order": 25,
+      "phase": "history-cleanup",
+      "title": "按清单更新远程 branches 和 tags",
+      "depends_on": [
+        "HIST-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-007",
+      "order": 26,
+      "phase": "history-cleanup",
+      "title": "重新克隆远程并全 refs 重扫为零有效秘密",
+      "depends_on": [
+        "HIST-006"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "HIST-008",
+      "order": 27,
+      "phase": "history-cleanup",
+      "title": "提交清理证据并发布协作者恢复说明",
+      "depends_on": [
+        "HIST-007"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-001",
+      "order": 30,
+      "phase": "cli-alpha",
+      "title": "冻结 CLI Alpha 候选并校验版本元数据",
+      "depends_on": [
+        "HIST-008"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-002",
+      "order": 31,
+      "phase": "cli-alpha",
+      "title": "运行 Core Alpha dry-run 构建与制品边界验证",
+      "depends_on": [
+        "CLI-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-003",
+      "order": 32,
+      "phase": "cli-alpha",
+      "title": "干净 Apple Silicon Mac 首次安装与启动",
+      "depends_on": [
+        "CLI-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-004",
+      "order": 33,
+      "phase": "cli-alpha",
+      "title": "使用正式支持模型完成真实 Agent 任务",
+      "depends_on": [
+        "CLI-003"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-005",
+      "order": 34,
+      "phase": "cli-alpha",
+      "title": "验证正常升级和覆盖安装",
+      "depends_on": [
+        "CLI-004"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-006",
+      "order": 35,
+      "phase": "cli-alpha",
+      "title": "注入失败升级并验证自动回滚",
+      "depends_on": [
+        "CLI-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-007",
+      "order": 36,
+      "phase": "cli-alpha",
+      "title": "验证卸载与未知用户文件保护",
+      "depends_on": [
+        "CLI-006"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-008",
+      "order": 37,
+      "phase": "cli-alpha",
+      "title": "验证 CLI 与 Hermes、用户 OpenCode 共存",
+      "depends_on": [
+        "CLI-007"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-009",
+      "order": 38,
+      "phase": "cli-alpha",
+      "title": "关闭 CLI Alpha 范围 P0/P1",
+      "depends_on": [
+        "CLI-008"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-010",
+      "order": 39,
+      "phase": "cli-alpha",
+      "title": "取得 CLI Alpha 公开发布授权",
+      "depends_on": [
+        "CLI-009"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-011",
+      "order": 40,
+      "phase": "cli-alpha",
+      "title": "发布 CLI Alpha 并最后提升 alpha channel",
+      "depends_on": [
+        "CLI-010"
+      ],
+      "executor": "local-ai",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-012",
+      "order": 41,
+      "phase": "cli-alpha",
+      "title": "从公开渠道执行下载、安装、升级和回滚回归",
+      "depends_on": [
+        "CLI-011"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "CLI-013",
+      "order": 42,
+      "phase": "cli-alpha",
+      "title": "完成 Alpha 用户反馈周期并关闭 P0/P1",
+      "depends_on": [
+        "CLI-012"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-001",
+      "order": 50,
+      "phase": "webui-beta",
+      "title": "验证 Alpha 到 Beta 数据迁移成功路径",
+      "depends_on": [
+        "CLI-013"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-002",
+      "order": 51,
+      "phase": "webui-beta",
+      "title": "验证迁移失败回滚和旧数据可恢复",
+      "depends_on": [
+        "WEB-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-003",
+      "order": 52,
+      "phase": "webui-beta",
+      "title": "干净机验证 start/open/status/stop 完整生命周期",
+      "depends_on": [
+        "WEB-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-004",
+      "order": 53,
+      "phase": "webui-beta",
+      "title": "验证 Browser Ticket、Cookie、重放和 URL 清理",
+      "depends_on": [
+        "WEB-003"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-005",
+      "order": 54,
+      "phase": "webui-beta",
+      "title": "验证 CLI、WebUI、Hermes、OpenCode 共存矩阵",
+      "depends_on": [
+        "WEB-004"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-006",
+      "order": 55,
+      "phase": "webui-beta",
+      "title": "运行 WebUI Beta dry-run 构建、边界、许可证和 checksum",
+      "depends_on": [
+        "WEB-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-007",
+      "order": 56,
+      "phase": "webui-beta",
+      "title": "关闭 WebUI Beta 范围 P0/P1",
+      "depends_on": [
+        "WEB-006"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-008",
+      "order": 57,
+      "phase": "webui-beta",
+      "title": "取得 WebUI Beta 公开发布授权",
+      "depends_on": [
+        "WEB-007"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-009",
+      "order": 58,
+      "phase": "webui-beta",
+      "title": "发布 WebUI Beta 并最后提升 beta channel",
+      "depends_on": [
+        "WEB-008"
+      ],
+      "executor": "local-ai",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-010",
+      "order": 59,
+      "phase": "webui-beta",
+      "title": "从公开渠道执行安装、迁移、升级和回滚回归",
+      "depends_on": [
+        "WEB-009"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "WEB-011",
+      "order": 60,
+      "phase": "webui-beta",
+      "title": "完成 Beta 用户反馈周期并关闭 P0/P1",
+      "depends_on": [
+        "WEB-010"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-001",
+      "order": 70,
+      "phase": "electron-preview",
+      "title": "在干净 Apple Silicon Mac 验证 unsigned DMG 下载与 checksum",
+      "depends_on": [
+        "WEB-011"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-001-2026-08-04.md",
+        "final_head_sha": "3f8a9a07de9d438c7adf820ca64d43b7c8391773",
+        "merge_sha": "3f8a9a07de9d438c7adf820ca64d43b7c8391773",
+        "pr_number": 52,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-002",
+      "order": 71,
+      "phase": "electron-preview",
+      "title": "验证 Gatekeeper 手工批准路径与限制说明",
+      "depends_on": [
+        "DESK-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-002-2026-08-04.md",
+        "final_head_sha": "92e70060356fc469e303079dfbfdc1b15f1d1b5d",
+        "merge_sha": "92e70060356fc469e303079dfbfdc1b15f1d1b5d",
+        "pr_number": 54,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-003",
+      "order": 72,
+      "phase": "electron-preview",
+      "title": "验证 DeepAgent 与 DeepCode 双模式真实任务",
+      "depends_on": [
+        "DESK-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-003-2026-08-04.md",
+        "final_head_sha": "4bd64b36a7f6397cb6113c7815a86f418a5848ef",
+        "merge_sha": "4bd64b36a7f6397cb6113c7815a86f418a5848ef",
+        "pr_number": 56,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-004",
+      "order": 73,
+      "phase": "electron-preview",
+      "title": "验证覆盖安装、升级、失败升级、回滚和卸载",
+      "depends_on": [
+        "DESK-003"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-004-2026-08-04.md",
+        "final_head_sha": "72c6f96338b95a61649d7c87c6c0bd5e6093bb3f",
+        "merge_sha": "72c6f96338b95a61649d7c87c6c0bd5e6093bb3f",
+        "pr_number": 59,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-005",
+      "order": 74,
+      "phase": "electron-preview",
+      "title": "验证 Main/Runtime crash、恢复和 Workspace Lease",
+      "depends_on": [
+        "DESK-004"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-005-2026-08-04.md",
+        "final_head_sha": "c9a871a64a77fd40acfd12c4e14ffbc719b61b10",
+        "merge_sha": "c9a871a64a77fd40acfd12c4e14ffbc719b61b10",
+        "pr_number": 60,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-006",
+      "order": 75,
+      "phase": "electron-preview",
+      "title": "验证 Desktop 与 CLI、WebUI、Hermes、OpenCode 共存",
+      "depends_on": [
+        "DESK-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-006-2026-08-04.md",
+        "final_head_sha": "596fc076533f366c2799687a53bc1eb1d5e2c6b1",
+        "merge_sha": "596fc076533f366c2799687a53bc1eb1d5e2c6b1",
+        "pr_number": 61,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-007",
+      "order": 76,
+      "phase": "electron-preview",
+      "title": "完成受控 Preview 用户测试",
+      "depends_on": [
+        "DESK-006"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-007-TASK-PACK.md",
+        "final_head_sha": "dead4385c04affa4b323da8ad15e5318e9113c6a",
+        "merge_sha": "dead4385c04affa4b323da8ad15e5318e9113c6a",
+        "pr_number": 63,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-008",
+      "order": 77,
+      "phase": "electron-preview",
+      "title": "关闭 Electron Preview 范围 P0/P1",
+      "depends_on": [
+        "DESK-007"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "056c362523119f878d1776fc9801f74465441358",
+        "merge_sha": "056c362523119f878d1776fc9801f74465441358",
+        "pr_number": 64,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-009",
+      "order": 78,
+      "phase": "electron-preview",
+      "title": "取得 unsigned Preview 公开发布授权",
+      "depends_on": [
+        "DESK-008"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "merge_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "pr_number": 65,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-010",
+      "order": 79,
+      "phase": "electron-preview",
+      "title": "发布 Electron Preview 并最后提升 preview channel",
+      "depends_on": [
+        "DESK-009"
+      ],
+      "executor": "local-ai",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "merge_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "pr_number": 65,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "DESK-011",
+      "order": 80,
+      "phase": "electron-preview",
+      "title": "完成 Preview 发布后回归和反馈闭环",
+      "depends_on": [
+        "DESK-010"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "7193bc21f3860cbbce802eb0dd29b2f5f39efafa",
+        "merge_sha": "7193bc21f3860cbbce802eb0dd29b2f5f39efafa",
+        "pr_number": 66,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "STB-001",
+      "order": 90,
+      "phase": "stable",
+      "title": "盘点 Apple Developer 证书、身份、权限和过期时间（WAIVED：无 Apple Developer 凭证，Owner 2026-08-05 决策走无签名路径）",
+      "depends_on": [
+        "DESK-011"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
+    },
+    {
+      "id": "STB-002",
+      "order": 91,
+      "phase": "stable",
+      "title": "配置并审计签名、Hardened Runtime 与 Entitlements（WAIVED：无 Apple Developer 凭证，Owner 2026-08-05 决策走无签名路径）",
+      "depends_on": [
+        "STB-001"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
+    },
+    {
+      "id": "STB-003",
+      "order": 92,
+      "phase": "stable",
+      "title": "完成 notarization、stapling 与 Gatekeeper 无绕过验证（WAIVED：无 Apple Developer 凭证，Owner 2026-08-05 决策走无签名路径）",
+      "depends_on": [
+        "STB-002"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
+    },
+    {
+      "id": "STB-004",
+      "order": 93,
+      "phase": "stable",
+      "title": "建立无签名 Stable 更新 feed、manifest 与回滚链（复用 Preview 渠道）",
+      "depends_on": [
+        "DESK-011"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "STB-005",
+      "order": 94,
+      "phase": "stable",
+      "title": "干净 Mac 验证 Stable 安装、升级、失败回滚和卸载",
+      "depends_on": [
+        "STB-004"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-004-2026-08-04.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "STB-006",
+      "order": 95,
+      "phase": "stable",
+      "title": "执行 CLI/WebUI/Desktop/Hermes/OpenCode 全矩阵回归",
+      "depends_on": [
+        "STB-005"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "STB-007",
+      "order": 96,
+      "phase": "stable",
+      "title": "冻结 Stable Release Candidate 并关闭 P0/P1",
+      "depends_on": [
+        "STB-006"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-007-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
+    },
+    {
+      "id": "STB-008",
+      "order": 97,
+      "phase": "stable",
+      "title": "取得 Stable 最终公开发布授权",
+      "depends_on": [
+        "STB-007"
+      ],
+      "executor": "owner",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "BLOCKED",
+      "blocker": {
+        "reason": "等待 Owner 授权（AUTHORIZE STABLE-PUBLISH）",
+        "unblocked_by": "owner",
+        "owner_action": "提供 AUTHORIZE STABLE-PUBLISH 授权（含版本/Head SHA/渠道/回滚）",
+        "required_input": "AUTHORIZE STABLE-PUBLISH 完整字段"
+      }
+    },
+    {
+      "id": "STB-009",
+      "order": 98,
+      "phase": "stable",
+      "title": "按 Gate 将候选合入 master、创建 Tag/Release 并提升 Stable channel",
+      "depends_on": [
+        "STB-008"
+      ],
+      "executor": "local-ai",
+      "irreversible": true,
+      "authorization_required": true,
+      "status": "LOCKED"
+    },
+    {
+      "id": "STB-010",
+      "order": 99,
+      "phase": "stable",
+      "title": "执行公开下载、安装、升级、回滚和监控验证",
+      "depends_on": [
+        "STB-009"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "LOCKED"
+    },
+    {
+      "id": "STB-011",
+      "order": 100,
+      "phase": "stable",
+      "title": "完成 Stable 用户反馈周期并处理回归",
+      "depends_on": [
+        "STB-010"
+      ],
+      "executor": "owner+local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "LOCKED"
+    },
+    {
+      "id": "STB-012",
+      "order": 101,
+      "phase": "stable",
+      "title": "同步最终 Plan、状态、证据、技术债务和交接并宣布闭环",
+      "depends_on": [
+        "STB-011"
+      ],
+      "executor": "local-ai",
+      "irreversible": false,
+      "authorization_required": false,
+      "status": "LOCKED"
+    }
+  ]
+}

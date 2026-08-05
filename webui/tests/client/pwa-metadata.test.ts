@@ -7,13 +7,13 @@ describe('PWA metadata', () => {
 
     expect(html).toContain('rel="manifest" href="/manifest.webmanifest"')
     expect(html).toContain('rel="apple-touch-icon" href="/logo.png"')
-    expect(html).toContain('name="apple-mobile-web-app-title" content="Hermes Studio"')
+    expect(html).toContain('name="apple-mobile-web-app-title" content="DeepAgent"')
   })
 
-  it('ships a standalone web manifest with the Hermes icon', () => {
+  it('ships a standalone web manifest with the DeepAgent icon', () => {
     const manifest = JSON.parse(readFileSync('packages/client/public/manifest.webmanifest', 'utf8'))
 
-    expect(manifest.name).toBe('Hermes Studio')
+    expect(manifest.name).toBe('DeepAgent')
     expect(manifest.display).toBe('standalone')
     expect(manifest.start_url).toBe('/#/hermes/chat')
     expect(manifest.icons).toEqual(expect.arrayContaining([

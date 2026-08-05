@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { homedir } from 'os'
 import { join, resolve } from 'path'
-import { getCorsOrigins, getListenHost, getWebUiHome, shouldCreateWebUiDataDir } from '../../packages/server/src/config'
+import { getCorsOrigins, getListenHost, getWebUiHome, getWebUiRuntimeDir, shouldCreateWebUiDataDir } from '../../packages/server/src/config'
 
 describe('server config', () => {
   it('defaults to an IPv4 bind host', () => {
-    expect(getListenHost({})).toBe('0.0.0.0')
+    expect(getListenHost({})).toBe('127.0.0.1')
   })
 
   it('uses BIND_HOST when provided', () => {
@@ -13,11 +13,21 @@ describe('server config', () => {
   })
 
   it('ignores blank BIND_HOST values', () => {
-    expect(getListenHost({ BIND_HOST: ' ' })).toBe('0.0.0.0')
+    expect(getListenHost({ BIND_HOST: ' ' })).toBe('127.0.0.1')
   })
 
-  it('defaults web-ui home to ~/.hermes-web-ui', () => {
-    expect(getWebUiHome({})).toBe(join(homedir(), '.hermes-web-ui'))
+  it('defaults web-ui home under the DeepAgent product root', () => {
+    expect(getWebUiHome({})).toBe(join(homedir(), '.deepagent', 'data', 'webui'))
+  })
+
+  it('uses DEEPAGENT_HOME without consulting Hermes data', () => {
+    expect(getWebUiHome({ DEEPAGENT_HOME: '/tmp/deepagent-product' }))
+      .toBe(join('/tmp/deepagent-product', 'data', 'webui'))
+  })
+
+  it('keeps process state in the DeepAgent runtime namespace', () => {
+    expect(getWebUiRuntimeDir({ DEEPAGENT_HOME: '/tmp/deepagent-product' }))
+      .toBe(join('/tmp/deepagent-product', 'runtime', 'webui'))
   })
 
   it('uses HERMES_WEB_UI_HOME when provided', () => {

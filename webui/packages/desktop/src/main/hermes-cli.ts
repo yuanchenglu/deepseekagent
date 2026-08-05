@@ -16,6 +16,7 @@ import {
 import { HERMES_CLI_ARG } from './cli-constants'
 import { ensureDesktopRuntime } from './runtime-manager'
 import { resolveDesktopHermesCliInvocation } from './hermes-cli-invocation'
+import { safeChildEnvironment } from './child-env'
 
 export function parseHermesCliArgs(argv: string[] = process.argv): string[] | null {
   const index = argv.indexOf(HERMES_CLI_ARG)
@@ -63,8 +64,7 @@ export async function runBundledHermesCli(args: string[]): Promise<number> {
   ].filter(Boolean).join(delimiter)
   const gitBin = bundledGit()
   const browserExecutableOverride = process.env.AGENT_BROWSER_EXECUTABLE_PATH?.trim()
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
+  const env: NodeJS.ProcessEnv = safeChildEnvironment({
     HERMES_DESKTOP: 'true',
     HERMES_BIN: hermesCommand,
     HERMES_AGENT_BRIDGE_PYTHON: pythonCommand,
@@ -77,10 +77,11 @@ export async function runBundledHermesCli(args: string[]): Promise<number> {
     PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || join(pythonDir(), 'ms-playwright'),
     ...(gitBin ? { HERMES_AGENT_GIT: gitBin } : {}),
     HERMES_HOME: hermesHome(),
+    DEEPAGENT_HOME: hermesHome(),
     HERMES_WEB_UI_HOME: webUiHome(),
     HERMES_WEBUI_STATE_DIR: webUiHome(),
     PATH: pathValue,
-  }
+  })
 
   return await new Promise(resolve => {
     const child = spawn(invocation.command, [...invocation.argsPrefix, ...args], {

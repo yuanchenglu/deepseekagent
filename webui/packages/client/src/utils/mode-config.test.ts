@@ -33,12 +33,12 @@ describe('mode-config.getSharedConfig', () => {
     expect(cfg).toEqual(EMPTY_SHARED_CONFIG)
   })
 
-  it('reads api key, baseUrl, profile from localStorage', () => {
+  it('never reads API keys while sharing non-secret mode context', () => {
     LS['hermes_api_key'] = 'sk-123'
     LS['hermes_server_url'] = 'https://example.com'
     LS['hermes_active_profile_name'] = 'work'
     const cfg = getSharedConfig()
-    expect(cfg.apiKey).toBe('sk-123')
+    expect(cfg).not.toHaveProperty('apiKey')
     expect(cfg.baseUrl).toBe('https://example.com')
     expect(cfg.profile).toBe('work')
   })
@@ -62,13 +62,13 @@ describe('mode-config.getSharedConfig', () => {
 
 describe('mode-config.applyToOpenCode', () => {
   it('returns desktop-only error in non-desktop environment', async () => {
-    const res = await applyToOpenCode({ apiKey: 'x', model: 'm', provider: 'p' })
+    const res = await applyToOpenCode({ model: 'm', provider: 'p' })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toBe('desktop-only')
   })
 
   it('invokes bridge.startCodeMode with the config on desktop', async () => {
-    const cfg: SharedConfig = { apiKey: 'sk-1', model: 'm1', provider: 'p1' }
+    const cfg: SharedConfig = { model: 'm1', provider: 'p1' }
     const startCodeMode = vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:9999' })
     const bridge = { isDesktop: true, platform: 'linux', startCodeMode } as any
     const res = await applyToOpenCode(cfg, bridge)
@@ -79,7 +79,7 @@ describe('mode-config.applyToOpenCode', () => {
   it('catches thrown errors from bridge', async () => {
     const startCodeMode = vi.fn().mockRejectedValue(new Error('boom'))
     const bridge = { isDesktop: true, platform: 'linux', startCodeMode } as any
-    const res = await applyToOpenCode({ apiKey: '', model: '', provider: '' }, bridge)
+    const res = await applyToOpenCode({ model: '', provider: '' }, bridge)
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toContain('boom')
   })
