@@ -27,9 +27,9 @@
       "status": "PASSED",
       "evidence": {
         "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
         "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
         "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
-        "pr_number": 33,
         "executed_at": "2026-08-05T00:00:00Z",
         "executor": "local-ai"
       }
@@ -48,9 +48,9 @@
       "status": "PASSED",
       "evidence": {
         "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
         "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
         "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
-        "pr_number": 33,
         "executed_at": "2026-08-05T00:00:00Z",
         "executor": "local-ai"
       }
@@ -69,9 +69,9 @@
       "status": "PASSED",
       "evidence": {
         "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "pr_number": 33,
         "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
         "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
-        "pr_number": 33,
         "executed_at": "2026-08-05T00:00:00Z",
         "executor": "local-ai"
       }
