@@ -207,9 +207,40 @@ jobs:
           mkdir -p dist/releases
           DMG="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
           ZIP="webui/packages/desktop/release/DeepAgent-${PREVIEW_VERSION}-arm64.zip"
+          [ -f "$DMG" ] || { echo "Expected DMG missing: $DMG" >&2; exit 1; }
+          [ -f "$ZIP" ] || { echo "Expected ZIP missing: $ZIP" >&2; exit 1; }
           cp "$DMG" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.dmg"
-          [ -f "$ZIP" ] && cp "$ZIP" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.zip" || true
-          [ -f "webui/packages/desktop/release/latest-mac.yml" ] && cp "webui/packages/desktop/release/latest-mac.yml" "dist/releases/latest-mac.yml" || true
+          cp "$ZIP" "dist/releases/DeepAgent-${PREVIEW_VERSION}-arm64.zip"
+          # latest-mac.yml is required for electron-updater but is only emitted
+          # on publish, so build it deterministically from the produced assets.
+          python3 - "$PREVIEW_VERSION" "$ZIP" "$DMG" <<'PY'
+          import base64, hashlib, pathlib, sys
+          version, zip_path, dmg_path = sys.argv[1:4]
+          def sha512(p):
+              h = hashlib.sha512()
+              with open(p, "rb") as f:
+                  for chunk in iter(lambda: f.read(1024*1024), b""):
+                      h.update(chunk)
+              return base64.b64encode(h.digest()).decode()
+          zip_name = pathlib.Path(zip_path).name
+          dmg_name = pathlib.Path(dmg_path).name
+          z = pathlib.Path(zip_path).stat().st_size
+          d = pathlib.Path(dmg_path).stat().st_size
+          entry = (
+              "version: " + version + "\n"
+              "files:\n"
+              f"  - url: {zip_name}\n"
+              f"    sha512: {sha512(zip_path)}\n"
+              f"    size: {z}\n"
+              f"  - url: {dmg_name}\n"
+              f"    sha512: {sha512(dmg_path)}\n"
+              f"    size: {d}\n"
+              f"path: {zip_name}\n"
+              f"sha512: {sha512(zip_path)}\n"
+              f"releaseDate: '{__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()}'\n"
+          )
+          pathlib.Path("dist/releases/latest-mac.yml").write_text(entry, encoding="utf-8")
+          PY
           cd dist/releases
           shasum -a 256 "DeepAgent-${PREVIEW_VERSION}-arm64.dmg" > "DeepAgent-${PREVIEW_VERSION}-arm64.dmg.sha256"
           python3 - "$PREVIEW_VERSION" "$RUNTIME_VERSION" <<'PY'
