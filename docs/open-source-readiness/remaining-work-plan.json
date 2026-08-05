@@ -1284,12 +1284,14 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "BLOCKED",
-      "blocker": {
-        "reason": "等待 Owner 授权（AUTHORIZE STABLE-PUBLISH）",
-        "unblocked_by": "owner",
-        "owner_action": "提供 AUTHORIZE STABLE-PUBLISH 授权（含版本/Head SHA/渠道/回滚）",
-        "required_input": "AUTHORIZE STABLE-PUBLISH 完整字段"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-008-2026-08-05.md",
+        "pr_number": 70,
+        "final_head_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "merge_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "owner"
       }
     },
     {
@@ -1303,7 +1305,15 @@
       "executor": "local-ai",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-009-010-2026-08-05.md",
+        "pr_number": 70,
+        "final_head_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "merge_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-010",
@@ -1316,7 +1326,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-009-010-2026-08-05.md",
+        "pr_number": 70,
+        "final_head_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "merge_sha": "e8c8138f67868f38a4cc0c9e2aef7f58b02cb764",
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-011",
@@ -1329,7 +1347,7 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "READY"
     },
     {
       "id": "STB-012",
