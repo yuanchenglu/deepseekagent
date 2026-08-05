@@ -24,7 +24,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "READY"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "pr_number": 33,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "BOOT-002",
@@ -37,7 +45,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "pr_number": 33,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "BOOT-003",
@@ -50,7 +66,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/BOOT-001-2026-08-03.md",
+        "final_head_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "merge_sha": "a32cb32895d629caf45f0edd69c991127a43dea1",
+        "pr_number": 33,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-001",
@@ -63,7 +87,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "adb6bd28f1d13cbcbbc1833a8aa9e29378e458f3",
+        "merge_sha": "adb6bd28f1d13cbcbbc1833a8aa9e29378e458f3",
+        "pr_number": 34,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-002",
@@ -76,7 +108,15 @@
       "executor": "owner",
       "irreversible": false,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-003",
@@ -89,7 +129,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-004",
@@ -102,7 +150,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-005",
@@ -115,7 +171,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-006",
@@ -128,7 +192,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "SEC-007",
@@ -141,7 +213,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/SEC-001-2026-08-03.md",
+        "final_head_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "merge_sha": "4cd0f536ffe79612ad62f4987f7752dd921ea864",
+        "pr_number": 35,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-001",
@@ -154,7 +234,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-002",
@@ -167,7 +255,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-003",
@@ -180,7 +276,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-004",
@@ -193,7 +297,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-005",
@@ -206,7 +318,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-006",
@@ -219,7 +339,15 @@
       "executor": "local-ai",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-007",
@@ -232,7 +360,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "HIST-008",
@@ -245,7 +381,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/HIST-001-008-2026-08-03.md",
+        "final_head_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "merge_sha": "3d64307174661bbd0a6fe422541ca7bb08f77898",
+        "pr_number": 36,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-001",
@@ -258,7 +402,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-002",
@@ -271,7 +423,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-003",
@@ -284,7 +444,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-004",
@@ -297,7 +465,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-005",
@@ -310,7 +486,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-006",
@@ -323,7 +507,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-007",
@@ -336,7 +528,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-008",
@@ -349,7 +549,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-009",
@@ -362,7 +570,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-010",
@@ -375,7 +591,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-011",
@@ -388,7 +612,15 @@
       "executor": "local-ai",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-012",
@@ -401,7 +633,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "CLI-013",
@@ -414,7 +654,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/CLI-001-013-2026-08-03.md",
+        "final_head_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "merge_sha": "6b1be4728ce824768fd98990825a5e68001281de",
+        "pr_number": 41,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-001",
@@ -427,7 +675,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-002",
@@ -440,7 +696,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-003",
@@ -453,7 +717,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-004",
@@ -466,7 +738,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-005",
@@ -479,7 +759,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-006",
@@ -492,7 +780,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-007",
@@ -505,7 +801,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-008",
@@ -518,7 +822,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-009",
@@ -531,7 +843,15 @@
       "executor": "local-ai",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-010",
@@ -544,7 +864,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "WEB-011",
@@ -557,7 +885,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/WEB-001-011-2026-08-04.md",
+        "final_head_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "merge_sha": "fa0162b8ae11bc169fd5c291639363bcaabc7035",
+        "pr_number": 51,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-001",
@@ -570,7 +906,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-001-2026-08-04.md",
+        "final_head_sha": "3f8a9a07de9d438c7adf820ca64d43b7c8391773",
+        "merge_sha": "3f8a9a07de9d438c7adf820ca64d43b7c8391773",
+        "pr_number": 52,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-002",
@@ -583,7 +927,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-002-2026-08-04.md",
+        "final_head_sha": "92e70060356fc469e303079dfbfdc1b15f1d1b5d",
+        "merge_sha": "92e70060356fc469e303079dfbfdc1b15f1d1b5d",
+        "pr_number": 54,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-003",
@@ -596,7 +948,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-003-2026-08-04.md",
+        "final_head_sha": "4bd64b36a7f6397cb6113c7815a86f418a5848ef",
+        "merge_sha": "4bd64b36a7f6397cb6113c7815a86f418a5848ef",
+        "pr_number": 56,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-004",
@@ -609,7 +969,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-004-2026-08-04.md",
+        "final_head_sha": "72c6f96338b95a61649d7c87c6c0bd5e6093bb3f",
+        "merge_sha": "72c6f96338b95a61649d7c87c6c0bd5e6093bb3f",
+        "pr_number": 59,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-005",
@@ -622,7 +990,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-005-2026-08-04.md",
+        "final_head_sha": "c9a871a64a77fd40acfd12c4e14ffbc719b61b10",
+        "merge_sha": "c9a871a64a77fd40acfd12c4e14ffbc719b61b10",
+        "pr_number": 60,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-006",
@@ -635,7 +1011,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-006-2026-08-04.md",
+        "final_head_sha": "596fc076533f366c2799687a53bc1eb1d5e2c6b1",
+        "merge_sha": "596fc076533f366c2799687a53bc1eb1d5e2c6b1",
+        "pr_number": 61,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-007",
@@ -648,7 +1032,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-007-TASK-PACK.md",
+        "final_head_sha": "dead4385c04affa4b323da8ad15e5318e9113c6a",
+        "merge_sha": "dead4385c04affa4b323da8ad15e5318e9113c6a",
+        "pr_number": 63,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-008",
@@ -661,7 +1053,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "056c362523119f878d1776fc9801f74465441358",
+        "merge_sha": "056c362523119f878d1776fc9801f74465441358",
+        "pr_number": 64,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-009",
@@ -674,7 +1074,15 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "merge_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "pr_number": 65,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-010",
@@ -687,7 +1095,15 @@
       "executor": "local-ai",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "merge_sha": "14c3beb64ddb7a3fffcfefb335f458d33f05e967",
+        "pr_number": 65,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "DESK-011",
@@ -700,7 +1116,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-010-011-2026-08-05.md",
+        "final_head_sha": "7193bc21f3860cbbce802eb0dd29b2f5f39efafa",
+        "merge_sha": "7193bc21f3860cbbce802eb0dd29b2f5f39efafa",
+        "pr_number": 66,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-001",
@@ -713,7 +1137,15 @@
       "executor": "owner+local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "WAIVED"
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
     },
     {
       "id": "STB-002",
@@ -726,7 +1158,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "WAIVED"
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
     },
     {
       "id": "STB-003",
@@ -739,7 +1179,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "WAIVED"
+      "status": "WAIVED",
+      "waivable": true,
+      "waiver": {
+        "owner": "小路",
+        "authorized_at": "2026-08-05T00:00:00Z",
+        "rationale": "Owner 无 Apple Developer 凭证且短期不申请；发布计划切换为无签名路径（沿用 Gatekeeper 手工批准）。",
+        "compensating_controls": "DESK-002 验证右键 Open 绕过路径；DESK-009 Owner 已授权无签名 Preview 公开发布；下载页与 Release Notes 均有 Gatekeeper 指引。",
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md"
+      }
     },
     {
       "id": "STB-004",
@@ -752,7 +1200,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "PASSED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-005",
@@ -765,7 +1221,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "PASSED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/DESK-004-2026-08-04.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-006",
@@ -778,7 +1242,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-004-006-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-007",
@@ -791,7 +1263,15 @@
       "executor": "local-ai",
       "irreversible": false,
       "authorization_required": false,
-      "status": "LOCKED"
+      "status": "PASSED",
+      "evidence": {
+        "evidence_file": "docs/open-source-readiness/evidence/STB-007-2026-08-05.md",
+        "final_head_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "merge_sha": "46bc1a3b9f5c56e6726fbc5ad57ca7a2e674cd87",
+        "pr_number": 68,
+        "executed_at": "2026-08-05T00:00:00Z",
+        "executor": "local-ai"
+      }
     },
     {
       "id": "STB-008",
@@ -804,7 +1284,13 @@
       "executor": "owner",
       "irreversible": true,
       "authorization_required": true,
-      "status": "LOCKED"
+      "status": "BLOCKED",
+      "blocker": {
+        "reason": "等待 Owner 授权（AUTHORIZE STABLE-PUBLISH）",
+        "unblocked_by": "owner",
+        "owner_action": "提供 AUTHORIZE STABLE-PUBLISH 授权（含版本/Head SHA/渠道/回滚）",
+        "required_input": "AUTHORIZE STABLE-PUBLISH 完整字段"
+      }
     },
     {
       "id": "STB-009",
