@@ -1073,6 +1073,35 @@ def _cprint(text: str):
 
 
 # ---------------------------------------------------------------------------
+# /export helpers — extracted as pure functions for tests.
+# ---------------------------------------------------------------------------
+
+def _resolve_export_path(path_arg: str, default_filename: str) -> str:
+    """Resolve an export target path from a user-supplied argument.
+
+    - Empty argument → ``<cwd>/<default_filename>``
+    - Existing directory → ``<dir>/<default_filename>``
+    - Anything else → the path itself (expanded)
+    """
+    if not path_arg:
+        return str(Path.cwd() / default_filename)
+    p = Path(path_arg).expanduser()
+    if p.is_dir():
+        return str(p / default_filename)
+    return str(p)
+
+
+def _write_export_jsonl(records: List[Dict[str, Any]], path: str) -> int:
+    """Write a list of dicts as JSON Lines. Returns the number of records written."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+    return len(records)
+
+
+# ---------------------------------------------------------------------------
 # File-drop / local attachment detection — extracted as pure helpers for tests.
 # ---------------------------------------------------------------------------
 
@@ -5258,7 +5287,93 @@ class HermesCLI:
             print("       DISCORD_BOT_TOKEN=your_token")
             print(f"    2. Or configure settings in {display_hermes_home()}/config.yaml")
             print()
-    
+
+    def _handle_export_command(self, command: str):
+        """Handle /export — export session data to JSONL or a full data archive.
+
+        Syntax:
+            /export                    — export current session to deepagent_session_<id>.jsonl
+            /export session [path]     — export current session to JSONL
+            /export all [path]         — export all sessions to a single JSONL
+            /export data [path]        — export full data archive (config, sessions, memories) as tar.gz
+        """
+        parts = command.split(maxsplit=2)
+        sub = parts[1].lower() if len(parts) > 1 else "session"
+        path_arg = parts[2].strip() if len(parts) > 2 else ""
+
+        if sub not in ("session", "all", "data"):
+            print(f"  Unknown subcommand: '{sub}'")
+            print("  Usage: /export [session|all|data] [path]")
+            return
+
+        if self._session_db is None:
+            try:
+                from hermes_state import SessionDB
+                self._session_db = SessionDB()
+            except Exception as e:
+                print(f"  Export failed: session database unavailable ({e})")
+                return
+
+        if sub == "session":
+            session_id = self.session_id
+            record = self._session_db.export_session(session_id)
+            if not record:
+                print("  No session data to export.")
+                return
+            default_name = f"deepagent_session_{session_id}.jsonl"
+            out = _resolve_export_path(path_arg, default_name)
+            _write_export_jsonl([record], out)
+            n_msgs = len(record.get("messages") or [])
+            print(f"  Exported session {session_id} ({n_msgs} messages) → {out}")
+        elif sub == "all":
+            records = self._session_db.export_all()
+            if not records:
+                print("  No session data to export.")
+                return
+            default_name = f"deepagent_sessions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
+            out = _resolve_export_path(path_arg, default_name)
+            _write_export_jsonl(records, out)
+            print(f"  Exported {len(records)} sessions → {out}")
+        else:  # data
+            default_name = f"deepagent_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.tar.gz"
+            out = _resolve_export_path(path_arg, default_name)
+            self._export_data_archive(out)
+
+    def _export_data_archive(self, out: str):
+        """Write a tar.gz archive of config.yaml, all sessions, and memories."""
+        import tarfile
+        import tempfile
+        from hermes_constants import get_hermes_home
+
+        home = Path(get_hermes_home())
+        target = Path(out)
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        sessions = self._session_db.export_all() if self._session_db else []
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".jsonl", delete=False
+        ) as tf:
+            for record in sessions:
+                tf.write(json.dumps(record) + "\n")
+            sessions_path = tf.name
+
+        try:
+            with tarfile.open(str(target), "w:gz") as tar:
+                tar.add(sessions_path, arcname="sessions.jsonl")
+                config_path = home / "config.yaml"
+                if config_path.exists():
+                    tar.add(str(config_path), arcname="config.yaml")
+                memories_dir = home / "memories"
+                if memories_dir.is_dir():
+                    for p in sorted(memories_dir.rglob("*")):
+                        if p.is_file():
+                            tar.add(str(p), arcname=p.relative_to(home).as_posix())
+        finally:
+            os.unlink(sessions_path)
+
+        print(f"  Exported data archive ({len(sessions)} sessions) → {out}")
+
     def process_command(self, command: str) -> bool:
         """
         Process a slash command.
@@ -5434,6 +5549,8 @@ class HermesCLI:
             self._handle_branch_command(cmd_original)
         elif canonical == "save":
             self.save_conversation()
+        elif canonical == "export":
+            self._handle_export_command(cmd_original)
         elif canonical == "cron":
             self._handle_cron_command(cmd_original)
         elif canonical == "skills":
