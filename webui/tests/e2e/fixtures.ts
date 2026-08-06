@@ -97,6 +97,7 @@ export async function mockHermesApi(page: Page, options: MockHermesApiOptions = 
   let activeProfileName = options.initialProfileName ?? 'research'
   let cookieSessionAuthenticated = false
   const consumedTickets = new Set<string>()
+  const registeredUsers = new Set(['playwright'])
 
   await page.route('**/*', async (route: Route) => {
     const request = route.request()
@@ -116,7 +117,42 @@ export async function mockHermesApi(page: Page, options: MockHermesApiOptions = 
     }
 
     if (pathname === '/api/auth/status') {
-      await route.fulfill(jsonResponse({ hasPasswordLogin: true, username: 'playwright' }))
+      await route.fulfill(jsonResponse({ hasPasswordLogin: true, username: 'playwright', registrationEnabled: true }))
+      return
+    }
+
+    if (pathname === '/api/auth/register') {
+      if (request.method() !== 'POST') {
+        await route.fulfill(jsonResponse({ error: 'Method not allowed' }, 405))
+        return
+      }
+      let body: { username?: unknown; password?: unknown }
+      try {
+        body = JSON.parse(request.postData() || '{}')
+      } catch {
+        await route.fulfill(jsonResponse({ error: 'Invalid JSON body' }, 400))
+        return
+      }
+      const username = String(body.username || '').trim()
+      const password = String(body.password || '')
+      if (username.length < 2) {
+        await route.fulfill(jsonResponse({ error: 'Username must be at least 2 characters' }, 400))
+        return
+      }
+      if (password.length < 6) {
+        await route.fulfill(jsonResponse({ error: 'Password must be at least 6 characters' }, 400))
+        return
+      }
+      if (registeredUsers.has(username)) {
+        await route.fulfill(jsonResponse({ error: 'Username already exists' }, 409))
+        return
+      }
+      registeredUsers.add(username)
+      cookieSessionAuthenticated = true
+      await route.fulfill({
+        ...jsonResponse({ user: { id: 1, username, role: 'admin' } }),
+        headers: { 'Set-Cookie': 'deepagent_session=playwright-cookie; Path=/; HttpOnly; SameSite=Strict' },
+      })
       return
     }
 
