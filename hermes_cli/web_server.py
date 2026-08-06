@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from hermes_cli import __version__, __release_date__
+from hermes_cli import __version__, __release_date__, web_users
 from hermes_cli.config import (
     DEFAULT_CONFIG,
     OPTIONAL_ENV_VARS,
@@ -96,6 +96,13 @@ _PUBLIC_API_PATHS: frozenset = frozenset({
     "/api/config/defaults",
     "/api/config/schema",
     "/api/model/info",
+    # Account / login endpoints — public so the first-run registration screen
+    # and the login form can reach them before any session exists.
+    "/api/auth/status",
+    "/api/auth/me",
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/logout",
 })
 
 
@@ -110,19 +117,118 @@ def _require_token(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _is_valid_token(auth_header: str) -> bool:
+    """Accept either the ephemeral session token or a live login token.
+
+    The ephemeral token (injected into the SPA at serve time) authenticates
+    the dashboard itself; login tokens issued by ``hermes_cli.web_users``
+    authenticate a signed-in user.  Either one grants access to protected
+    API routes.
+    """
+    if not auth_header:
+        return False
+    expected = f"Bearer {_SESSION_TOKEN}"
+    if hmac.compare_digest(auth_header.encode(), expected.encode()):
+        return True
+    prefix = "Bearer "
+    if auth_header.startswith(prefix):
+        return web_users.session_user(auth_header[len(prefix):].strip()) is not None
+    return False
+
+
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """Require the session token on all /api/ routes except the public list."""
+    """Require a valid token on all /api/ routes except the public list."""
     path = request.url.path
-    if path.startswith("/api/") and path not in _PUBLIC_API_PATHS:
-        auth = request.headers.get("authorization", "")
-        expected = f"Bearer {_SESSION_TOKEN}"
-        if not hmac.compare_digest(auth.encode(), expected.encode()):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Unauthorized"},
-            )
+    if (
+        path.startswith("/api/")
+        and path not in _PUBLIC_API_PATHS
+        and not _is_valid_token(request.headers.get("authorization", ""))
+    ):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Unauthorized"},
+        )
     return await call_next(request)
+
+
+# ---------------------------------------------------------------------------
+# Account / login endpoints — backed by hermes_cli.web_users
+# ---------------------------------------------------------------------------
+# These are public (no token required): they drive the first-run registration
+# screen and the login form before any dashboard session exists.  The handlers
+# stay thin — all account/session logic lives in ``web_users``.
+
+class LoginBody(BaseModel):
+    login: str
+    password: str
+
+
+class RegisterBody(BaseModel):
+    username: str
+    password: str
+    email: str = ""
+    phone: str = ""
+
+
+def _bearer_token(request: Request) -> Optional[str]:
+    """Return the raw bearer token from a request, or None."""
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):].strip()
+        return token or None
+    return None
+
+
+@app.get("/api/auth/status")
+async def auth_status():
+    """Whether an account exists yet — drives first-run setup in the UI."""
+    return {"has_users": web_users.has_users()}
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """Current signed-in user, or an unauthenticated marker (always 200)."""
+    username = web_users.session_user(_bearer_token(request))
+    if username is None:
+        return {"authenticated": False, "user": None}
+    return {"authenticated": True, "user": {"username": username}}
+
+
+@app.post("/api/auth/login")
+async def auth_login(body: LoginBody):
+    """Authenticate by username / email / phone; returns a session token."""
+    token = web_users.login(body.login, body.password)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"ok": True, "token": token, "user": {"username": web_users.session_user(token)}}
+
+
+@app.post("/api/auth/register")
+async def auth_register(body: RegisterBody):
+    """Create the first account (only when none exists yet)."""
+    username = body.username.strip()
+    if len(username) < web_users.USERNAME_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Username must be at least {web_users.USERNAME_MIN_LENGTH} characters",
+        )
+    if len(body.password) < web_users.PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {web_users.PASSWORD_MIN_LENGTH} characters",
+        )
+    token = web_users.register(username, body.password, body.email, body.phone)
+    if token is None:
+        raise HTTPException(status_code=403, detail="An account already exists")
+    return {"ok": True, "token": token, "user": {"username": username}}
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request):
+    """Invalidate the presented login token (no-op when absent)."""
+    web_users.logout(_bearer_token(request))
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
