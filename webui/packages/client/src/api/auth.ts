@@ -3,6 +3,7 @@ import { request } from './client'
 export interface AuthStatus {
   hasPasswordLogin: boolean
   hasUsers?: boolean
+  registrationEnabled?: boolean
 }
 
 export async function fetchAuthStatus(): Promise<AuthStatus> {
@@ -29,6 +30,22 @@ export async function loginWithPassword(username: string, password: string): Pro
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
     const err: any = new Error(data.error || 'Login failed')
+    err.status = res.status
+    throw err
+  }
+  return res.json()
+}
+
+export async function registerAccount(username: string, password: string): Promise<AuthenticatedSession> {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ username, password }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    const err: any = new Error(data.error || 'Registration failed')
     err.status = res.status
     throw err
   }

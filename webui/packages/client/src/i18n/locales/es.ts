@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Token',
     usernamePlaceholder: 'Nombre de usuario',
     passwordPlaceholder: 'Contrasena',
+    createAccount: 'Crear cuenta',
     credentialsRequired: 'Por favor, introduzca nombre de usuario y contrasena',
     invalidCredentials: 'Nombre de usuario o contrasena incorrectos',
     tooManyAttempts: 'Demasiados intentos fallidos, por favor intente mas tarde',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: 'La cuenta actual aun usa el nombre de usuario o la contrasena predeterminados. Para evitar accesos no autorizados, cambia cuanto antes el nombre de usuario y la contrasena de la cuenta actual.',
     defaultCredentialAction: 'Cambiar ahora',
     defaultCredentialLater: 'Recordar mas tarde',
+  },
+
+  register: {
+    title: 'Crear cuenta',
+    description: 'Crea una cuenta para empezar.',
+    credentialsRequired: 'Introduce usuario, contrasena y confirmacion',
+    passwordMismatch: 'Las contrasenas no coinciden',
+    failed: 'Error al registrar',
+    confirmPasswordPlaceholder: 'Confirmar contrasena',
+    submit: 'Crear cuenta',
+    backToLogin: 'Volver al inicio de sesion',
   },
 
   users: {

@@ -9,6 +9,7 @@ authPublicRoutes.post('/api/auth/login', ctrl.login)
 authPublicRoutes.post('/api/auth/ticket', ctrl.loginWithTicket)
 authPublicRoutes.post('/api/auth/logout', ctrl.logout)
 authPublicRoutes.post('/api/auth/mcu-login', ctrl.microcontrollerLogin)
+authPublicRoutes.post('/api/auth/register', ctrl.register)
 
 // Protected routes (auth required)
 export const authProtectedRoutes = new Router()

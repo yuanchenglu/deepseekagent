@@ -14,6 +14,7 @@ const password = ref("");
 const loading = ref(false);
 const errorMsg = ref("");
 const showLockResetHint = ref(false);
+const registrationEnabled = ref(false);
 
 onMounted(async () => {
   const rawTicket = Array.isArray(route.query.ticket) ? route.query.ticket[0] : route.query.ticket;
@@ -47,7 +48,8 @@ onMounted(async () => {
   }
 
   try {
-    await fetchAuthStatus();
+    const status = await fetchAuthStatus();
+    registrationEnabled.value = status.registrationEnabled === true;
   } catch {
     // Login remains available; the submit request will surface connection errors.
   }
@@ -58,6 +60,7 @@ async function handleLogin() {
 }
 
 async function handlePasswordLogin() {
+  if (loading.value) return;
   if (!username.value.trim() || !password.value) {
     errorMsg.value = t("login.credentialsRequired");
     return;
@@ -105,7 +108,6 @@ async function handlePasswordLogin() {
           type="password"
           class="login-input"
           :placeholder="t('login.passwordPlaceholder')"
-          @keyup.enter="handleLogin"
         />
 
         <div v-if="errorMsg" class="login-error">{{ errorMsg }}</div>
@@ -117,6 +119,9 @@ async function handlePasswordLogin() {
           {{ loading ? "..." : t("login.submit") }}
         </button>
       </form>
+      <div v-if="registrationEnabled" class="login-register">
+        <RouterLink to="/register" class="login-register-link">{{ t("login.createAccount") }}</RouterLink>
+      </div>
     </div>
   </div>
 </template>
@@ -236,6 +241,20 @@ async function handlePasswordLogin() {
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+}
+
+.login-register {
+  margin-top: 18px;
+  font-size: 13px;
+}
+
+.login-register-link {
+  color: $accent-primary;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
   }
 }
 </style>

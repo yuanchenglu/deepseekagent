@@ -19,6 +19,7 @@ import { homedir } from 'os'
  * Auth:
  * - AUTH_TOKEN: Explicit bearer token. If unset, Web UI stores an auto-generated token under HERMES_WEB_UI_HOME.
  * - HERMES_WEB_UI_AUTH_JWT_EXPIRES_IN: Username/password session JWT lifetime. Supports seconds or s/m/h/d suffixes. Default: 30d.
+ * - HERMES_WEB_UI_ALLOW_REGISTRATION: Enable self-service account registration on the login page. Values: 1/true/on/yes. Default: disabled.
  *
  * Runtime behavior:
  * - PROFILE: Initial Hermes profile name. Default: default.

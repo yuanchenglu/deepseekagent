@@ -12,6 +12,7 @@ export default {
     tokenLogin: '權杖登入',
     usernamePlaceholder: '使用者名稱',
     passwordPlaceholder: '密碼',
+    createAccount: '建立帳號',
     credentialsRequired: '請輸入使用者名稱和密碼',
     invalidCredentials: '使用者名稱或密碼錯誤',
     tooManyAttempts: '登入失敗次數過多，請稍後再試',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: '目前登入帳號仍在使用預設使用者名稱或預設密碼。為避免未授權存取，請盡快進入目前帳號修改使用者名稱和密碼。',
     defaultCredentialAction: '去修改',
     defaultCredentialLater: '稍後提醒',
+  },
+
+  register: {
+    title: '建立帳號',
+    description: '建立帳號以開始使用。',
+    credentialsRequired: '請輸入使用者名稱、密碼和確認密碼',
+    passwordMismatch: '兩次輸入的密碼不一致',
+    failed: '註冊失敗',
+    confirmPasswordPlaceholder: '確認密碼',
+    submit: '建立帳號',
+    backToLogin: '返回登入',
   },
 
   users: {

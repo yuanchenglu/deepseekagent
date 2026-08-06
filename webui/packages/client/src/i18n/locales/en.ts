@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Token',
     usernamePlaceholder: 'Username',
     passwordPlaceholder: 'Password',
+    createAccount: 'Create account',
     credentialsRequired: 'Please enter username and password',
     invalidCredentials: 'Invalid username or password',
     tooManyAttempts: 'Too many failed attempts, please try again later',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: 'This account is still using the default username or password. To prevent unauthorized access, update the username and password as soon as possible.',
     defaultCredentialAction: 'Update now',
     defaultCredentialLater: 'Remind me later',
+  },
+
+  register: {
+    title: 'Create Account',
+    description: 'Create an account to get started.',
+    credentialsRequired: 'Please enter username, password and confirmation',
+    passwordMismatch: 'Passwords do not match',
+    failed: 'Registration failed',
+    confirmPasswordPlaceholder: 'Confirm Password',
+    submit: 'Create Account',
+    backToLogin: 'Back to login',
   },
 
   users: {

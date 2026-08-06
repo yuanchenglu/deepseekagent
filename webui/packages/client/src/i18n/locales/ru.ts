@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Вход по токену',
     usernamePlaceholder: 'Имя пользователя',
     passwordPlaceholder: 'Пароль',
+    createAccount: 'Создать аккаунт',
     credentialsRequired: 'Введите имя пользователя и пароль',
     invalidCredentials: 'Неверное имя пользователя или пароль',
     tooManyAttempts: 'Слишком много неудачных попыток входа, повторите попытку позже',
@@ -41,6 +42,17 @@ export default {
     defaultCredentialMessage: 'Текущая учётная запись всё ещё использует имя пользователя или пароль по умолчанию. Во избежание несанкционированного доступа, как можно скорее измените имя пользователя и пароль для этой учётной записи.',
     defaultCredentialAction: 'Изменить',
     defaultCredentialLater: 'Напомнить позже',
+  },
+
+  register: {
+    title: 'Создать аккаунт',
+    description: 'Создайте аккаунт, чтобы начать.',
+    credentialsRequired: 'Введите имя пользователя, пароль и подтверждение',
+    passwordMismatch: 'Пароли не совпадают',
+    failed: 'Ошибка регистрации',
+    confirmPasswordPlaceholder: 'Подтвердите пароль',
+    submit: 'Создать аккаунт',
+    backToLogin: 'Вернуться ко входу',
   },
 
   users: {
