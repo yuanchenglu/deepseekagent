@@ -12,6 +12,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$WEBSITE_DIR"
+python3 "$WEBSITE_DIR/scripts/extract-skills.py"
 npm ci --ignore-scripts
 npm run typecheck
 npm run test:functions
