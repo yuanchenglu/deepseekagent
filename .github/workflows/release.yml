@@ -368,8 +368,8 @@ jobs:
         run: |
           cd website
           npx wrangler pages deploy build \
-            --project-name=deepagent-website \
-            --branch=main
+            --project-name=deepagent-landing \
+            --branch=production
 
       - name: Verify deployment
         run: |
@@ -377,8 +377,8 @@ jobs:
           sleep 5
           # 获取最新部署 URL
           PAGES_URL=$(npx wrangler pages deployment list \
-            --project-name=deepagent-website 2>/dev/null | \
-            grep -oE 'https://[a-f0-9]+\.deepagent-website\.pages\.dev' | head -1)
+            --project-name=deepagent-landing 2>/dev/null | \
+            grep -oE 'https://[a-f0-9]+\.deepagent-landing\.pages\.dev' | head -1)
 
           if [ -z "$PAGES_URL" ]; then
             echo "Could not determine Pages URL" >&2
