@@ -12,6 +12,7 @@ export default {
     tokenLogin: '令牌登录',
     usernamePlaceholder: '用户名',
     passwordPlaceholder: '密码',
+    createAccount: '创建账号',
     credentialsRequired: '请输入用户名和密码',
     invalidCredentials: '用户名或密码错误',
     tooManyAttempts: '登录失败次数过多，请稍后重试',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: '当前登录账户仍在使用默认用户名或默认密码。为了避免未授权访问，请尽快进入当前账户修改用户名和密码。',
     defaultCredentialAction: '去修改',
     defaultCredentialLater: '稍后提醒',
+  },
+
+  register: {
+    title: '创建账号',
+    description: '创建账号以开始使用。',
+    credentialsRequired: '请输入用户名、密码和确认密码',
+    passwordMismatch: '两次输入的密码不一致',
+    failed: '注册失败',
+    confirmPasswordPlaceholder: '确认密码',
+    submit: '创建账号',
+    backToLogin: '返回登录',
   },
 
   users: {

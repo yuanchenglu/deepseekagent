@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 
 const mockReplace = vi.hoisted(() => vi.fn())
 const mockFetchAuthStatus = vi.hoisted(() => vi.fn())
@@ -99,5 +99,53 @@ describe('LoginView password login', () => {
     expect(commands).toEqual([
       'deepagent webui stop && deepagent webui start',
     ])
+  })
+
+  it('does not fire duplicate login requests while one is in flight', async () => {
+    let resolveLogin: (value: unknown) => void = () => {}
+    mockLoginWithPassword.mockReturnValue(new Promise((resolve) => {
+      resolveLogin = resolve
+    }))
+    const wrapper = mount(LoginView)
+
+    const inputs = wrapper.findAll('input.login-input')
+    await inputs[0].setValue('admin')
+    await inputs[1].setValue('123456')
+    await wrapper.find('form.login-form').trigger('submit')
+    await wrapper.find('form.login-form').trigger('submit')
+
+    expect(mockLoginWithPassword).toHaveBeenCalledTimes(1)
+
+    resolveLogin({ user: { id: 1, username: 'admin', role: 'super_admin' } })
+    await flushPromises()
+    expect(mockMarkCookieSession).toHaveBeenCalledTimes(1)
+    expect(mockReplace).toHaveBeenCalledWith('/hermes/chat')
+  })
+
+  it('shows a create account link when registration is enabled', async () => {
+    mockFetchAuthStatus.mockResolvedValue({ hasPasswordLogin: true, username: 'admin', registrationEnabled: true })
+    const wrapper = mount(LoginView, {
+      global: {
+        stubs: {
+          RouterLink: { template: '<a class="login-register-link"><slot /></a>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.login-register-link').exists()).toBe(true)
+  })
+
+  it('does not show a create account link when registration is disabled', async () => {
+    const wrapper = mount(LoginView, {
+      global: {
+        stubs: {
+          RouterLink: { template: '<a class="login-register-link"><slot /></a>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('.login-register-link').exists()).toBe(false)
   })
 })

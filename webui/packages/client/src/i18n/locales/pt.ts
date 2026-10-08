@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Token',
     usernamePlaceholder: 'Nome de usuario',
     passwordPlaceholder: 'Senha',
+    createAccount: 'Criar conta',
     credentialsRequired: 'Por favor, insira nome de usuario e senha',
     invalidCredentials: 'Nome de usuario ou senha incorretos',
     tooManyAttempts: 'Muitas tentativas falhadas, por favor tente novamente mais tarde',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: 'A conta atual ainda usa o nome de usuario ou a senha padrao. Para evitar acesso nao autorizado, altere o nome de usuario e a senha da conta atual o quanto antes.',
     defaultCredentialAction: 'Alterar agora',
     defaultCredentialLater: 'Lembrar depois',
+  },
+
+  register: {
+    title: 'Criar conta',
+    description: 'Crie uma conta para começar.',
+    credentialsRequired: 'Digite usuario, senha e confirmacao',
+    passwordMismatch: 'As senhas nao coincidem',
+    failed: 'Falha no registro',
+    confirmPasswordPlaceholder: 'Confirmar senha',
+    submit: 'Criar conta',
+    backToLogin: 'Voltar ao login',
   },
 
   users: {

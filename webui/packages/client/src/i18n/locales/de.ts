@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Token',
     usernamePlaceholder: 'Benutzername',
     passwordPlaceholder: 'Passwort',
+    createAccount: 'Konto erstellen',
     credentialsRequired: 'Bitte Benutzername und Passwort eingeben',
     invalidCredentials: 'Ungultiger Benutzername oder Passwort',
     tooManyAttempts: 'Zu viele fehlgeschlagene Versuche, bitte versuchen Sie es spater erneut',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: 'Das aktuelle Konto verwendet noch den Standard-Benutzernamen oder das Standard-Passwort. Um unbefugten Zugriff zu vermeiden, andern Sie Benutzername und Passwort des aktuellen Kontos so bald wie moglich.',
     defaultCredentialAction: 'Jetzt andern',
     defaultCredentialLater: 'Spater erinnern',
+  },
+
+  register: {
+    title: 'Konto erstellen',
+    description: 'Erstellen Sie ein Konto, um zu starten.',
+    credentialsRequired: 'Benutzername, Passwort und Bestätigung eingeben',
+    passwordMismatch: 'Passwörter stimmen nicht überein',
+    failed: 'Registrierung fehlgeschlagen',
+    confirmPasswordPlaceholder: 'Passwort bestätigen',
+    submit: 'Konto erstellen',
+    backToLogin: 'Zurück zum Login',
   },
 
   users: {

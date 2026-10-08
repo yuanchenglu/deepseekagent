@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'トークン',
     usernamePlaceholder: 'ユーザー名',
     passwordPlaceholder: 'パスワード',
+    createAccount: 'アカウント作成',
     credentialsRequired: 'ユーザー名とパスワードを入力してください',
     invalidCredentials: 'ユーザー名またはパスワードが正しくありません',
     tooManyAttempts: 'ログイン試行回数が多すぎます。しばらくしてからお試しください',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: '現在のログインアカウントは、既定のユーザー名または既定のパスワードをまだ使用しています。不正アクセスを防ぐため、できるだけ早く現在のアカウントでユーザー名とパスワードを変更してください。',
     defaultCredentialAction: '変更する',
     defaultCredentialLater: '後で通知',
+  },
+
+  register: {
+    title: 'アカウント作成',
+    description: 'アカウントを作成して開始します。',
+    credentialsRequired: 'ユーザー名、パスワード、確認用パスワードを入力してください',
+    passwordMismatch: 'パスワードが一致しません',
+    failed: '登録に失敗しました',
+    confirmPasswordPlaceholder: '確認用パスワード',
+    submit: 'アカウント作成',
+    backToLogin: 'ログインに戻る',
   },
 
   users: {

@@ -12,6 +12,7 @@ export default {
     tokenLogin: '토큰',
     usernamePlaceholder: '사용자 이름',
     passwordPlaceholder: '비밀번호',
+    createAccount: '계정 만들기',
     credentialsRequired: '사용자 이름과 비밀번호를 입력해 주세요',
     invalidCredentials: '사용자 이름 또는 비밀번호가 올바르지 않습니다',
     tooManyAttempts: '로그인 시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: '현재 로그인 계정이 아직 기본 사용자 이름 또는 기본 비밀번호를 사용하고 있습니다. 무단 접근을 방지하려면 현재 계정에서 사용자 이름과 비밀번호를 가능한 한 빨리 변경하세요.',
     defaultCredentialAction: '변경하기',
     defaultCredentialLater: '나중에 알림',
+  },
+
+  register: {
+    title: '계정 만들기',
+    description: '계정을 만들어 시작하세요.',
+    credentialsRequired: '사용자 이름, 비밀번호, 확인을 입력하세요',
+    passwordMismatch: '비밀번호가 일치하지 않습니다',
+    failed: '등록에 실패했습니다',
+    confirmPasswordPlaceholder: '비밀번호 확인',
+    submit: '계정 만들기',
+    backToLogin: '로그인으로 돌아가기',
   },
 
   users: {

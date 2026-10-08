@@ -31,6 +31,17 @@ import { listProfileNamesFromDisk } from '../services/hermes/hermes-profile'
 import { startOutboundRelayClient, stopOutboundRelayClient } from '../services/global-agent/outbound-relay-client'
 
 /**
+ * Whether self-service account registration is enabled.
+ *
+ * Controlled by HERMES_WEB_UI_ALLOW_REGISTRATION. Values 1/true/on/yes enable
+ * the POST /api/auth/register endpoint and the matching UI entry point.
+ */
+export function isRegistrationEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const value = env.HERMES_WEB_UI_ALLOW_REGISTRATION?.trim().toLowerCase()
+  return value === '1' || value === 'true' || value === 'on' || value === 'yes'
+}
+
+/**
  * GET /api/auth/status
  * Check if username/password login is configured (public).
  */
@@ -38,6 +49,66 @@ export async function authStatus(ctx: Context) {
   ctx.body = {
     hasPasswordLogin: true,
     hasUsers: countUsers() > 0,
+    registrationEnabled: isRegistrationEnabled(),
+  }
+}
+
+/**
+ * POST /api/auth/register
+ * Self-service account registration (public, gated by
+ * HERMES_WEB_UI_ALLOW_REGISTRATION). Registers a new 'admin' account bound to
+ * the default profile and signs it in with an HttpOnly session cookie.
+ */
+export async function register(ctx: Context) {
+  if (!isRegistrationEnabled()) {
+    ctx.status = 403
+    ctx.body = { error: 'Self-service registration is disabled' }
+    return
+  }
+
+  const { username, password } = ctx.request.body as { username?: string; password?: string }
+  const cleanUsername = String(username || '').trim()
+  const cleanPassword = String(password || '')
+
+  if (cleanUsername.length < 2) {
+    ctx.status = 400
+    ctx.body = { error: 'Username must be at least 2 characters' }
+    return
+  }
+  if (cleanPassword.length < 6) {
+    ctx.status = 400
+    ctx.body = { error: 'Password must be at least 6 characters' }
+    return
+  }
+  if (findUserByUsername(cleanUsername)) {
+    ctx.status = 409
+    ctx.body = { error: 'Username already exists' }
+    return
+  }
+
+  const user = createUser({
+    username: cleanUsername,
+    password: cleanPassword,
+    role: 'admin',
+    status: 'active',
+    profiles: ['default'],
+    defaultProfile: 'default',
+  })
+  if (!user) {
+    ctx.status = 500
+    ctx.body = { error: 'Failed to create user' }
+    return
+  }
+
+  const token = await issueUserJwt(user)
+  setUserSessionCookie(ctx, token)
+  ctx.status = 201
+  ctx.body = {
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    },
   }
 }
 

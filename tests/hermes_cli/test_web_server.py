@@ -309,6 +309,185 @@ class TestWebServerEndpoints:
 
 
 # ---------------------------------------------------------------------------
+# Account / login endpoints (backed by hermes_cli.web_users)
+# ---------------------------------------------------------------------------
+
+
+class TestAuthEndpoints:
+    """End-to-end tests of the /api/auth/* handlers through the quick interface.
+
+    Sessions are process-global in ``web_users``; the on-disk account store
+    lives under HERMES_HOME (redirected to a temp dir by conftest).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup_client(self):
+        from hermes_cli import web_users
+        from hermes_cli.web_server import app
+
+        web_users.clear_sessions()
+        try:
+            from starlette.testclient import TestClient
+        except ImportError:
+            pytest.skip("fastapi/starlette not installed")
+        self.client = TestClient(app)
+        yield
+        web_users.clear_sessions()
+
+    def test_status_false_when_no_users(self):
+        resp = self.client.get("/api/auth/status")
+        assert resp.status_code == 200
+        assert resp.json() == {"has_users": False}
+
+    def test_status_true_after_register(self):
+        self.client.post("/api/auth/register", json={"username": "admin", "password": "secret123"})
+        resp = self.client.get("/api/auth/status")
+        assert resp.json() == {"has_users": True}
+
+    def test_me_unauthenticated(self):
+        resp = self.client.get("/api/auth/me")
+        assert resp.status_code == 200
+        assert resp.json() == {"authenticated": False, "user": None}
+
+    def test_me_with_login_token(self):
+        token = self.client.post(
+            "/api/auth/register", json={"username": "admin", "password": "secret123"}
+        ).json()["token"]
+        resp = self.client.get(
+            "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"authenticated": True, "user": {"username": "admin"}}
+
+    def test_me_with_ephemeral_session_token(self):
+        from hermes_cli.web_server import _SESSION_TOKEN
+
+        resp = self.client.get(
+            "/api/auth/me", headers={"Authorization": f"Bearer {_SESSION_TOKEN}"}
+        )
+        assert resp.json() == {"authenticated": False, "user": None}
+
+    def test_register_creates_first_account_and_session(self):
+        resp = self.client.post(
+            "/api/auth/register",
+            json={"username": "admin", "password": "secret123", "email": "a@b.co"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["token"]
+        assert data["user"] == {"username": "admin"}
+
+    def test_register_strips_username_whitespace(self):
+        resp = self.client.post(
+            "/api/auth/register", json={"username": "  admin  ", "password": "secret123"}
+        )
+        assert resp.status_code == 200
+        assert resp.json()["user"]["username"] == "admin"
+
+    def test_register_short_username_returns_400(self):
+        resp = self.client.post(
+            "/api/auth/register", json={"username": "a", "password": "secret123"}
+        )
+        assert resp.status_code == 400
+
+    def test_register_short_password_returns_400(self):
+        resp = self.client.post(
+            "/api/auth/register", json={"username": "admin", "password": "short"}
+        )
+        assert resp.status_code == 400
+
+    def test_register_second_account_returns_403(self):
+        self.client.post("/api/auth/register", json={"username": "admin", "password": "secret123"})
+        resp = self.client.post(
+            "/api/auth/register", json={"username": "other", "password": "secret123"}
+        )
+        assert resp.status_code == 403
+
+    def test_login_with_username(self):
+        self.client.post("/api/auth/register", json={"username": "admin", "password": "secret123"})
+        resp = self.client.post(
+            "/api/auth/login", json={"login": "admin", "password": "secret123"}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["token"]
+        assert data["user"] == {"username": "admin"}
+
+    def test_login_with_email(self):
+        self.client.post(
+            "/api/auth/register",
+            json={"username": "admin", "password": "secret123", "email": "admin@example.com"},
+        )
+        resp = self.client.post(
+            "/api/auth/login", json={"login": "admin@example.com", "password": "secret123"}
+        )
+        assert resp.status_code == 200
+
+    def test_login_wrong_password_returns_401(self):
+        self.client.post("/api/auth/register", json={"username": "admin", "password": "secret123"})
+        resp = self.client.post(
+            "/api/auth/login", json={"login": "admin", "password": "wrong"}
+        )
+        assert resp.status_code == 401
+
+    def test_login_unknown_user_returns_401(self):
+        resp = self.client.post(
+            "/api/auth/login", json={"login": "ghost", "password": "secret123"}
+        )
+        assert resp.status_code == 401
+
+    def test_logout_invalidates_token(self):
+        token = self.client.post(
+            "/api/auth/register", json={"username": "admin", "password": "secret123"}
+        ).json()["token"]
+        resp = self.client.post(
+            "/api/auth/logout", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True}
+        # The token is now dead — protected endpoints reject it.
+        resp = self.client.get(
+            "/api/config", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 401
+
+    def test_protected_api_accepts_login_token(self):
+        token = self.client.post(
+            "/api/auth/register", json={"username": "admin", "password": "secret123"}
+        ).json()["token"]
+        resp = self.client.get(
+            "/api/config", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200
+
+    def test_protected_api_rejects_garbage_login_token(self):
+        resp = self.client.get(
+            "/api/config", headers={"Authorization": "Bearer not-a-real-token"}
+        )
+        assert resp.status_code == 401
+
+    def test_public_auth_endpoints_need_no_token(self):
+        """None of the auth endpoints are gated by the middleware."""
+        # login with bad creds returns the endpoint's own 401 (not "Unauthorized").
+        resp = self.client.post("/api/auth/login", json={"login": "x", "password": "y"})
+        assert resp.status_code == 401
+        assert resp.json().get("detail") == "Invalid credentials"
+
+        resp = self.client.get("/api/auth/status")
+        assert resp.status_code == 200
+
+        resp = self.client.get("/api/auth/me")
+        assert resp.status_code == 200
+
+        resp = self.client.post(
+            "/api/auth/register", json={"username": "admin", "password": "secret123"}
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # _build_schema_from_config tests
 # ---------------------------------------------------------------------------
 

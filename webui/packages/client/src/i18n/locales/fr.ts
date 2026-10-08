@@ -12,6 +12,7 @@ export default {
     tokenLogin: 'Jeton',
     usernamePlaceholder: 'Nom d\'utilisateur',
     passwordPlaceholder: 'Mot de passe',
+    createAccount: 'Créer un compte',
     credentialsRequired: 'Veuillez entrer le nom d\'utilisateur et le mot de passe',
     invalidCredentials: 'Nom d\'utilisateur ou mot de passe incorrect',
     tooManyAttempts: 'Trop de tentatives echouees, veuillez reessayer plus tard',
@@ -42,6 +43,17 @@ export default {
     defaultCredentialMessage: 'Le compte connecte utilise encore le nom d utilisateur ou le mot de passe par defaut. Pour eviter tout acces non autorise, modifiez rapidement le nom d utilisateur et le mot de passe du compte actuel.',
     defaultCredentialAction: 'Modifier maintenant',
     defaultCredentialLater: 'Me le rappeler plus tard',
+  },
+
+  register: {
+    title: 'Créer un compte',
+    description: 'Créez un compte pour commencer.',
+    credentialsRequired: 'Saisissez un nom d\'utilisateur, un mot de passe et sa confirmation',
+    passwordMismatch: 'Les mots de passe ne correspondent pas',
+    failed: 'Échec de l\'inscription',
+    confirmPasswordPlaceholder: 'Confirmer le mot de passe',
+    submit: 'Créer un compte',
+    backToLogin: 'Retour à la connexion',
   },
 
   users: {
